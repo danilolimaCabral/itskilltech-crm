@@ -59,6 +59,8 @@ export default function CRM() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [enriching, setEnriching] = useState<string | null>(null);
+  const [enrichingAll, setEnrichingAll] = useState(false);
+  const [enrichProgress, setEnrichProgress] = useState({ done: 0, total: 0 });
   // Call modal
   const [callModal, setCallModal] = useState<Lead | null>(null);
   const [callResult, setCallResult] = useState('');
@@ -257,7 +259,32 @@ export default function CRM() {
             <>
               <div className="page-header">
                 <div><div className="page-title">Leads</div><div className="page-description">{ws?.name} · {leads.length} contato(s)</div></div>
-                <div className="page-actions"><button className="btn btn-primary" onClick={() => { setEditing(null); setModalOpen(true); }}><Icon d={ICONS.plus} />Novo lead</button></div>
+                <div className="page-actions">
+                  <button className="btn" style={{background:'#f59e0b',color:'#fff',border:'none',marginRight:8,fontSize:12,padding:'6px 12px',borderRadius:6,cursor:'pointer',opacity:enrichingAll?0.6:1}} disabled={enrichingAll} onClick={async () => {
+                    const toEnrich = leads.filter(l => !l.phone && l.company);
+                    if (!toEnrich.length) { showToast('Todos os leads já têm telefone!'); return; }
+                    setEnrichingAll(true);
+                    setEnrichProgress({ done: 0, total: toEnrich.length });
+                    for (let i = 0; i < toEnrich.length; i++) {
+                      const lead = toEnrich[i];
+                      try {
+                        const r = await fetch('/api/enrich', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company: lead.company, leadId: lead.id }) });
+                        const data = await r.json();
+                        if (data.phone) {
+                          await fetch('/api/leads', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: lead.id, phone: data.phone, whatsapp: data.phone }) });
+                          setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, phone: data.phone, whatsapp: data.phone } : l));
+                        }
+                      } catch {}
+                      setEnrichProgress({ done: i + 1, total: toEnrich.length });
+                      await new Promise(res => setTimeout(res, 400));
+                    }
+                    setEnrichingAll(false);
+                    showToast('Enriquecimento concluído!');
+                  }}>
+                    {enrichingAll ? `⚙ Enriquecendo... ${enrichProgress.done}/${enrichProgress.total}` : '⚙ Enriquecer todos'}
+                  </button>
+                  <button className="btn btn-primary" onClick={() => { setEditing(null); setModalOpen(true); }}><Icon d={ICONS.plus} />Novo lead</button>
+                </div>
               </div>
               <div className="stats">
                 <div className="stat"><div className="stat-label"><span className="stat-dot" style={{ background: '#475467' }} />Total</div><div className="stat-value">{stats.total}</div></div>
@@ -300,10 +327,14 @@ export default function CRM() {
                           <Icon d={ICONS.email} />
                         </button>
                         {/* WhatsApp */}
-                        <button className="ch-icon whatsapp-btn" disabled={!lead.whatsapp && !lead.phone} title={lead.whatsapp || lead.phone ? `WhatsApp: ${lead.whatsapp || lead.phone}` : 'Sem número'} onClick={() => {
+                        <button className="ch-icon whatsapp-btn" title={lead.whatsapp || lead.phone ? `WhatsApp: ${lead.whatsapp || lead.phone}` : 'Abrir WhatsApp (sem número)'} onClick={() => {
                           const num = cleanPhone(lead.whatsapp || lead.phone || '');
-                          const msg = encodeURIComponent(`Olá ${lead.name.split(' ')[0]}, tudo bem? Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e gostaria de apresentar uma solução de TMS que pode otimizar sua operação logística. Posso te mostrar em 15 minutos?`);
-                          window.open(`https://wa.me/${num}?text=${msg}`, '_blank');
+                          const msg = encodeURIComponent(`Olá ${lead.name.split(' ')[0]}, tudo bem?\n\nMeu nome é Danilo, da ITskillTech. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar a operação logística de vocês.\n\nPosso te mostrar em 15 minutos como estamos ajudando empresas do mesmo segmento?\n\nQualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
+                          if (num) {
+                            window.open(`https://wa.me/${num}?text=${msg}`, '_blank');
+                          } else {
+                            window.open(`https://web.whatsapp.com/send?text=${msg}`, '_blank');
+                          }
                         }}><Icon d={ICONS.whatsapp} /></button>
                       </div></td>
                     </tr>

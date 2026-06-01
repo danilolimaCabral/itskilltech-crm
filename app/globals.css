@@ -126,8 +126,8 @@ table.data tbody tr:hover { background: var(--surface-hover); }
 .ch-icon:hover { background: var(--surface-2); color: var(--text); }
 .ch-icon svg { width: 12px; height: 12px; }
 .ch-icon:disabled { opacity: 0.35; cursor: not-allowed; }
-.ch-icon.whatsapp-btn:not(:disabled) { color: #25D366; border-color: #25D366; }
-.ch-icon.whatsapp-btn:not(:disabled):hover { background: #25D366; color: #fff; }
+.ch-icon.whatsapp-btn { color: #25D366; border-color: #25D366; }
+.ch-icon.whatsapp-btn:hover { background: #25D366; color: #fff; }
 .ch-icon.enrich-btn:not(:disabled) { color: #f59e0b; border-color: #f59e0b; }
 .ch-icon.enrich-btn:not(:disabled):hover { background: #f59e0b; color: #fff; }
 .ch-icon.phone-btn:not(:disabled) { color: #0066ff; border-color: #0066ff; }
