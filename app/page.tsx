@@ -679,6 +679,47 @@ function SearchView({ workspace, onImport, showToast }: any) {
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<any[]>([]);
   const [importPreview, setImportPreview] = useState<any[]>([]);
+  // CNPJ.já
+  const [cnpjaQuery, setCnpjaQuery] = useState('');
+  const [cnpjaMode, setCnpjaMode] = useState<'cnpj' | 'name'>('cnpj');
+  const [cnpjaLoading, setCnpjaLoading] = useState(false);
+  const [cnpjaResult, setCnpjaResult] = useState<any>(null);
+  const [cnpjaError, setCnpjaError] = useState('');
+
+  const searchCnpja = async () => {
+    if (!cnpjaQuery.trim()) return;
+    setCnpjaLoading(true); setCnpjaResult(null); setCnpjaError('');
+    try {
+      const param = cnpjaMode === 'cnpj' ? `cnpj=${encodeURIComponent(cnpjaQuery.replace(/\D/g,''))}` : `name=${encodeURIComponent(cnpjaQuery)}`;
+      const r = await fetch(`/api/cnpja?${param}`);
+      const j = await r.json();
+      if (!r.ok) { setCnpjaError(j.error || 'Erro na consulta'); }
+      else { setCnpjaResult(j); showToast('Dados encontrados!'); }
+    } catch { setCnpjaError('Erro de conexão'); }
+    setCnpjaLoading(false);
+  };
+
+  const importFromCnpja = (data: any) => {
+    const lead = {
+      name: data.alias || data.name || '',
+      company: data.name || data.alias || '',
+      role: data.members?.[0] ? `${data.members[0].role} — ${data.members[0].name}` : '',
+      email: data.email || '',
+      phone: data.phone || '',
+      whatsapp: data.phone ? data.phone.replace(/\D/g,'') : '',
+      notes: [
+        data.cnpj ? `CNPJ: ${data.cnpj}` : '',
+        data.cnae ? `CNAE: ${data.cnae}` : '',
+        data.street ? `Endereço: ${data.street}, ${data.district || ''}, ${data.city}/${data.state}` : '',
+        data.size ? `Porte: ${data.size}` : '',
+        data.founded ? `Fundada: ${data.founded}` : '',
+        data.members?.length ? `Sócios: ${data.members.map((m: any) => `${m.name} (${m.role})`).join(', ')}` : ''
+      ].filter(Boolean).join('\n'),
+      source: 'CNPJ.já'
+    };
+    onImport([lead]);
+    showToast('Lead importado!');
+  };
 
   const labels: any = {
     country: filters.country,
@@ -722,10 +763,94 @@ function SearchView({ workspace, onImport, showToast }: any) {
         <div><div className="page-title">Buscar Leads</div><div className="page-description">Prospecção e importação de contatos</div></div>
       </div>
       <div className="filter-group" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
+        <button className={`filter-tab${tab === 'cnpja' ? ' active' : ''}`} onClick={() => setTab('cnpja')} style={{ fontWeight: 700 }}>CNPJ.já</button>
         <button className={`filter-tab${tab === 'buscar' ? ' active' : ''}`} onClick={() => setTab('buscar')}>Buscar (API)</button>
         <button className={`filter-tab${tab === 'briefing' ? ' active' : ''}`} onClick={() => setTab('briefing')}>Briefing</button>
         <button className={`filter-tab${tab === 'importar' ? ' active' : ''}`} onClick={() => setTab('importar')}>Importar</button>
       </div>
+      {tab === 'cnpja' && (
+        <div className="table-wrap" style={{ padding: 16, marginBottom: 16 }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <button className={`filter-tab${cnpjaMode === 'cnpj' ? ' active' : ''}`} onClick={() => { setCnpjaMode('cnpj'); setCnpjaResult(null); setCnpjaError(''); }}>Por CNPJ</button>
+              <button className={`filter-tab${cnpjaMode === 'name' ? ' active' : ''}`} onClick={() => { setCnpjaMode('name'); setCnpjaResult(null); setCnpjaError(''); }}>Por Nome</button>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                className="field-input"
+                style={{ flex: 1 }}
+                placeholder={cnpjaMode === 'cnpj' ? 'Digite o CNPJ (ex: 53.113.791/0001-22)' : 'Digite o nome da empresa (ex: TOTVS)'}
+                value={cnpjaQuery}
+                onChange={e => setCnpjaQuery(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && searchCnpja()}
+              />
+              <button className="btn btn-primary" onClick={searchCnpja} disabled={cnpjaLoading} style={{ flexShrink: 0 }}>
+                {cnpjaLoading ? 'Buscando...' : 'Consultar'}
+              </button>
+            </div>
+            {cnpjaError && <div style={{ color: '#ef4444', fontSize: 13, marginTop: 8 }}>{cnpjaError}</div>}
+          </div>
+          {cnpjaResult && !cnpjaResult.results && (
+            <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 16 }}>{cnpjaResult.alias || cnpjaResult.name}</div>
+                  {cnpjaResult.alias !== cnpjaResult.name && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{cnpjaResult.name}</div>}
+                  <div style={{ fontSize: 12, color: 'var(--primary)', marginTop: 4, fontWeight: 600 }}>CNPJ: {cnpjaResult.cnpj?.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')}</div>
+                </div>
+                <button className="btn btn-primary btn-sm" onClick={() => importFromCnpja(cnpjaResult)}>+ Importar Lead</button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', fontSize: 13, marginBottom: 12 }}>
+                {cnpjaResult.phone && <div><span style={{ color: 'var(--text-muted)' }}>Telefone:</span> <strong>{cnpjaResult.phone}</strong></div>}
+                {cnpjaResult.email && <div><span style={{ color: 'var(--text-muted)' }}>E-mail:</span> <strong>{cnpjaResult.email}</strong></div>}
+                {cnpjaResult.city && <div><span style={{ color: 'var(--text-muted)' }}>Cidade:</span> <strong>{cnpjaResult.city}/{cnpjaResult.state}</strong></div>}
+                {cnpjaResult.cnae && <div style={{ gridColumn: '1/-1' }}><span style={{ color: 'var(--text-muted)' }}>CNAE:</span> <strong>{cnpjaResult.cnae}</strong></div>}
+                {cnpjaResult.size && <div><span style={{ color: 'var(--text-muted)' }}>Porte:</span> <strong>{cnpjaResult.size}</strong></div>}
+                {cnpjaResult.status && <div><span style={{ color: 'var(--text-muted)' }}>Situação:</span> <strong style={{ color: cnpjaResult.status === 'Ativa' ? '#22c55e' : '#ef4444' }}>{cnpjaResult.status}</strong></div>}
+                {cnpjaResult.founded && <div><span style={{ color: 'var(--text-muted)' }}>Fundação:</span> <strong>{cnpjaResult.founded}</strong></div>}
+                {cnpjaResult.street && <div style={{ gridColumn: '1/-1' }}><span style={{ color: 'var(--text-muted)' }}>Endereço:</span> <strong>{cnpjaResult.street}, {cnpjaResult.district} — {cnpjaResult.zip}</strong></div>}
+              </div>
+              {cnpjaResult.members?.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sócios / Diretores</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {cnpjaResult.members.map((m: any, i: number) => (
+                      <div key={i} style={{ fontSize: 13, display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 500 }}>{m.name}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>{m.role}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {cnpjaResult.sideActivities?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Atividades Secundárias</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{cnpjaResult.sideActivities.join(' • ')}</div>
+                </div>
+              )}
+              <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-muted)', textAlign: 'right' }}>Fonte: {cnpjaResult.source}</div>
+            </div>
+          )}
+          {cnpjaResult?.results && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {cnpjaResult.results.map((r: any, i: number) => (
+                <div key={i} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{r.alias || r.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.cnpj} • {r.city}/{r.state}</div>
+                      {r.phone && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>Tel: {r.phone}</div>}
+                      {r.email && <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Email: {r.email}</div>}
+                    </div>
+                    <button className="btn btn-sm" onClick={() => importFromCnpja(r)}>+ Lead</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {(tab === 'buscar' || tab === 'briefing') && (
         <div className="table-wrap" style={{ padding: 16, marginBottom: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
