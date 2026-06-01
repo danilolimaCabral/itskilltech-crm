@@ -102,10 +102,15 @@ html, body {
 .filter-tab.active { background: var(--surface-2); color: var(--text); }
 
 /* TABLE */
-.table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
-table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow-x: auto; overflow-y: hidden; }
+table.data { width: 100%; min-width: 600px; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
 table.data th { background: var(--surface-2); color: var(--text-secondary); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
-table.data td { padding: 11px 14px; border-bottom: 1px solid var(--border); }
+table.data th:nth-child(1) { width: 35%; }
+table.data th:nth-child(2) { width: 30%; }
+table.data th:nth-child(3) { width: 15%; }
+table.data th:nth-child(4) { width: 20%; text-align: right; }
+table.data td { padding: 11px 14px; border-bottom: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; }
+table.data td:last-child { overflow: visible; }
 table.data tbody tr:last-child td { border-bottom: none; }
 table.data tbody tr { cursor: pointer; }
 table.data tbody tr:hover { background: var(--surface-hover); }
@@ -121,7 +126,7 @@ table.data tbody tr:hover { background: var(--surface-hover); }
 .badge-fechado { background: var(--success-soft); color: var(--success); border-color: #abefc6; }
 .badge-perdido { background: var(--danger-soft); color: var(--danger); border-color: #fda29b; }
 
-.channel-icons { display: flex; gap: 4px; justify-content: flex-end; }
+.channel-icons { display: flex; gap: 4px; justify-content: flex-end; flex-wrap: nowrap; min-width: 120px; }
 .ch-icon { width: 26px; height: 26px; border-radius: 4px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-secondary); display: grid; place-items: center; cursor: pointer; }
 .ch-icon:hover { background: var(--surface-2); color: var(--text); }
 .ch-icon svg { width: 12px; height: 12px; }
