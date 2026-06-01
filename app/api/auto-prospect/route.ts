@@ -12,6 +12,9 @@ const openai = new OpenAI();
 const CNPJA_KEY = process.env.CNPJA_API_KEY || '';
 const APOLLO_KEY = process.env.APOLLO_API_KEY || '';
 const RESEND_KEY = process.env.RESEND_API_KEY || '';
+const ZAPI_ID    = process.env.ZAPI_INSTANCE_ID || '';
+const ZAPI_TOKEN = process.env.ZAPI_TOKEN || '';
+const ZAPI_CLIENT = process.env.ZAPI_CLIENT_TOKEN || '';
 
 const uid = () => 'ag_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
 
@@ -418,6 +421,30 @@ export async function POST(req: NextRequest) {
           }
           // Delay entre envios para evitar rate limit
           await new Promise(r => setTimeout(r, 800));
+        }
+        // Enviar WhatsApp se habilitado e lead tiver telefone
+        if (config?.send_whatsapp && ZAPI_ID && ZAPI_TOKEN && lead.phone) {
+          try {
+            const waMsg = `Olá ${lead.name}! 👋\n\nSou Danilo da *${wsName || 'getLOG/Lottustech'}*. Vi que a *${lead.company}* atua no segmento de ${lead.cnae || 'logística'} e acredito que nossa solução TMS pode otimizar a operação de vocês.\n\nPosso apresentar em 15 minutos? 🚀\n\nwww.gettms.com.br`;
+            const waPhone = lead.phone.replace(/\D/g, '');
+            const waNum = waPhone.length <= 11 ? '55' + waPhone : waPhone;
+            const zapiBase = `https://api.z-api.io/instances/${ZAPI_ID}/token/${ZAPI_TOKEN}`;
+            const zapiHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (ZAPI_CLIENT) zapiHeaders['Client-Token'] = ZAPI_CLIENT;
+            const waRes = await fetch(`${zapiBase}/send-text`, {
+              method: 'POST',
+              headers: zapiHeaders,
+              body: JSON.stringify({ phone: waNum, message: waMsg }),
+            });
+            if (waRes.ok) {
+              logs.push(`[${new Date().toLocaleTimeString('pt-BR')}] 📱 WhatsApp enviado: ${lead.phone}`);
+            } else {
+              logs.push(`[${new Date().toLocaleTimeString('pt-BR')}] ⚠ WhatsApp falhou para ${lead.phone}`);
+            }
+            await new Promise(r => setTimeout(r, 500));
+          } catch (we: any) {
+            logs.push(`[${new Date().toLocaleTimeString('pt-BR')}] ⚠ Erro WhatsApp: ${we.message}`);
+          }
         }
       } catch (e: any) {
         errors++;

@@ -45,11 +45,41 @@ export function AgentView({ workspace, workspaceName, showToast }: { workspace: 
   const [runs, setRuns] = useState<any[]>([]);
   const [running, setRunning] = useState(false);
   const [runLog, setRunLog] = useState<string[]>([]);
-  const [tab, setTab] = useState<'config' | 'history' | 'log'>('config');
+  const [tab, setTab] = useState<'config' | 'history' | 'log' | 'whatsapp'>('config');
   const [saving, setSaving] = useState(false);
   const [lastRun, setLastRun] = useState<any>(null);
   const [cronStatus, setCronStatus] = useState<'active' | 'inactive'>('inactive');
   const logRef = useRef<HTMLDivElement>(null);
+  // WhatsApp (Z-API)
+  const [waStatus, setWaStatus] = useState<any>(null);
+  const [waLoading, setWaLoading] = useState(false);
+  const [waSending, setWaSending] = useState(false);
+  const [waTestPhone, setWaTestPhone] = useState('');
+  const [waTestMsg, setWaTestMsg] = useState('');
+  const checkWaStatus = async () => {
+    setWaLoading(true);
+    try {
+      const r = await fetch('/api/whatsapp?action=status');
+      const j = await r.json();
+      setWaStatus(j);
+    } catch { setWaStatus({ ok: false, error: 'Erro de conexão' }); }
+    setWaLoading(false);
+  };
+  const sendWaTest = async () => {
+    if (!waTestPhone) return;
+    setWaSending(true);
+    try {
+      const r = await fetch('/api/whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: waTestPhone, message: waTestMsg || undefined, action: 'send-text' }),
+      });
+      const j = await r.json();
+      showToast(j.ok ? '✓ WhatsApp enviado com sucesso!' : ('Erro: ' + (j.error || j.message || 'falha')));
+    } catch (e: any) { showToast('Erro: ' + e.message); }
+    setWaSending(false);
+  };
+  useEffect(() => { checkWaStatus(); }, []);
 
   const load = async () => {
     try {
@@ -204,12 +234,15 @@ export function AgentView({ workspace, workspaceName, showToast }: { workspace: 
 
       {/* Abas */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
-        {([['config', '⚙️ Configuração'], ['history', '📋 Histórico'], ['log', '📟 Log']] as const).map(([t, lbl]) => (
+        {(['config', 'whatsapp', 'history', 'log'] as const).map((t) => {
+          const labels: Record<string, string> = { config: '⚙️ Configuração', whatsapp: '💬 WhatsApp', history: '📋 Histórico', log: '📟 Log' };
+          return (
           <button key={t} onClick={() => setTab(t)}
             style={{ padding: '10px 18px', fontSize: 13, fontWeight: tab === t ? 700 : 400, borderBottom: tab === t ? '2px solid var(--primary)' : '2px solid transparent', background: 'none', cursor: 'pointer', color: tab === t ? 'var(--primary)' : 'var(--text-muted)', transition: 'all .15s' }}>
-            {lbl}
+            {labels[t]}
           </button>
-        ))}
+        );
+      })}
       </div>
 
       {/* Aba: Configuração */}
@@ -353,6 +386,82 @@ export function AgentView({ workspace, workspaceName, showToast }: { workspace: 
         </div>
       )}
 
+      {/* Aba: WhatsApp */}
+      {tab === 'whatsapp' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Status da conexão */}
+          <div style={{ background: 'var(--surface-2)', borderRadius: 12, padding: '20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>Status da Conexão Z-API</div>
+              <button className="btn" onClick={checkWaStatus} disabled={waLoading} style={{ padding: '6px 12px', fontSize: 12 }}>
+                {waLoading ? 'Verificando...' : '🔄 Atualizar'}
+              </button>
+            </div>
+            {!waStatus ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Verificando status...</div>
+            ) : !waStatus.configured ? (
+              <div>
+                <div style={{ background: '#fef3c7', border: '1px solid #fbbf24', borderRadius: 8, padding: '14px 16px', marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, color: '#92400e', marginBottom: 6 }}>⚠️ Z-API não configurada</div>
+                  <div style={{ fontSize: 13, color: '#78350f' }}>Siga os passos abaixo para ativar o WhatsApp automático:</div>
+                </div>
+                <ol style={{ fontSize: 13, lineHeight: 2.2, color: 'var(--text)', paddingLeft: 20 }}>
+                  <li>Acesse <a href="https://app.z-api.io" target="_blank" style={{ color: 'var(--primary)' }}>app.z-api.io</a> e crie uma conta gratuita</li>
+                  <li>Crie uma nova instância e escaneie o QR Code com seu WhatsApp</li>
+                  <li>Copie o <strong>Instance ID</strong>, <strong>Token</strong> e <strong>Client Token</strong></li>
+                  <li>Acesse a <a href="https://vercel.com" target="_blank" style={{ color: 'var(--primary)' }}>Vercel</a> → Settings → Environment Variables</li>
+                  <li>Adicione: <code style={{ background: 'var(--surface-3,#f3f4f6)', padding: '2px 6px', borderRadius: 4, fontSize: 12 }}>ZAPI_INSTANCE_ID</code>, <code style={{ background: 'var(--surface-3,#f3f4f6)', padding: '2px 6px', borderRadius: 4, fontSize: 12 }}>ZAPI_TOKEN</code>, <code style={{ background: 'var(--surface-3,#f3f4f6)', padding: '2px 6px', borderRadius: 4, fontSize: 12 }}>ZAPI_CLIENT_TOKEN</code></li>
+                  <li>Clique em <strong>Redeploy</strong> na Vercel e volte aqui</li>
+                </ol>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 12, height: 12, borderRadius: '50%', background: waStatus.connected ? '#22c55e' : '#ef4444', boxShadow: waStatus.connected ? '0 0 8px #22c55e' : 'none' }} />
+                <span style={{ fontWeight: 700, color: waStatus.connected ? '#16a34a' : '#dc2626' }}>
+                  {waStatus.connected ? '✅ WhatsApp Conectado' : '❌ Desconectado — escaneie o QR Code em app.z-api.io'}
+                </span>
+                {waStatus.phone && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>({waStatus.phone})</span>}
+              </div>
+            )}
+          </div>
+          {/* Teste de envio */}
+          {waStatus?.configured && (
+            <div style={{ background: 'var(--surface-2)', borderRadius: 12, padding: '20px' }}>
+              <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>📤 Enviar Mensagem de Teste</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Número (com DDD)</label>
+                  <input className="field-input" placeholder="(41) 99999-9999" value={waTestPhone} onChange={e => setWaTestPhone(e.target.value)} style={{ width: '100%' }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>Mensagem (opcional)</label>
+                  <textarea className="field-input" placeholder="Olá! Mensagem de teste..." value={waTestMsg} onChange={e => setWaTestMsg(e.target.value)} rows={3} style={{ width: '100%', resize: 'vertical' }} />
+                </div>
+                <button className="btn btn-primary" onClick={sendWaTest} disabled={waSending || !waTestPhone} style={{ alignSelf: 'flex-start', padding: '10px 20px' }}>
+                  {waSending ? 'Enviando...' : '📱 Enviar Teste'}
+                </button>
+              </div>
+            </div>
+          )}
+          {/* Toggle agente WhatsApp */}
+          <div style={{ background: 'var(--surface-2)', borderRadius: 12, padding: '20px' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>🤖 Agente WhatsApp Automático</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14, lineHeight: 1.6 }}>Quando ativo, envia automaticamente uma mensagem de WhatsApp para cada lead prospectado que tiver telefone cadastrado.</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div onClick={() => setConfig((c: any) => ({ ...c, send_whatsapp: !c.send_whatsapp }))} style={{ width: 48, height: 26, borderRadius: 13, cursor: 'pointer', transition: 'background .2s', background: config.send_whatsapp ? '#22c55e' : 'var(--border)', position: 'relative', flexShrink: 0 }}>
+                <div style={{ position: 'absolute', top: 3, left: config.send_whatsapp ? 25 : 3, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>{config.send_whatsapp ? '✅ Envio automático ativo' : 'Envio automático desativado'}</span>
+            </div>
+            {config.send_whatsapp && !waStatus?.connected && (
+              <div style={{ marginTop: 12, fontSize: 12, color: '#dc2626', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '8px 12px' }}>⚠️ WhatsApp não está conectado. Configure a Z-API acima.</div>
+            )}
+            <div style={{ marginTop: 14 }}>
+              <button className="btn" onClick={save} disabled={saving} style={{ padding: '8px 16px', fontSize: 13 }}>{saving ? 'Salvando...' : '💾 Salvar Configurações'}</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Aba: Histórico */}
       {tab === 'history' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
