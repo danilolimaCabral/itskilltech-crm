@@ -6,6 +6,54 @@ const BASE_URL = 'https://api.cnpja.com'
 
 const openai = new OpenAI()
 
+// Mapeamento de segmentos comuns para códigos CNAE
+const CNAE_MAP: Record<string, string[]> = {
+  transporte: ['4930201', '4930202', '4930203', '4921301', '4921302', '4922101', '4922102', '4922103'],
+  logística: ['5211701', '5211702', '5212500', '5229001', '5229002', '5229099', '4930201'],
+  logistica: ['5211701', '5211702', '5212500', '5229001', '5229002', '5229099', '4930201'],
+  tecnologia: ['6201501', '6201502', '6202300', '6203100', '6204000', '6209100', '6311900'],
+  software: ['6201501', '6201502', '6202300', '6209100'],
+  ti: ['6201501', '6201502', '6202300', '6203100', '6204000', '6209100'],
+  saúde: ['8610101', '8610102', '8621601', '8621602', '8630501', '8630502', '8630503'],
+  saude: ['8610101', '8610102', '8621601', '8621602', '8630501', '8630502', '8630503'],
+  varejo: ['4711301', '4711302', '4712100', '4713001', '4713002', '4721102', '4721103'],
+  atacado: ['4632001', '4632002', '4632003', '4633801', '4634601', '4635401'],
+  construção: ['4110700', '4120400', '4211101', '4211102', '4212000', '4213800'],
+  construcao: ['4110700', '4120400', '4211101', '4211102', '4212000', '4213800'],
+  agro: ['0111301', '0111302', '0111303', '0113000', '0115600', '0116401'],
+  agronegócio: ['0111301', '0111302', '0111303', '0113000', '0115600', '0116401'],
+  agronegocio: ['0111301', '0111302', '0111303', '0113000', '0115600', '0116401'],
+  indústria: ['2211100', '2221800', '2229301', '2311700', '2312500', '2319200'],
+  industria: ['2211100', '2221800', '2229301', '2311700', '2312500', '2319200'],
+  educação: ['8511200', '8512100', '8513900', '8520100', '8531700', '8532500'],
+  educacao: ['8511200', '8512100', '8513900', '8520100', '8531700', '8532500'],
+  financeiro: ['6422100', '6423100', '6424701', '6424702', '6431000', '6432800'],
+  financeira: ['6422100', '6423100', '6424701', '6424702', '6431000', '6432800'],
+  alimentício: ['1011201', '1011202', '1012101', '1012102', '1013901', '1031700'],
+  alimenticio: ['1011201', '1011202', '1012101', '1012102', '1013901', '1031700'],
+  alimentos: ['1011201', '1011202', '1012101', '1012102', '1013901', '1031700'],
+  telecomunicações: ['6110801', '6110802', '6110803', '6120501', '6120502', '6130200'],
+  telecomunicacoes: ['6110801', '6110802', '6110803', '6120501', '6120502', '6130200'],
+  energia: ['3511501', '3511502', '3512300', '3513100', '3514000', '3520401'],
+  petróleo: ['0600001', '0600002', '1921700', '1922501', '1922502', '1922599'],
+  petroleo: ['0600001', '0600002', '1921700', '1922501', '1922502', '1922599'],
+  farmacêutico: ['2121101', '2121102', '2121103', '2122000', '4771701', '4771702'],
+  farmaceutico: ['2121101', '2121102', '2121103', '2122000', '4771701', '4771702'],
+  seguros: ['6511101', '6511102', '6512000', '6520100', '6530800', '6541300'],
+  imobiliário: ['4110700', '6810201', '6810202', '6821801', '6821802', '6822600'],
+  imobiliario: ['4110700', '6810201', '6810202', '6821801', '6821802', '6822600'],
+  tms: ['4930201', '4930202', '5229001', '5229002', '6201501'],
+  erp: ['6201501', '6201502', '6202300', '6209100'],
+  consultoria: ['7020400', '7111100', '7112000', '7119701', '7119702', '7119799'],
+  marketing: ['7311400', '7312200', '7319001', '7319002', '7319003', '7319004'],
+  publicidade: ['7311400', '7312200', '7319001', '7319002', '7319003', '7319004'],
+  turismo: ['7911200', '7912100', '7990200', '5510801', '5510802', '5590601'],
+  hotelaria: ['5510801', '5510802', '5590601', '5590602', '5590603', '5590699'],
+  restaurante: ['5611201', '5611202', '5611203', '5612100', '5620101', '5620102'],
+  alimentação: ['5611201', '5611202', '5611203', '5612100', '5620101', '5620102'],
+  alimentacao: ['5611201', '5611202', '5611203', '5612100', '5620101', '5620102'],
+}
+
 function formatPhone(phones: Array<{ area: string; number: string }> = []): string {
   if (!phones.length) return ''
   const p = phones[0]
@@ -16,49 +64,92 @@ function formatEmail(emails: Array<{ address: string }> = []): string {
   return emails[0]?.address || ''
 }
 
-async function fetchCnpja(cnpj: string) {
-  const clean = cnpj.replace(/\D/g, '')
-  if (clean.length !== 14) return null
-  try {
-    const res = await fetch(`${BASE_URL}/office/${clean}`, {
-      headers: { Authorization: CNPJA_KEY },
-      next: { revalidate: 3600 }
-    })
-    if (!res.ok) return null
-    const d = await res.json()
-    const company = d.company || {}
-    return {
-      cnpj: d.taxId,
-      name: company.name || d.alias,
-      alias: d.alias || company.name,
-      phone: formatPhone(d.phones || []),
-      email: formatEmail(d.emails || []),
-      city: d.address?.city || '',
-      state: d.address?.state || '',
-      zip: d.address?.zip || '',
-      street: d.address?.street ? `${d.address.street}, ${d.address.number || ''}` : '',
-      district: d.address?.district || '',
-      cnae: d.mainActivity?.text || '',
-      cnaeCode: d.mainActivity?.id || '',
-      status: d.status?.text || '',
-      founded: d.founded || '',
-      size: company.size?.text || '',
-      members: (company.members || []).slice(0, 3).map((m: {
-        person?: { name?: string }
-        role?: { text?: string }
-      }) => ({
-        name: m.person?.name || '',
-        role: m.role?.text || ''
-      })),
-      source: 'CNPJ.já'
-    }
-  } catch {
-    return null
+function mapRecordToLead(o: {
+  taxId?: string;
+  alias?: string;
+  founded?: string;
+  head?: boolean;
+  status?: { text?: string };
+  company?: {
+    name?: string;
+    size?: { text?: string };
+    members?: Array<{
+      person?: { name?: string };
+      role?: { text?: string };
+      since?: string;
+    }>;
+  };
+  address?: { city?: string; state?: string; street?: string; number?: string; district?: string; zip?: string };
+  phones?: Array<{ area: string; number: string }>;
+  emails?: Array<{ address: string }>;
+  mainActivity?: { text?: string; id?: string };
+}) {
+  const company = o.company || {}
+  const address = o.address || {}
+  return {
+    cnpj: o.taxId,
+    name: company.name || o.alias,
+    alias: o.alias || company.name,
+    phone: formatPhone(o.phones || []),
+    email: formatEmail(o.emails || []),
+    city: address.city || '',
+    state: address.state || '',
+    zip: address.zip || '',
+    street: address.street ? `${address.street}, ${address.number || ''}` : '',
+    district: address.district || '',
+    cnae: o.mainActivity?.text || '',
+    cnaeCode: o.mainActivity?.id || '',
+    status: o.status?.text || '',
+    founded: o.founded || '',
+    size: company.size?.text || '',
+    members: (company.members || []).slice(0, 3).map((m) => ({
+      name: m.person?.name || '',
+      role: m.role?.text || '',
+      since: m.since || ''
+    })),
+    source: 'CNPJ.já'
   }
 }
 
+async function getCnaeCodesForSegment(segment: string): Promise<string[]> {
+  // Verificar mapeamento direto primeiro
+  const lower = segment.toLowerCase().trim()
+  for (const [key, codes] of Object.entries(CNAE_MAP)) {
+    if (lower.includes(key) || key.includes(lower)) {
+      return codes.slice(0, 4) // máximo 4 CNAEs para não sobrecarregar
+    }
+  }
+
+  // Se não encontrou no mapeamento, usar IA para mapear
+  try {
+    const resp = await openai.chat.completions.create({
+      model: 'gemini-2.5-flash',
+      messages: [
+        {
+          role: 'system',
+          content: 'Você é especialista em classificação CNAE brasileira. Retorne SOMENTE um array JSON com os códigos CNAE mais relevantes (máximo 4 códigos, 7 dígitos cada). Sem texto adicional.'
+        },
+        {
+          role: 'user',
+          content: `Quais são os códigos CNAE (7 dígitos) mais relevantes para empresas do segmento "${segment}"? Retorne: ["0000000","0000000"]`
+        }
+      ],
+      temperature: 0.1,
+      max_tokens: 200
+    })
+    const raw = (resp.choices[0]?.message?.content || '[]')
+      .replace(/```(?:json)?\s*/g, '').replace(/```\s*/g, '').trim()
+    const codes = JSON.parse(raw.match(/\[[\s\S]*\]/)?.[0] || '[]')
+    if (Array.isArray(codes) && codes.length > 0) {
+      return codes.slice(0, 4).map((c: string) => String(c).replace(/\D/g, ''))
+    }
+  } catch {
+    // fallback
+  }
+  return []
+}
+
 // POST /api/search-companies
-// Body: { query: string, mode: 'name' | 'segment', state?: string, limit?: number }
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -68,135 +159,90 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'query é obrigatório' }, { status: 400 })
     }
 
-    const stateHint = state ? ` no estado ${state}` : ' no Brasil'
-    const limitNum = Math.min(parseInt(String(limit)) || 10, 15)
+    const limitNum = Math.min(parseInt(String(limit)) || 10, 20)
 
-    // Pedir ao Gemini para sugerir CNPJs reais
-    // Para segmento: pedir mais CNPJs pois muitos podem ser inválidos
-    const askCount = mode === 'segment' ? Math.min(limitNum * 3, 30) : Math.min(limitNum * 2, 20)
-
-    let systemPrompt: string
-    let userPrompt: string
+    if (mode === 'cnpj') {
+      // Busca direta por CNPJ
+      const clean = query.replace(/\D/g, '')
+      if (clean.length !== 14) {
+        return NextResponse.json({ error: 'CNPJ inválido' }, { status: 400 })
+      }
+      const res = await fetch(`${BASE_URL}/office/${clean}`, {
+        headers: { Authorization: CNPJA_KEY }
+      })
+      if (!res.ok) {
+        return NextResponse.json({ error: 'CNPJ não encontrado' }, { status: 404 })
+      }
+      const d = await res.json()
+      return NextResponse.json({ results: [mapRecordToLead(d)], total: 1, verified: 1 })
+    }
 
     if (mode === 'name') {
-      systemPrompt = `Você é um especialista em empresas brasileiras.
-Você conhece os CNPJs REAIS de empresas brasileiras registradas na Receita Federal.
-Retorne SOMENTE JSON válido, sem markdown, sem texto adicional.`
+      // Busca por nome da empresa via /office com company.name.in
+      const params = new URLSearchParams({
+        'company.name.in': query.toUpperCase(),
+        limit: String(limitNum)
+      })
+      if (state) params.append('address.state.in', state)
 
-      userPrompt = `Forneça ${askCount} CNPJs reais de empresas brasileiras cujo nome ou razão social contenha "${query}"${stateHint}.
-Inclua a matriz e filiais principais se conhecer.
-IMPORTANTE: Os CNPJs devem ser REAIS e EXATOS como registrados na Receita Federal.
-Retorne SOMENTE este JSON (sem texto adicional, sem markdown):
-[{"cnpj":"XX.XXX.XXX/XXXX-XX","razao_social":"NOME COMPLETO","nome_fantasia":"NOME FANTASIA"}]`
-    } else {
-      systemPrompt = `Você é um especialista em empresas brasileiras.
-Você conhece empresas de todos os setores da economia brasileira.
-Retorne SOMENTE JSON válido, sem markdown, sem texto adicional.`
-
-      userPrompt = `Liste ${askCount} empresas brasileiras do segmento/setor de "${query}"${stateHint}.
-Inclua empresas conhecidas de diferentes portes (grandes, médias e pequenas).
-Para cada empresa, forneça o CNPJ mais provável no formato XX.XXX.XXX/0001-XX.
-Prefira empresas com presença nacional conhecida no setor de "${query}".
-Retorne SOMENTE este JSON (sem texto adicional, sem markdown):
-[{"cnpj":"XX.XXX.XXX/0001-XX","razao_social":"NOME COMPLETO","nome_fantasia":"NOME FANTASIA"}]`
-    }
-
-    const completion = await openai.chat.completions.create({
-      model: 'gemini-2.5-flash',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: 0.1,
-      max_tokens: 3000
-    })
-
-    const rawText = completion.choices[0]?.message?.content || '[]'
-
-    // Extrair JSON da resposta (lidar com markdown do Gemini)
-    let suggestions: Array<{ cnpj: string; razao_social?: string; nome_fantasia?: string }> = []
-    try {
-      // Remover markdown code blocks
-      const cleaned = rawText.replace(/```(?:json)?\s*/g, '').replace(/```\s*/g, '').trim()
-      try {
-        suggestions = JSON.parse(cleaned)
-      } catch {
-        const jsonMatch = cleaned.match(/\[[\s\S]*\]/)
-        if (jsonMatch) {
-          suggestions = JSON.parse(jsonMatch[0])
-        } else {
-          throw new Error('No JSON array found')
-        }
+      const res = await fetch(`${BASE_URL}/office?${params}`, {
+        headers: { Authorization: CNPJA_KEY }
+      })
+      if (!res.ok) {
+        return NextResponse.json({ results: [], total: 0, message: `Nenhuma empresa encontrada para "${query}"` })
       }
-    } catch {
+      const d = await res.json()
+      const records = d.records || []
+      const results = records.map(mapRecordToLead)
+
       return NextResponse.json({
-        results: [],
-        total: 0,
-        message: `Não foi possível processar a busca para "${query}". Tente buscar por CNPJ diretamente.`
+        results,
+        total: results.length,
+        totalFound: d.count || results.length,
+        query, mode,
+        verified: results.length
       })
     }
 
-    if (!suggestions.length) {
-      return NextResponse.json({
-        results: [],
-        total: 0,
-        message: `Nenhuma empresa encontrada para "${query}". Tente buscar por CNPJ diretamente.`
-      })
-    }
+    if (mode === 'segment') {
+      // Busca por segmento/CNAE
+      const cnaeCodes = await getCnaeCodesForSegment(query)
 
-    // Deduplicate CNPJs
-    const seen = new Set<string>()
-    const uniqueSuggestions = suggestions.filter(s => {
-      const clean = s.cnpj?.replace(/\D/g, '') || ''
-      if (!clean || seen.has(clean)) return false
-      seen.add(clean)
-      return true
-    })
-
-    // Buscar dados reais no CNPJ.já para cada sugestão (sem validar dígitos verificadores)
-    // O CNPJ.já vai rejeitar os inválidos
-    const results = await Promise.allSettled(
-      uniqueSuggestions.slice(0, askCount).map(s => fetchCnpja(s.cnpj))
-    )
-
-    const validResults = results
-      .map(r => r.status === 'fulfilled' ? r.value : null)
-      .filter(Boolean)
-      .slice(0, limitNum)
-
-    if (validResults.length === 0) {
-      // Para segmento, retornar resultados "não verificados" como fallback
-      if (mode === 'segment') {
-        const fallback = uniqueSuggestions.slice(0, limitNum).map(s => ({
-          cnpj: s.cnpj?.replace(/\D/g, '') || '',
-          name: s.razao_social || '',
-          alias: s.nome_fantasia || s.razao_social || '',
-          phone: '', email: '', city: '', state: state || '',
-          cnae: query, status: '', founded: '', size: '',
-          members: [], source: 'IA (não verificado)'
-        }))
+      if (!cnaeCodes.length) {
         return NextResponse.json({
-          results: fallback,
-          total: fallback.length,
-          query, mode,
-          verified: 0,
-          message: `Resultados sugeridos por IA para "${query}" — não verificados na Receita Federal. Para dados precisos, busque pelo CNPJ.`
+          results: [],
+          total: 0,
+          message: `Não foi possível identificar o segmento "${query}". Tente usar termos como: transporte, logística, tecnologia, saúde, varejo, construção, agro, etc.`
         })
       }
+
+      const params = new URLSearchParams({
+        'mainActivity.id.in': cnaeCodes.join(','),
+        limit: String(limitNum)
+      })
+      if (state) params.append('address.state.in', state)
+
+      const res = await fetch(`${BASE_URL}/office?${params}`, {
+        headers: { Authorization: CNPJA_KEY }
+      })
+      if (!res.ok) {
+        return NextResponse.json({ results: [], total: 0, message: `Erro ao buscar empresas do segmento "${query}"` })
+      }
+      const d = await res.json()
+      const records = d.records || []
+      const results = records.map(mapRecordToLead)
+
       return NextResponse.json({
-        results: [],
-        total: 0,
-        message: `Não encontrei empresas verificadas para "${query}"${stateHint}. Tente buscar por CNPJ diretamente ou use termos mais específicos.`
+        results,
+        total: results.length,
+        totalFound: d.count || results.length,
+        query, mode,
+        cnaeCodes,
+        verified: results.length
       })
     }
 
-    return NextResponse.json({
-      results: validResults,
-      total: validResults.length,
-      query,
-      mode,
-      verified: validResults.length
-    })
+    return NextResponse.json({ error: 'mode inválido' }, { status: 400 })
 
   } catch (err) {
     console.error('search-companies error:', err)
