@@ -451,7 +451,7 @@ export default function CRM() {
         </div>
         <div className="sidebar-section">
           <div className="section-label">Navegação</div>
-          {[['leads', 'Leads', ICONS.leads], ['search', 'Buscar Leads', ICONS.search2], ['agent', '🤖 Agente IA', ICONS.sparkles], ['templates', 'Templates', ICONS.template], ['bi', 'BI / Prospecção', ICONS.bi], ['inbox', 'Caixa de Entrada', ICONS.inbox], ['settings', 'Configurações', ICONS.settings]].map(([v, label, ic]) => (
+          {[['leads', 'Leads', ICONS.leads], ['search', 'Buscar Leads', ICONS.search2], ['agent', '🤖 Agente IA', ICONS.sparkles], ['templates', 'Templates', ICONS.template], ['bi', 'BI / Prospecção', ICONS.bi], ['sheets', '📊 Google Sheets', ICONS.upload], ['inbox', 'Caixa de Entrada', ICONS.inbox], ['settings', 'Configurações', ICONS.settings]].map(([v, label, ic]) => (
             <button key={v} className={`nav-item${view === v ? ' active' : ''}`} onClick={() => { setView(v as string); setSidebarOpen(false); }}>
               <Icon d={ic as string} /><span>{label}</span>
             </button>
@@ -463,7 +463,7 @@ export default function CRM() {
       <div className="main">
         <header className="topbar">
           <button className="btn menu-toggle" onClick={() => setSidebarOpen(true)}><Icon d='<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>' /></button>
-          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{ws?.name} <span style={{ color: 'var(--text-muted)' }}>/</span> <strong style={{ color: 'var(--text)' }}>{{ leads: 'Leads', search: 'Buscar Leads', agent: 'Agente de Prospecção', templates: 'Templates', bi: 'BI / Prospecção', inbox: 'Caixa de Entrada', workspaces: 'Workspaces', settings: 'Configurações' }[view] || view}</strong></span>
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{ws?.name} <span style={{ color: 'var(--text-muted)' }}>/</span> <strong style={{ color: 'var(--text)' }}>{{ leads: 'Leads', search: 'Buscar Leads', agent: 'Agente de Prospecção', templates: 'Templates', bi: 'BI / Prospecção', sheets: 'Google Sheets', inbox: 'Caixa de Entrada', workspaces: 'Workspaces', settings: 'Configurações' }[view] || view}</strong></span>
           <span className={`db-badge ${gmailConfigured ? 'on' : 'off'}`}>{gmailConfigured ? '✉ E-mail ativo' : 'E-mail não configurado'}</span>
         </header>
 
@@ -615,6 +615,7 @@ export default function CRM() {
           {view === 'templates' && <TemplatesView workspace={workspace} workspaceName={ws?.name} templates={templates} onReload={() => loadTemplates(workspace)} showToast={showToast} />}
           {view === 'agent' && <AgentView workspace={workspace} workspaceName={ws?.name} showToast={showToast} />}
           {view === 'bi' && <BIView workspace={workspace} leads={leads} />}
+          {view === 'sheets' && <SheetsView workspace={workspace} workspaceName={ws?.name} onImport={(newLeads: any[]) => { setLeads(prev => { const ids = new Set(prev.map((l:any)=>l.id)); const fresh = newLeads.filter((l:any)=>!ids.has(l.id)); return [...fresh,...prev]; }); showToast(newLeads.length + ' lead(s) importado(s) do Sheets'); }} showToast={showToast} />}
           {view === 'settings' && <SettingsView gmailConfigured={gmailConfigured} hasDb={hasDb} showToast={showToast} />}
         </div></div>
       </div>
@@ -1551,6 +1552,208 @@ function LeadModal({ lead, workspace, onClose, onSave, onDelete }: any) {
           <div className="field"><label className="field-label">Anotações</label><textarea className="field-textarea" value={f.notes || ''} onChange={e => set('notes', e.target.value)} /></div>
         </div>
         <div className="modal-footer">{onDelete && <button className="btn btn-danger" onClick={onDelete} style={{ marginRight: 'auto' }}>Excluir</button>}<button className="btn" onClick={onClose}>Cancelar</button><button className="btn btn-primary" onClick={submit}>Salvar</button></div>
+      </div>
+    </div>
+  );
+}
+
+// ── Google Sheets Integration View ──────────────────────────────────────────
+function SheetsView({ workspace, workspaceName, onImport, showToast }: any) {
+  const [loading, setLoading] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [result, setResult] = useState<any>(null);
+  const [sheetId, setSheetId] = useState('1iKPPIP3q6lgh4CQuHBH0frIMLOnd3MpAKXsjvwU9EuY');
+  const [selectedTab, setSelectedTab] = useState('all');
+
+  const TABS = [
+    { id: 'all', label: 'Todas as abas' },
+    { id: '2026', label: '2026' },
+    { id: 'SMB', label: 'SMB' },
+    { id: 'Novos 2026', label: 'Novos 2026' },
+  ];
+
+  const doImport = async (action: 'import' | 'sync') => {
+    if (action === 'import') setLoading(true);
+    else setSyncing(true);
+    setResult(null);
+    try {
+      const params = new URLSearchParams({ workspace, action, tab: selectedTab });
+      const r = await fetch(`/api/sheets?${params}`);
+      const j = await r.json();
+      setResult(j);
+      if (j.ok && j.totalImported > 0) {
+        // Recarregar leads após importação
+        const lr = await fetch(`/api/leads?workspace=${workspace}`);
+        const lj = await lr.json();
+        if (lj.leads) onImport(lj.leads);
+        showToast(`✅ ${j.totalImported} lead(s) importado(s) do Google Sheets`);
+      } else if (j.ok && j.totalImported === 0) {
+        showToast('Nenhum lead novo encontrado (todos já existem no CRM)');
+      }
+    } catch (e) {
+      setResult({ ok: false, error: String(e) });
+      showToast('Erro ao importar do Google Sheets');
+    } finally {
+      setLoading(false);
+      setSyncing(false);
+    }
+  };
+
+  const doExport = async () => {
+    setExporting(true);
+    try {
+      const r = await fetch(`/api/sheets?workspace=${workspace}&action=export`);
+      const blob = await r.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `leads_${workspaceName || workspace}_${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('✅ Leads exportados com sucesso!');
+    } catch {
+      showToast('Erro ao exportar leads');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <div className="page-title">📊 Google Sheets</div>
+          <div className="page-description">{workspaceName} · Importar, sincronizar e exportar leads</div>
+        </div>
+      </div>
+
+      {/* Planilha configurada */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12, color: 'var(--text)' }}>📋 Planilha Conectada</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'block', marginBottom: 4 }}>ID da Planilha Google Sheets</label>
+            <input
+              style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 13, background: 'var(--bg)', color: 'var(--text)', fontFamily: 'monospace' }}
+              value={sheetId}
+              onChange={e => setSheetId(e.target.value)}
+              placeholder="ID da planilha do Google Sheets"
+            />
+          </div>
+          <a
+            href={`https://docs.google.com/spreadsheets/d/${sheetId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ marginTop: 20, padding: '8px 14px', background: '#0f9d58', color: '#fff', borderRadius: 8, fontSize: 12, fontWeight: 600, textDecoration: 'none', whiteSpace: 'nowrap' }}
+          >
+            🔗 Abrir Planilha
+          </a>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '8px 12px', background: '#f0fdf4', borderRadius: 8, border: '1px solid #bbf7d0' }}>
+          ✅ Planilha pública detectada — importação disponível sem autenticação
+        </div>
+      </div>
+
+      {/* Seletor de aba */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12, color: 'var(--text)' }}>📑 Selecionar Aba</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {TABS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setSelectedTab(t.id)}
+              style={{
+                padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                background: selectedTab === t.id ? '#0066ff' : 'var(--bg)',
+                color: selectedTab === t.id ? '#fff' : 'var(--text-secondary)',
+                border: `1px solid ${selectedTab === t.id ? '#0066ff' : 'var(--border)'}`,
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Ações */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
+        {/* Importar */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20 }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>📥</div>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Importar Leads</div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 16 }}>
+            Importa leads novos da planilha para o CRM. Duplicatas são ignoradas automaticamente.
+          </div>
+          <button
+            onClick={() => doImport('import')}
+            disabled={loading}
+            style={{ width: '100%', padding: '10px', background: '#0066ff', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}
+          >
+            {loading ? '⏳ Importando...' : '📥 Importar Agora'}
+          </button>
+        </div>
+
+        {/* Sincronizar */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20 }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>🔄</div>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Sincronizar</div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 16 }}>
+            Atualiza leads existentes e importa novos. Mantém o CRM sempre em dia com a planilha.
+          </div>
+          <button
+            onClick={() => doImport('sync')}
+            disabled={syncing}
+            style={{ width: '100%', padding: '10px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: syncing ? 'not-allowed' : 'pointer', opacity: syncing ? 0.7 : 1 }}
+          >
+            {syncing ? '⏳ Sincronizando...' : '🔄 Sincronizar'}
+          </button>
+        </div>
+
+        {/* Exportar */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20 }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>📤</div>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Exportar Leads</div>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 16 }}>
+            Exporta todos os leads do CRM para um arquivo CSV pronto para importar no Google Sheets.
+          </div>
+          <button
+            onClick={doExport}
+            disabled={exporting}
+            style={{ width: '100%', padding: '10px', background: '#f59e0b', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: exporting ? 'not-allowed' : 'pointer', opacity: exporting ? 0.7 : 1 }}
+          >
+            {exporting ? '⏳ Exportando...' : '📤 Exportar CSV'}
+          </button>
+        </div>
+      </div>
+
+      {/* Resultado */}
+      {result && (
+        <div style={{ background: result.ok ? '#f0fdf4' : '#fef2f2', border: `1px solid ${result.ok ? '#bbf7d0' : '#fecaca'}`, borderRadius: 12, padding: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: result.ok ? '#15803d' : '#dc2626', marginBottom: 8 }}>
+            {result.ok ? '✅ Concluído' : '❌ Erro'}
+          </div>
+          {result.message && <div style={{ fontSize: 13, color: result.ok ? '#166534' : '#991b1b', marginBottom: 8 }}>{result.message}</div>}
+          {result.results && result.results.map((r: any) => (
+            <div key={r.tab} style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>
+              <strong>{r.tab}:</strong> {r.imported} importado(s), {r.skipped} ignorado(s)
+              {r.errors?.length > 0 && <span style={{ color: '#dc2626' }}> · {r.errors.length} erro(s)</span>}
+            </div>
+          ))}
+          {result.error && <div style={{ fontSize: 12, color: '#dc2626' }}>{result.error}</div>}
+        </div>
+      )}
+
+      {/* Instrução de uso */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 20, marginTop: 16 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 12 }}>📖 Como usar</div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+          <p><strong>1. Importar:</strong> Clique em "Importar Agora" para trazer todos os leads da planilha para o CRM. Duplicatas são detectadas automaticamente pelo e-mail ou nome da empresa.</p>
+          <p><strong>2. Sincronizar:</strong> Use quando adicionar novos leads na planilha — o CRM vai buscar apenas os novos e atualizar os existentes.</p>
+          <p><strong>3. Exportar:</strong> Baixa um CSV com todos os leads do CRM no workspace atual, pronto para colar no Google Sheets.</p>
+          <p><strong>Colunas suportadas:</strong> Empresa, Nome Contato, Cargo, Telefone, Tel. Empresa, E-mail, Status</p>
+          <p><strong>Status mapeados:</strong> Perdido → Prospecção · Fechado → Fechamento · Apresentação → Apresentação · Qualificação → Qualificação</p>
+        </div>
       </div>
     </div>
   );
