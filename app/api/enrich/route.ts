@@ -57,24 +57,29 @@ async function enrichByCNPJ(cnpj: string) {
   try {
     const res = await fetch(
       `https://brasilapi.com.br/api/cnpj/v1/${clean}`,
-      { signal: AbortSignal.timeout(8000) }
+      { signal: AbortSignal.timeout(10000) }
     );
     if (res.ok) {
       const d = await res.json();
+      const tel1 = (d.ddd_telefone_1 || '').toString().trim();
+      const tel2 = (d.ddd_telefone_2 || '').toString().trim();
       return {
         cnpj: clean,
         razao_social: d.razao_social || d.nome || '',
-        telefone: formatPhone(d.ddd_telefone_1 || d.telefone || ''),
-        telefone2: formatPhone(d.ddd_telefone_2 || ''),
-        email: d.email || '',
+        telefone: formatPhone(tel1),
+        telefone2: formatPhone(tel2),
+        email: (d.email || '').toLowerCase(),
         municipio: d.municipio || d.municipio_nome || '',
         uf: d.uf || '',
         cep: d.cep || '',
         logradouro: d.logradouro || '',
-        source: 'BrasilAPI',
+        source: `BrasilAPI${tel1 ? '' : ' (sem tel)'}`,
+        _raw_tel: tel1,
       };
     }
-  } catch {}
+  } catch (e: any) {
+    console.error('[enrich] BrasilAPI error:', e?.message);
+  }
 
   // Fallback: Minha Receita
   try {
