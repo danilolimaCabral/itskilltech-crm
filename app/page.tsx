@@ -152,8 +152,8 @@ export default function CRM() {
     else { const ex = leads.some(l => l.id === lead.id); const next = ex ? leads.map(l => l.id === lead.id ? lead : l) : [lead, ...leads]; setLeads(next); persistLocal(next); }
   };
 
-  const removeLead = async (id: string) => {
-    if (!confirm('Excluir este lead?')) return;
+  const removeLead = async (id: string, skipConfirm?: boolean) => {
+    if (!skipConfirm && !confirm('Excluir este lead?')) return;
     if (hasDb) { await fetch(`/api/leads?id=${id}`, { method: 'DELETE' }); await loadLeads(); }
     else { const next = leads.filter(l => l.id !== id); setLeads(next); persistLocal(next); }
     showToast('Lead excluído');
@@ -477,6 +477,7 @@ export default function CRM() {
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 10 }}>
                   <button className="btn btn-sm" title="Editar lead" onClick={() => { setEditing(leadPanel); setModalOpen(true); }}><Icon d={ICONS.edit} /></button>
+                  <button className="btn btn-sm" title="Excluir lead" style={{ color: '#ef4444', borderColor: '#ef4444' }} onClick={async () => { if (confirm(`Excluir "${leadPanel.name}"? Esta ação não pode ser desfeita.`)) { await removeLead(leadPanel.id, true); setLeadPanel(null); } }}><Icon d={ICONS.trash} /></button>
                   <button className="modal-close" onClick={() => setLeadPanel(null)} style={{ position: 'static', fontSize: 20, width: 32, height: 32 }}>×</button>
                 </div>
               </div>
