@@ -41,42 +41,104 @@ const SENDERS: Record<string, any> = {
 };
 const DEFAULT_SENDER = SENDERS.lottus;
 
-// ── Fonte 1: CNPJ.já ──────────────────────────────────────────────────────────
+// ── Gerar e-mail por padrão de domínio ───────────────────────────────────────
+function guessEmail(name: string, cnpj: string): string {
+  // Criar slug do nome da empresa para montar e-mail
+  const slug = name
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
+    .replace(/\s+(ltda|me|sa|s\.a|eireli|epp|ss|sss|comercio|industria|servicos|solucoes|brasil|do|da|de|e|em|para|com|the)\b/gi, '')
+    .replace(/[^a-z0-9]/g, '')
+    .slice(0, 20);
+  if (!slug) return '';
+  return `contato@${slug}.com.br`;
+}
+
+// Mapeamento CNAE para busca direta na API CNPJ.já
+const CNAE_DIRECT: Record<string, string[]> = {
+  logistica:   ['5211701', '5211702', '5212500', '5229001', '5229002'],
+  transporte:  ['4930201', '4930202', '4921301', '4921302', '4922101'],
+  tms:         ['4930201', '4930202', '5229001', '5229002', '5211701'],
+  tecnologia:  ['6201501', '6201502', '6202300', '6203100', '6204000'],
+  software:    ['6201501', '6201502', '6202300', '6209100'],
+  atacado:     ['4632001', '4632002', '4633801', '4634601', '4635401'],
+  industria:   ['2511000', '2512800', '2521700', '2522500', '2531401'],
+  saude:       ['8610101', '8610102', '8621601', '8621602', '8630501'],
+  varejo:      ['4711301', '4711302', '4712100', '4713001', '4721102'],
+  construcao:  ['4110700', '4120400', '4211101', '4211102', '4212000'],
+  agro:        ['0111301', '0111302', '0111303', '0113000', '0115600'],
+  financeiro:  ['6422100', '6423100', '6424701', '6424702', '6431000'],
+  educacao:    ['8511200', '8512100', '8513900', '8520100', '8531700'],
+  alimentos:   ['1011201', '1011202', '1012101', '1012102', '1013901'],
+};
+
+// ── Fonte 1: CNPJ.já (direto via API) ──────────────────────────────────────
 async function fetchFromCnpja(industry: string, limit: number, state?: string, reqBaseUrl?: string): Promise<any[]> {
   try {
-    // Usar a rota interna /api/search-companies que já tem CNAE correto e chave configurada
-    const base = reqBaseUrl || process.env.NEXT_PUBLIC_URL || 'https://itskilltech-crm.vercel.app';
-    const res = await fetch(`${base}/api/search-companies`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        query: industry,
-        mode: 'segment',
-        limit: Math.min(limit, 20),
-        state: state || '',
-      }),
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    const results: any[] = data.results || [];
-    return results
-      .filter((o: any) => o.name && o.email)
-      .map((o: any) => ({
-        id: uid(),
-        name: o.name || o.alias || '',
-        company: o.name || o.alias || '',
-        role: 'Empresa',
-        email: o.email || '',
-        phone: o.phone || '',
-        whatsapp: '',
-        linkedin: '',
-        source: 'CNPJ.já',
-        cnpj: o.cnpj || '',
-        city: o.city || '',
-        state: o.state || '',
-        cnae: o.cnae || '',
-        size: o.size || '',
-      }));
+    const cnaeCodes = CNAE_DIRECT[industry.toLowerCase()] || CNAE_DIRECT['logistica'];
+    const limitPerCnae = Math.ceil((limit * 3) / cnaeCodes.length);
+    let allRecords: any[] = [];
+
+    if (CNPJA_KEY) {
+      // Chamada direta à API do CNPJ.já (mais rápido e confiável)
+      for (const cnae of cnaeCodes.slice(0, 3)) {
+        try {
+          const params = new URLSearchParams({
+            'mainActivity.id.in': cnae,
+            limit: String(Math.min(limitPerCnae, 20)),
+          });
+          if (state) params.append('address.state.in', state);
+          const res = await fetch(`https://api.cnpja.com/office?${params}`, {
+            headers: { Authorization: CNPJA_KEY },
+          });
+          if (!res.ok) continue;
+          const data = await res.json();
+          allRecords.push(...(data.records || []));
+        } catch { continue; }
+      }
+    } else {
+      // Fallback: usar rota interna
+      const base = reqBaseUrl || process.env.NEXT_PUBLIC_URL || 'https://itskilltech-crm.vercel.app';
+      const res = await fetch(`${base}/api/search-companies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: industry, mode: 'segment', limit: Math.min(limit * 3, 60), state: state || '' }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Rota interna já retorna no formato mapeado
+        return (data.results || [])
+          .filter((o: any) => o.name)
+          .map((o: any) => ({
+            id: uid(), name: o.name || '', company: o.name || '', role: 'Empresa',
+            email: o.email || guessEmail(o.name || '', o.cnpj || ''),
+            emailGuessed: !o.email, phone: o.phone || '', whatsapp: '', linkedin: '',
+            source: 'CNPJ.já', cnpj: o.cnpj || '', city: o.city || '',
+            state: o.state || '', cnae: o.cnae || '', size: o.size || '',
+          }))
+          .filter((o: any) => o.email);
+      }
+      return [];
+    }
+
+    // Mapear registros da API direta
+    return allRecords
+      .filter((o: any) => o.company?.name)
+      .map((o: any) => {
+        const name = o.company?.name || o.alias || '';
+        const emailReal = o.emails?.[0]?.address || '';
+        const email = emailReal || guessEmail(name, o.taxId || '');
+        const phone = o.phones?.[0] ? `(${o.phones[0].area}) ${o.phones[0].number.slice(0,-4)}-${o.phones[0].number.slice(-4)}` : '';
+        return {
+          id: uid(), name, company: name, role: 'Empresa',
+          email, emailGuessed: !emailReal,
+          phone, whatsapp: '', linkedin: '',
+          source: 'CNPJ.já', cnpj: o.taxId || '',
+          city: o.address?.city || '', state: o.address?.state || '',
+          cnae: o.mainActivity?.text || industry, size: o.company?.size?.text || '',
+        };
+      })
+      .filter((o: any) => o.email);
   } catch { return []; }
 }
 
@@ -300,7 +362,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (allLeads.length === 0) {
-      logs.push(`[${new Date().toLocaleTimeString('pt-BR')}] ⚠ Nenhuma empresa encontrada. Verifique se a chave CNPJA_API_KEY está configurada nas variáveis de ambiente da Vercel.`);
+      logs.push(`[${new Date().toLocaleTimeString('pt-BR')}] ⚠ Nenhuma empresa encontrada. Possíveis causas: 1) Chave CNPJA_API_KEY inválida ou expirada; 2) Segmento não reconhecido (tente: logistica, transporte, tecnologia, saude, varejo); 3) Limite de requisições atingido.`);
+    } else {
+      const guessed = allLeads.filter((l: any) => l.emailGuessed).length;
+      const real = allLeads.length - guessed;
+      logs.push(`[${new Date().toLocaleTimeString('pt-BR')}] E-mails reais: ${real} | E-mails gerados por domínio: ${guessed}`);
     }
 
     leadsFound = allLeads.length;
