@@ -15,22 +15,22 @@ const RESEND_KEY = process.env.RESEND_API_KEY || '';
 
 const uid = () => 'ag_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
 
-// ── Mapeamento CNAE por segmento ──────────────────────────────────────────────
+// ── Mapeamento CNAE por segmento (7 dígitos — formato correto da API CNPJ.já) ──
 const CNAE_MAP: Record<string, string[]> = {
-  logistica:   ['5211', '5212', '5229', '5231', '5232', '5239', '5240'],
-  transporte:  ['4930', '4921', '4922', '4923', '4924', '4929'],
-  tms:         ['4930', '5211', '5212', '5229'],
-  tecnologia:  ['6201', '6202', '6203', '6204', '6209', '6311'],
-  software:    ['6201', '6202', '6203', '6204', '6209'],
-  atacado:     ['4639', '4641', '4642', '4643', '4644', '4649'],
-  industria:   ['2511', '2512', '2521', '2522', '2531', '2532'],
-  saude:       ['8610', '8621', '8622', '8630', '8640', '8650'],
-  varejo:      ['4711', '4712', '4713', '4721', '4722', '4723'],
-  construcao:  ['4110', '4120', '4211', '4212', '4213', '4221'],
-  agro:        ['0111', '0112', '0113', '0114', '0115', '0116'],
-  financeiro:  ['6411', '6412', '6421', '6422', '6423', '6424'],
-  educacao:    ['8511', '8512', '8513', '8520', '8531', '8532'],
-  alimentos:   ['1011', '1012', '1013', '1020', '1031', '1032'],
+  logistica:   ['5211701', '5211702', '5212500', '5229001', '5229002', '5229099'],
+  transporte:  ['4930201', '4930202', '4921301', '4921302', '4922101', '4922102'],
+  tms:         ['4930201', '4930202', '5229001', '5229002', '5211701'],
+  tecnologia:  ['6201501', '6201502', '6202300', '6203100', '6204000', '6209100'],
+  software:    ['6201501', '6201502', '6202300', '6209100'],
+  atacado:     ['4632001', '4632002', '4633801', '4634601', '4635401', '4639701'],
+  industria:   ['2511000', '2512800', '2521700', '2522500', '2531401', '2532201'],
+  saude:       ['8610101', '8610102', '8621601', '8621602', '8630501', '8630502'],
+  varejo:      ['4711301', '4711302', '4712100', '4713001', '4721102', '4721103'],
+  construcao:  ['4110700', '4120400', '4211101', '4211102', '4212000', '4213800'],
+  agro:        ['0111301', '0111302', '0111303', '0113000', '0115600', '0116401'],
+  financeiro:  ['6422100', '6423100', '6424701', '6424702', '6431000', '6432800'],
+  educacao:    ['8511200', '8512100', '8513900', '8520100', '8531700', '8532500'],
+  alimentos:   ['1011201', '1011202', '1012101', '1012102', '1013901', '1031700'],
 };
 
 // ── Senders por workspace ─────────────────────────────────────────────────────
@@ -42,65 +42,41 @@ const SENDERS: Record<string, any> = {
 const DEFAULT_SENDER = SENDERS.lottus;
 
 // ── Fonte 1: CNPJ.já ──────────────────────────────────────────────────────────
-async function fetchFromCnpja(industry: string, limit: number, state?: string): Promise<any[]> {
-  if (!CNPJA_KEY) return [];
+async function fetchFromCnpja(industry: string, limit: number, state?: string, reqBaseUrl?: string): Promise<any[]> {
   try {
-    const segLower = industry.toLowerCase().trim();
-    let cnaeCodes: string[] = [];
-    for (const [key, codes] of Object.entries(CNAE_MAP)) {
-      if (segLower.includes(key) || key.includes(segLower)) { cnaeCodes = codes; break; }
-    }
-    if (!cnaeCodes.length) {
-      // Tentar IA para mapear CNAE
-      try {
-        const resp = await openai.chat.completions.create({
-          model: 'gpt-4.1-mini',
-          messages: [
-            { role: 'system', content: 'Retorne SOMENTE um array JSON com códigos CNAE de 4 dígitos (máx 4). Sem texto adicional.' },
-            { role: 'user', content: `Códigos CNAE para o segmento "${industry}"? Ex: ["4930","5211"]` },
-          ],
-          temperature: 0.1, max_tokens: 100,
-        });
-        const raw = (resp.choices[0]?.message?.content || '[]').replace(/```[a-z]*\s*/g, '').trim();
-        const parsed = JSON.parse(raw.match(/\[[\s\S]*\]/)?.[0] || '[]');
-        if (Array.isArray(parsed) && parsed.length) cnaeCodes = parsed.slice(0, 4).map(String);
-      } catch {}
-    }
-    if (!cnaeCodes.length) return [];
-
-    const params = new URLSearchParams({ limit: String(Math.min(limit, 20)) });
-    if (state) params.set('state', state);
-    params.set('mainActivity', cnaeCodes[0]);
-
-    const res = await fetch(`https://api.cnpja.com/search?${params}`, {
-      headers: { Authorization: CNPJA_KEY },
+    // Usar a rota interna /api/search-companies que já tem CNAE correto e chave configurada
+    const base = reqBaseUrl || process.env.NEXT_PUBLIC_URL || 'https://itskilltech-crm.vercel.app';
+    const res = await fetch(`${base}/api/search-companies`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: industry,
+        mode: 'segment',
+        limit: Math.min(limit, 20),
+        state: state || '',
+      }),
     });
     if (!res.ok) return [];
     const data = await res.json();
-    const offices = data.offices || data.results || [];
-    return offices.map((o: any) => {
-      const company = o.company || {};
-      const phones = o.phones || [];
-      const emails = o.emails || [];
-      const phone = phones[0] ? `(${phones[0].area}) ${phones[0].number.slice(0, -4)}-${phones[0].number.slice(-4)}` : '';
-      const email = emails[0]?.address || (o.address?.city ? `contato@${(company.name || '').toLowerCase().replace(/\s+/g, '').slice(0, 20)}.com.br` : '');
-      return {
+    const results: any[] = data.results || [];
+    return results
+      .filter((o: any) => o.name && o.email)
+      .map((o: any) => ({
         id: uid(),
-        name: company.name || o.alias || '',
-        company: company.name || o.alias || '',
+        name: o.name || o.alias || '',
+        company: o.name || o.alias || '',
         role: 'Empresa',
-        email,
-        phone,
+        email: o.email || '',
+        phone: o.phone || '',
         whatsapp: '',
         linkedin: '',
         source: 'CNPJ.já',
-        cnpj: o.taxId || '',
-        city: o.address?.city || '',
-        state: o.address?.state || '',
-        cnae: o.mainActivity?.text || '',
-        size: company.size?.text || '',
-      };
-    }).filter((l: any) => l.name && l.email);
+        cnpj: o.cnpj || '',
+        city: o.city || '',
+        state: o.state || '',
+        cnae: o.cnae || '',
+        size: o.size || '',
+      }));
   } catch { return []; }
 }
 
@@ -305,21 +281,26 @@ export async function POST(req: NextRequest) {
     logs.push(`[${new Date().toLocaleTimeString('pt-BR')}] E-mails já cadastrados: ${existingEmails.size}`);
 
     let allLeads: any[] = [];
+    const reqBase = process.env.NEXT_PUBLIC_URL || 'https://itskilltech-crm.vercel.app';
 
-    // Fonte 1: CNPJ.já
-    if (sources.includes('cnpja') && CNPJA_KEY) {
-      logs.push(`[${new Date().toLocaleTimeString('pt-BR')}] Buscando no CNPJ.já...`);
-      const cnpjaLeads = await fetchFromCnpja(industry, limit);
+    // Fonte 1: CNPJ.já (via rota interna — sempre tenta, não precisa de CNPJA_KEY aqui)
+    if (sources.includes('cnpja')) {
+      logs.push(`[${new Date().toLocaleTimeString('pt-BR')}] Buscando no CNPJ.já (segmento: ${industry})...`);
+      const cnpjaLeads = await fetchFromCnpja(industry, limit, undefined, reqBase);
       logs.push(`[${new Date().toLocaleTimeString('pt-BR')}] CNPJ.já: ${cnpjaLeads.length} empresas encontradas`);
       allLeads.push(...cnpjaLeads);
     }
 
-    // Fonte 2: Apollo.io
+    // Fonte 2: Apollo.io (só se tiver chave)
     if (sources.includes('apollo') && APOLLO_KEY && allLeads.length < limit) {
       logs.push(`[${new Date().toLocaleTimeString('pt-BR')}] Buscando no Apollo.io...`);
       const apolloLeads = await fetchFromApollo(industry, limit - allLeads.length);
       logs.push(`[${new Date().toLocaleTimeString('pt-BR')}] Apollo.io: ${apolloLeads.length} empresas encontradas`);
       allLeads.push(...apolloLeads);
+    }
+
+    if (allLeads.length === 0) {
+      logs.push(`[${new Date().toLocaleTimeString('pt-BR')}] ⚠ Nenhuma empresa encontrada. Verifique se a chave CNPJA_API_KEY está configurada nas variáveis de ambiente da Vercel.`);
     }
 
     leadsFound = allLeads.length;
