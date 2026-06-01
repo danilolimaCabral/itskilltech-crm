@@ -4,13 +4,13 @@ import { Resend } from 'resend'
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 const WORKSPACE_SENDERS: Record<string, { email: string; name: string }> = {
-  lottus: { email: 'danilo@lottustech.com.br', name: 'Danilo | getLOG/Lottustech' },
-  iota: { email: 'danilo@iota.com.br', name: 'Danilo | IOTA' },
-  splice: { email: 'danilo@lottustech.com.br', name: 'Danilo | Splice' },
-  connect: { email: 'danilo@lottustech.com.br', name: 'Danilo | Connect' },
+  lottus: { email: 'crm@grandy.ia.br', name: 'Danilo | getLOG/Lottustech' },
+  iota: { email: 'crm@grandy.ia.br', name: 'Danilo | IOTA' },
+  splice: { email: 'crm@grandy.ia.br', name: 'Danilo | Splice' },
+  connect: { email: 'crm@grandy.ia.br', name: 'Danilo | Connect' },
 }
 
-const DEFAULT_SENDER = { email: 'onboarding@resend.dev', name: 'ITskillTech CRM' }
+const DEFAULT_SENDER = { email: 'crm@grandy.ia.br', name: 'ITskillTech CRM' }
 
 export async function POST(req: NextRequest) {
   try {
