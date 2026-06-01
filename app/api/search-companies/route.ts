@@ -118,16 +118,22 @@ Retorne SOMENTE este JSON (sem texto adicional):
 
     const rawText = completion.choices[0]?.message?.content || '[]'
 
-    // Extrair JSON da resposta
+    // Extrair JSON da resposta (lidar com markdown do Gemini)
     let suggestions: Array<{ cnpj: string; razao_social?: string; nome_fantasia?: string }> = []
     try {
-      // Tentar extrair JSON de diferentes formatos
-      const jsonMatch = rawText.match(/\[[\s\S]*?\]/s) || rawText.match(/\[[\s\S]*\]/)
-      if (jsonMatch) {
-        suggestions = JSON.parse(jsonMatch[0])
-      } else {
-        // Tentar parsear diretamente
-        suggestions = JSON.parse(rawText)
+      // Remover markdown code blocks (```json ... ``` ou ``` ... ```)
+      const cleaned = rawText.replace(/```(?:json)?\s*/g, '').replace(/```\s*/g, '').trim()
+      // Tentar parsear diretamente após limpeza
+      try {
+        suggestions = JSON.parse(cleaned)
+      } catch {
+        // Fallback: extrair array JSON com regex
+        const jsonMatch = cleaned.match(/\[[\s\S]*\]/)
+        if (jsonMatch) {
+          suggestions = JSON.parse(jsonMatch[0])
+        } else {
+          throw new Error('No JSON array found')
+        }
       }
     } catch {
       return NextResponse.json({
