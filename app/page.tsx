@@ -340,12 +340,7 @@ function SearchView({ workspace, onImport, showToast }: any) {
   const [briefing, setBriefing] = useState('');
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<any[]>([]);
-  const [apolloConfigured, setApolloConfigured] = useState(false);
   const [importPreview, setImportPreview] = useState<any[]>([]);
-
-  useEffect(() => {
-    fetch('/api/prospect').then(r => r.json()).then(j => setApolloConfigured(!!j.configured)).catch(() => {});
-  }, []);
 
   const labels: any = {
     country: filters.country,
@@ -375,7 +370,6 @@ function SearchView({ workspace, onImport, showToast }: any) {
     const data = await file.arrayBuffer();
     const wb = (XLSX as any).read(data);
     const rows = (XLSX as any).utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-    // Mapeia colunas comuns em PT/EN
     const mapped = rows.map((row: any) => {
       const get = (...keys: string[]) => { for (const k of Object.keys(row)) { if (keys.some(t => k.toLowerCase().includes(t))) return row[k]; } return ''; };
       return { name: get('nome', 'name'), company: get('empresa', 'company', 'organização'), role: get('cargo', 'title', 'role'), email: get('email', 'e-mail'), whatsapp: get('whats', 'celular', 'telefone', 'phone'), linkedin: get('linkedin') };
@@ -390,31 +384,27 @@ function SearchView({ workspace, onImport, showToast }: any) {
         <div><div className="page-title">Buscar Leads</div><div className="page-description">Prospecção e importação de contatos</div></div>
       </div>
 
-      <div className="filter-group" style={{ marginBottom: 16 }}>
+      <div className="filter-group" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
         <button className={`filter-tab${tab === 'buscar' ? ' active' : ''}`} onClick={() => setTab('buscar')}>Buscar (API)</button>
-        <button className={`filter-tab${tab === 'briefing' ? ' active' : ''}`} onClick={() => setTab('briefing')}>Gerar briefing</button>
-        <button className={`filter-tab${tab === 'importar' ? ' active' : ''}`} onClick={() => setTab('importar')}>Importar planilha</button>
+        <button className={`filter-tab${tab === 'briefing' ? ' active' : ''}`} onClick={() => setTab('briefing')}>Briefing</button>
+        <button className={`filter-tab${tab === 'importar' ? ' active' : ''}`} onClick={() => setTab('importar')}>Importar</button>
       </div>
 
       {(tab === 'buscar' || tab === 'briefing') && (
-        <div className="table-wrap" style={{ padding: 18, marginBottom: 16 }}>
-          <div className="field-row">
+        <div className="table-wrap" style={{ padding: 16, marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div className="field"><label className="field-label">País</label><select className="field-select" value={filters.country} onChange={e => setFilters({ ...filters, country: e.target.value })}><option>Brasil</option><option>Estados Unidos</option><option>Portugal</option></select></div>
-            <div className="field"><label className="field-label">Departamento</label><select className="field-select" value={filters.department} onChange={e => setFilters({ ...filters, department: e.target.value })}><option value="ti">TI / Tecnologia</option><option value="operacoes">Operações</option><option value="logistica">Logística</option><option value="comercial">Comercial</option></select></div>
+            <div className="field"><label className="field-label">Setor</label><select className="field-select" value={filters.department} onChange={e => setFilters({ ...filters, department: e.target.value })}><option value="ti">TI / Tecnologia</option><option value="operacoes">Operações</option><option value="logistica">Logística</option><option value="comercial">Comercial</option></select></div>
+            <div className="field"><label className="field-label">Nível</label><select className="field-select" value={filters.level} onChange={e => setFilters({ ...filters, level: e.target.value })}><option value="decisores">C-level / Diretor</option><option value="donos">Donos / Fundadores</option><option value="gerencia">Gerência</option></select></div>
+            <div className="field"><label className="field-label">Qtd</label><select className="field-select" value={filters.qty} onChange={e => setFilters({ ...filters, qty: e.target.value })}><option>25</option><option>50</option><option>100</option></select></div>
           </div>
-          <div className="field-row">
-            <div className="field"><label className="field-label">Nível</label><select className="field-select" value={filters.level} onChange={e => setFilters({ ...filters, level: e.target.value })}><option value="decisores">Decisores (C-level, Diretor, VP)</option><option value="donos">Donos / Fundadores</option><option value="gerencia">Gerência</option></select></div>
-            <div className="field"><label className="field-label">Quantidade</label><select className="field-select" value={filters.qty} onChange={e => setFilters({ ...filters, qty: e.target.value })}><option>25</option><option>50</option><option>100</option></select></div>
-          </div>
-          <div className="field"><label className="field-label">Setor (opcional)</label><input className="field-input" value={filters.industry} onChange={e => setFilters({ ...filters, industry: e.target.value })} placeholder="Ex: varejo, indústria..." /></div>
-
+          <div className="field" style={{ marginTop: 10 }}><label className="field-label">Segmento (opcional)</label><input className="field-input" value={filters.industry} onChange={e => setFilters({ ...filters, industry: e.target.value })} placeholder="Ex: varejo, saúde, indústria..." /></div>
           {tab === 'buscar' ? (
-            <>
-              {!apolloConfigured && <div className="alert alert-warn" style={{ marginTop: 4 }}>A busca real precisa da chave da API. Adicione <strong>APOLLO_API_KEY</strong> nas variáveis de ambiente da Vercel. Enquanto isso, use a aba "Gerar briefing".</div>}
-              <button className="btn btn-primary" onClick={realSearch} disabled={searching || !apolloConfigured}><Icon d={ICONS.search2} />{searching ? 'Buscando...' : 'Buscar leads reais'}</button>
-            </>
+            <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 12 }} onClick={realSearch} disabled={searching}>
+              <Icon d={ICONS.search2} />{searching ? 'Buscando...' : 'Buscar leads reais'}
+            </button>
           ) : (
-            <button className="btn btn-primary" onClick={genBriefing}><Icon d={ICONS.search2} />Gerar briefing</button>
+            <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 12 }} onClick={genBriefing}><Icon d={ICONS.search2} />Gerar briefing</button>
           )}
         </div>
       )}
@@ -428,32 +418,69 @@ function SearchView({ workspace, onImport, showToast }: any) {
 
       {tab === 'buscar' && results.length > 0 && (
         <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8 }}>
             <strong style={{ fontSize: 13 }}>{results.length} resultado(s)</strong>
-            <button className="btn btn-primary btn-sm" onClick={() => onImport(results)}><Icon d={ICONS.download} />Importar todos como leads</button>
+            <button className="btn btn-primary btn-sm" onClick={() => onImport(results)}><Icon d={ICONS.download} />Importar todos</button>
           </div>
-          <div className="table-wrap"><table className="data"><thead><tr><th>Nome</th><th>Empresa</th><th>Cargo</th><th>E-mail</th></tr></thead><tbody>
-            {results.map((r, i) => (<tr key={i}><td><div className="cell-primary">{r.name}</div></td><td><div className="cell-secondary">{r.company || '—'}</div></td><td><div className="cell-secondary">{r.role || '—'}</div></td><td><div className="cell-secondary">{r.email || '—'}</div></td></tr>))}
-          </tbody></table></div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {results.map((r, i) => (
+              <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 14px', boxShadow: '0 1px 3px rgba(0,0,0,.06)' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+                  {r.logo && (
+                    <img src={r.logo} alt="" style={{ width: 38, height: 38, borderRadius: 8, objectFit: 'contain', background: '#fff', border: '1px solid var(--border)', flexShrink: 0 }}
+                      onError={(e: any) => { e.target.style.display = 'none'; }} />
+                  )}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3 }}>{r.name || r.company}</div>
+                    {r.industry && <div style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 500, marginTop: 2 }}>{r.industry}</div>}
+                  </div>
+                  <button className="btn btn-sm" style={{ flexShrink: 0, fontSize: 11, padding: '5px 10px', borderRadius: 8 }} onClick={() => onImport([r])}>+ Lead</button>
+                </div>
+                {(r.city || r.employees || r.revenue) && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px 10px', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
+                    {r.city && <span>📍 {r.city}{r.country ? `, ${r.country}` : ''}</span>}
+                    {r.employees && <span>👥 {r.employees}</span>}
+                    {r.revenue && <span>💰 {r.revenue}</span>}
+                  </div>
+                )}
+                {r.email && (
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✉️ {r.email}</div>
+                )}
+                {r.website && (
+                  <a href={r.website.startsWith('http') ? r.website : `https://${r.website}`} target="_blank" rel="noreferrer"
+                    style={{ fontSize: 12, color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', marginBottom: 4 }}>🌐 {r.website}</a>
+                )}
+                {r.description && (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.description}</div>
+                )}
+              </div>
+            ))}
+          </div>
         </>
       )}
 
       {tab === 'importar' && (
-        <div className="table-wrap" style={{ padding: 18 }}>
-          <div className="alert alert-info">Envie uma planilha (CSV ou Excel). As colunas são reconhecidas automaticamente: nome, empresa, cargo, email, telefone/whatsapp, linkedin.</div>
-          <label className="btn btn-primary" style={{ cursor: 'pointer', display: 'inline-flex' }}>
+        <div className="table-wrap" style={{ padding: 16 }}>
+          <div className="alert alert-info" style={{ fontSize: 13 }}>Envie uma planilha (CSV ou Excel). Colunas reconhecidas: nome, empresa, cargo, email, telefone/whatsapp, linkedin.</div>
+          <label className="btn btn-primary" style={{ cursor: 'pointer', display: 'inline-flex', width: '100%', justifyContent: 'center', marginTop: 8 }}>
             <Icon d={ICONS.upload} />Escolher arquivo
             <input type="file" accept=".csv,.xlsx,.xls" style={{ display: 'none' }} onChange={handleFile} />
           </label>
           {importPreview.length > 0 && (
             <div style={{ marginTop: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <strong style={{ fontSize: 13 }}>{importPreview.length} contato(s) na planilha</strong>
+                <strong style={{ fontSize: 13 }}>{importPreview.length} contato(s)</strong>
                 <button className="btn btn-primary btn-sm" onClick={() => { onImport(importPreview); setImportPreview([]); }}><Icon d={ICONS.download} />Importar todos</button>
               </div>
-              <div className="table-wrap"><table className="data"><thead><tr><th>Nome</th><th>Empresa</th><th>E-mail</th></tr></thead><tbody>
-                {importPreview.slice(0, 10).map((r, i) => (<tr key={i}><td><div className="cell-primary">{r.name}</div></td><td><div className="cell-secondary">{r.company || '—'}</div></td><td><div className="cell-secondary">{r.email || '—'}</div></td></tr>))}
-              </tbody></table></div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {importPreview.slice(0, 10).map((r, i) => (
+                  <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px' }}>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{r.name}</div>
+                    {r.company && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.company}</div>}
+                    {r.email && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>✉️ {r.email}</div>}
+                  </div>
+                ))}
+              </div>
               {importPreview.length > 10 && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>...e mais {importPreview.length - 10}</div>}
             </div>
           )}
