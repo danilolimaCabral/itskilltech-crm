@@ -1,38 +1,28 @@
 import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
-// Mapeamento de empresas conhecidas da planilha para seus CNPJs
+// Mapeamento de empresas conhecidas da planilha para seus CNPJs (verificados na BrasilAPI)
 const KNOWN_CNPJS: Record<string, string> = {
-  'roldão atacadista': '07170938000100',
-  'roldao atacadista': '07170938000100',
-  'portobello': '83475913000150',
-  'portobello grupo': '83475913000150',
+  // Atacadistas/Distribuidores
   'makro': '59291534000167',
   'makro atacadista': '59291534000167',
+  'portobello': '83475913000191',
+  'portobello grupo': '83475913000191',
+  // Indústria/Materiais
   'duratex': '97837181000147',
   'dexco': '97837181000147',
-  'eucatex': '60900846000128',
-  'saint gobain': '61064929000190',
-  'saint-gobain': '61064929000190',
-  'cassol': '87230938000100',
-  'cassol centerlar': '87230938000100',
-  'leroy merlin': '04867554000100',
-  'c&a': '45242914000131',
-  'renner': '92754738000162',
-  'riachuelo': '33200056000196',
-  'marisa': '43470942000196',
-  'hering': '78876950000171',
+  // TI/Software
   'totvs': '53113791000122',
   'linx': '06948969000175',
-  'senior sistemas': '00569178000192',
-  'sankhya': '00543283000110',
-  'sap brasil': '01877862000100',
   'oracle brasil': '59456277000176',
-  'microsoft brasil': '60316817000100',
-  'ibm brasil': '33372251000100',
-  'accenture brasil': '04418407000100',
-  'deloitte brasil': '49288247000148',
-  'pwc brasil': '61562112000120',
+  'microsoft': '60316817000103',
+  'microsoft brasil': '60316817000103',
+  'ibm': '33372251000156',
+  'ibm brasil': '33372251000156',
+  // Varejo
+  'renner': '92754738000162',
+  'riachuelo': '33200056000196',
+  'hering': '78876950000171',
 };
 
 async function searchCNPJByName(companyName: string): Promise<string | null> {
