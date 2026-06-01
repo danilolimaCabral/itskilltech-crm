@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { neon } from '@neondatabase/serverless';
+import { sql } from '@vercel/postgres';
 
 // Pixel de rastreamento 1x1 transparente
 const PIXEL = Buffer.from(
@@ -14,10 +14,8 @@ export async function GET(req: NextRequest) {
 
   if (leadId && workspace) {
     try {
-      const sql = neon(process.env.POSTGRES_URL!);
-
       // Buscar o lead atual
-      const rows = await sql`SELECT * FROM leads WHERE id = ${leadId} AND workspace = ${workspace} LIMIT 1`;
+      const { rows } = await sql`SELECT * FROM leads WHERE id = ${leadId} AND workspace = ${workspace} LIMIT 1`;
       if (rows.length > 0) {
         const lead = rows[0];
         const currentStatus = lead.status || 'prospeccao';
