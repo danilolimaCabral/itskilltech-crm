@@ -225,7 +225,7 @@ export default function CRM() {
       const r = await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: emailModal.email, toName: emailModal.name, subject: emailSubject, body: emailBody }),
+        body: JSON.stringify({ to: emailModal.email, toName: emailModal.name, subject: emailSubject, body: emailBody, workspaceSlug: workspace, fromName: ws?.name }),
       });
       const j = await r.json();
       if (j.success) {
@@ -708,7 +708,7 @@ function InboxView({ workspace, gmailConfigured, leads, showToast }: any) {
     if (!compose.to) { showToast('Informe o destinatário'); return; }
     setSending(true);
     try {
-      const r = await fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: compose.to, subject: compose.subject, body: compose.body }) });
+      const r = await fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: compose.to, subject: compose.subject, body: compose.body, workspaceSlug: workspace }) });
       const j = await r.json();
       if (j.success) { showToast('E-mail enviado'); setCompose({ to: '', subject: '', body: '' }); }
       else showToast('Erro: ' + (j.error || 'falha no envio'));

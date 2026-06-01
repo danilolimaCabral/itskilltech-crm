@@ -28,7 +28,9 @@ export async function POST(req: NextRequest) {
     }
 
     const sender = workspaceSlug ? (WORKSPACE_SENDERS[workspaceSlug] || DEFAULT_SENDER) : DEFAULT_SENDER
-    const fromEmail = fromName ? `${fromName} <${sender.email}>` : `${sender.name} <${sender.email}>`
+    // Usa o nome do workspace passado pelo frontend, ou o nome padrão do workspace
+    const displayName = fromName || sender.name
+    const fromEmail = `${displayName} <${sender.email}>`
 
     const htmlBody = `<!DOCTYPE html>
 <html>
