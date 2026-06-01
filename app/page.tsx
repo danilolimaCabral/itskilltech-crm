@@ -538,6 +538,8 @@ function WorkspacesView({ workspaces, onReload, showToast }: any) {
   const [name, setName] = useState('');
   const [color, setColor] = useState('#0066ff');
   const [saving, setSaving] = useState(false);
+  const [editingWs, setEditingWs] = useState<any | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const create = async () => {
     if (!name.trim()) { showToast('Nome obrigatório'); return; }
@@ -551,6 +553,17 @@ function WorkspacesView({ workspaces, onReload, showToast }: any) {
     setSaving(false);
   };
 
+  const saveEdit = async () => {
+    if (!editingWs?.name?.trim()) { showToast('Nome obrigatório'); return; }
+    setSavingEdit(true);
+    try {
+      await fetch('/api/workspaces', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editingWs.id, name: editingWs.name.trim(), color: editingWs.color }) });
+      await onReload();
+      setEditingWs(null); showToast('Workspace atualizado!');
+    } catch { showToast('Erro ao salvar'); }
+    setSavingEdit(false);
+  };
+
   const remove = async (id: string) => {
     if (!confirm('Excluir este workspace?')) return;
     try {
@@ -561,11 +574,11 @@ function WorkspacesView({ workspaces, onReload, showToast }: any) {
 
   return (
     <>
-      <div className="page-header"><div><div className="page-title">Workspaces</div><div className="page-description">Gerencie seus espaços de trabalho</div></div></div>
+      <div className="page-header"><div><div className="page-title">Workspaces</div><div className="page-description">Gerencie seus espaços de trabalho — o nome é usado nos templates da IA</div></div></div>
       <div className="table-wrap" style={{ padding: 16, marginBottom: 16 }}>
         <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>Criar novo workspace</div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div className="field" style={{ flex: 1, minWidth: 180 }}><label className="field-label">Nome</label><input className="field-input" value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Clientes Varejo" /></div>
+          <div className="field" style={{ flex: 1, minWidth: 180 }}><label className="field-label">Nome</label><input className="field-input" value={name} onChange={e => setName(e.target.value)} placeholder="Ex: getLOG/Lottustech" /></div>
           <div className="field"><label className="field-label">Cor</label><input type="color" value={color} onChange={e => setColor(e.target.value)} style={{ width: 44, height: 38, border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', padding: 2 }} /></div>
           <button className="btn btn-primary" onClick={create} disabled={saving}><Icon d={ICONS.plus} />{saving ? 'Criando...' : 'Criar'}</button>
         </div>
@@ -575,12 +588,39 @@ function WorkspacesView({ workspaces, onReload, showToast }: any) {
           <div key={w.id} className="account-card">
             <span className="ws-dot" style={{ background: w.color, width: 12, height: 12, borderRadius: '50%', flexShrink: 0 }} />
             <div className="account-info"><div className="account-ws">{w.name}</div><div className="account-email" style={{ fontSize: 11 }}>ID: {w.id}</div></div>
+            <button className="btn btn-sm" onClick={() => setEditingWs({ ...w })} title="Editar nome e cor"><Icon d={ICONS.edit} /></button>
             {!['lottus', 'iota', 'splice'].includes(w.id) && (
               <button className="btn btn-danger btn-sm" onClick={() => remove(w.id)}><Icon d={ICONS.trash} /></button>
             )}
           </div>
         ))}
       </div>
+
+      {editingWs && (
+        <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) setEditingWs(null); }}>
+          <div className="modal" style={{ maxWidth: 420 }}>
+            <div className="modal-header">
+              <div className="modal-title">Editar workspace</div>
+              <button className="modal-close" onClick={() => setEditingWs(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="field">
+                <label className="field-label">Nome do workspace</label>
+                <input className="field-input" value={editingWs.name} onChange={e => setEditingWs({ ...editingWs, name: e.target.value })} placeholder="Ex: getLOG/Lottustech" />
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Este nome aparece nos templates gerados pela IA e no cabeçalho do CRM</div>
+              </div>
+              <div className="field">
+                <label className="field-label">Cor</label>
+                <input type="color" value={editingWs.color} onChange={e => setEditingWs({ ...editingWs, color: e.target.value })} style={{ width: 60, height: 38, border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', padding: 2 }} />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn" onClick={() => setEditingWs(null)}>Cancelar</button>
+              <button className="btn btn-primary" disabled={savingEdit} onClick={saveEdit}>{savingEdit ? 'Salvando...' : 'Salvar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

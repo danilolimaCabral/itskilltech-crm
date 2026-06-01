@@ -22,6 +22,17 @@ export async function POST(req: Request) {
   }
 }
 
+export async function PUT(req: Request) {
+  try {
+    const ws = await req.json();
+    if (!ws.id || !ws.name) return NextResponse.json({ error: 'id e name são obrigatórios' }, { status: 400 });
+    await upsertWorkspace(ws);
+    return NextResponse.json({ ok: true, workspace: ws });
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 });
+  }
+}
+
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
