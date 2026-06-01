@@ -6,9 +6,12 @@ interface Lead {
   id: string; workspace: string; name: string; company?: string; role?: string;
   email?: string; whatsapp?: string; linkedin?: string; phone?: string;
   source?: string; notes?: string; status: string; created_at: number; updated_at: number;
+  call_count?: number; last_contact?: number;
 }
 
-const WORKSPACES = [
+interface Workspace { id: string; name: string; color: string; }
+
+const DEFAULT_WORKSPACES: Workspace[] = [
   { id: 'lottus', name: 'Lottus Tech', color: '#0066ff' },
   { id: 'iota', name: 'IOTA', color: '#6938ef' },
   { id: 'splice', name: 'Splice', color: '#079455' },
@@ -22,8 +25,8 @@ const statusLabel = (s: string) => (({ novo: 'Novo', contatado: 'Contatado', neg
 const Icon = ({ d, fill }: { d: string; fill?: boolean }) => (
   <svg viewBox="0 0 24 24" fill={fill ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: d }} />
 );
+
 const ICONS: any = {
-  enrich: '<path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm1-13h-2v5l4.25 2.52.75-1.23-3-1.79z"/>',
   leads: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
   send: '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
@@ -31,19 +34,24 @@ const ICONS: any = {
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   email: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/>',
   whatsapp: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+  phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.18 6.18l1.87-1.87a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>',
   refresh: '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
   search2: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
   download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+  enrich: '<circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>',
+  workspace: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
+  trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
+  edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
 };
 
 export default function CRM() {
+  const [workspaces, setWorkspaces] = useState<Workspace[]>(DEFAULT_WORKSPACES);
   const [workspace, setWorkspace] = useState('lottus');
   const [view, setView] = useState('leads');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [hasDb, setHasDb] = useState<boolean | null>(null);
-  const [accounts, setAccounts] = useState<any[]>([]);
-  const [oauthConfigured, setOauthConfigured] = useState(false);
+  const [gmailConfigured, setGmailConfigured] = useState(false);
   const [toast, setToast] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Lead | null>(null);
@@ -51,42 +59,43 @@ export default function CRM() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [enriching, setEnriching] = useState<string | null>(null);
+  // Call modal
+  const [callModal, setCallModal] = useState<Lead | null>(null);
+  const [callResult, setCallResult] = useState('');
+  const [callNotes, setCallNotes] = useState('');
+  const [savingCall, setSavingCall] = useState(false);
+  // Email compose modal
+  const [emailModal, setEmailModal] = useState<Lead | null>(null);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
 
-  const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2600); };
-
-  const enrichLead = async (lead: Lead) => {
-    if (!lead.company) { showToast('Lead sem empresa — não é possível enriquecer'); return; }
-    setEnriching(lead.id);
-    try {
-      const r = await fetch('/api/enrich', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company: lead.company, cnpj: (lead as any).cnpj }) });
-      const d = await r.json();
-      if (!d.ok) { showToast(d.error || 'Dados não encontrados'); return; }
-      const updated: Lead = { ...lead, phone: d.telefone || lead.phone || '', updated_at: Date.now() } as any;
-      if (d.email && !lead.email) (updated as any).email = d.email;
-      if (d.razao_social && !lead.company) updated.company = d.razao_social;
-      await saveLead(updated);
-      showToast(`✓ Enriquecido: ${d.telefone || 'sem telefone'} · ${d.source}`);
-    } catch { showToast('Erro ao enriquecer'); }
-    setEnriching(null);
-  };
-  const ws = WORKSPACES.find(w => w.id === workspace)!;
-  const account = accounts.find(a => a.workspace === workspace);
+  const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2800); };
 
   // init
   useEffect(() => {
     (async () => {
-      try { const r = await fetch('/api/init'); const j = await r.json(); setHasDb(!!j.hasDatabase); } catch { setHasDb(false); }
-      await loadAccounts();
+      try {
+        const r = await fetch('/api/init');
+        const j = await r.json();
+        setHasDb(!!j.hasDatabase);
+      } catch { setHasDb(false); }
+      // check gmail smtp
+      try {
+        const r = await fetch('/api/email-status');
+        const j = await r.json();
+        setGmailConfigured(!!j.configured);
+      } catch { setGmailConfigured(false); }
+      // load workspaces from DB if available
+      try {
+        const r = await fetch('/api/workspaces');
+        const j = await r.json();
+        if (j.workspaces?.length) setWorkspaces(j.workspaces);
+      } catch {}
     })();
-    // feedback do OAuth
     const params = new URLSearchParams(window.location.search);
-    if (params.get('auth') === 'ok') { showToast('Conta Google conectada'); window.history.replaceState({}, '', '/'); }
-    if (params.get('auth') === 'error') { showToast('Falha ao conectar conta'); window.history.replaceState({}, '', '/'); }
+    if (params.get('auth') === 'ok') { showToast('Conta conectada'); window.history.replaceState({}, '', '/'); }
   }, []);
-
-  const loadAccounts = async () => {
-    try { const r = await fetch('/api/accounts'); const j = await r.json(); setAccounts(j.accounts || []); setOauthConfigured(!!j.configured); } catch {}
-  };
 
   const loadLeads = useCallback(async () => {
     if (hasDb) {
@@ -106,6 +115,7 @@ export default function CRM() {
     if (hasDb) { await fetch('/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lead) }); await loadLeads(); }
     else { const ex = leads.some(l => l.id === lead.id); const next = ex ? leads.map(l => l.id === lead.id ? lead : l) : [lead, ...leads]; setLeads(next); persistLocal(next); }
   };
+
   const removeLead = async (id: string) => {
     if (!confirm('Excluir este lead?')) return;
     if (hasDb) { await fetch(`/api/leads?id=${id}`, { method: 'DELETE' }); await loadLeads(); }
@@ -113,12 +123,100 @@ export default function CRM() {
     showToast('Lead excluído');
   };
 
+  const enrichLead = async (lead: Lead) => {
+    if (!lead.company) { showToast('Lead sem empresa — não é possível enriquecer'); return; }
+    setEnriching(lead.id);
+    try {
+      const r = await fetch('/api/enrich', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company: lead.company }) });
+      const d = await r.json();
+      if (!d.ok) { showToast(d.error || 'Dados não encontrados'); return; }
+      const updated: Lead = { ...lead, phone: d.telefone || lead.phone || '', updated_at: Date.now() };
+      await saveLead(updated);
+      showToast(`✓ Enriquecido: ${d.telefone || 'sem telefone'} · ${d.source}`);
+    } catch { showToast('Erro ao enriquecer'); }
+    setEnriching(null);
+  };
+
+  // Registrar ligação e mover lead de status
+  const saveCall = async () => {
+    if (!callResult || !callModal) return;
+    setSavingCall(true);
+    const STATUS_MAP: any = {
+      atendeu_interesse: 'negociacao',
+      atendeu_sem_interesse: 'contatado',
+      nao_atendeu: null,
+      caixa_postal: null,
+      numero_errado: null,
+    };
+    const newStatus = STATUS_MAP[callResult];
+    const updatedLead: Lead = {
+      ...callModal,
+      status: newStatus || callModal.status,
+      call_count: (callModal.call_count || 0) + 1,
+      last_contact: Date.now(),
+      updated_at: Date.now(),
+      notes: callNotes ? `[Ligação ${new Date().toLocaleDateString('pt-BR')}] ${callNotes}\n${callModal.notes || ''}` : callModal.notes,
+    };
+    try {
+      // Salvar log de ligação no banco
+      if (hasDb) {
+        await fetch('/api/calls', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lead_id: callModal.id, workspace, result: callResult, notes: callNotes }),
+        });
+      }
+      await saveLead(updatedLead);
+      const resultLabels: any = { atendeu_interesse: '✓ Atendeu — interesse!', atendeu_sem_interesse: '✓ Atendeu — sem interesse', nao_atendeu: 'Não atendeu', caixa_postal: 'Caixa postal', numero_errado: 'Número errado' };
+      showToast(resultLabels[callResult] || 'Ligação registrada');
+    } catch { showToast('Erro ao registrar ligação'); }
+    setCallModal(null); setCallResult(''); setCallNotes('');
+    setSavingCall(false);
+  };
+
+  // Enviar e-mail via SMTP
+  const sendEmail = async () => {
+    if (!emailModal?.email) return;
+    setSendingEmail(true);
+    try {
+      const r = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: emailModal.email, toName: emailModal.name, subject: emailSubject, body: emailBody }),
+      });
+      const j = await r.json();
+      if (j.success) {
+        showToast('✓ E-mail enviado para ' + emailModal.email);
+        // Atualizar status para contatado se ainda for novo
+        if (emailModal.status === 'novo') {
+          await saveLead({ ...emailModal, status: 'contatado', updated_at: Date.now() });
+        }
+        setEmailModal(null); setEmailSubject(''); setEmailBody('');
+      } else {
+        showToast('Erro: ' + (j.error || 'falha no envio'));
+      }
+    } catch { showToast('Erro ao enviar e-mail'); }
+    setSendingEmail(false);
+  };
+
+  const openEmailModal = (lead: Lead) => {
+    setEmailModal(lead);
+    setEmailSubject(`Apresentação ITskillTech — Solução TMS para ${lead.company || 'sua empresa'}`);
+    setEmailBody(`Olá ${lead.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo, sou da ITskillTech. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar significativamente a operação logística de vocês.\n\nGostaria de agendar uma conversa rápida de 15 minutos para apresentar os resultados que estamos gerando para empresas do mesmo segmento.\n\nQual seria o melhor horário para você?\n\nAtenciosamente,\nDanilo\nITskillTech`);
+  };
+
+  const ws = workspaces.find(w => w.id === workspace) || workspaces[0];
   const filtered = leads.filter(l => {
     const t = search.toLowerCase();
     const ms = !t || l.name.toLowerCase().includes(t) || (l.email || '').toLowerCase().includes(t) || (l.company || '').toLowerCase().includes(t);
     return ms && (statusFilter === 'all' || l.status === statusFilter);
   });
-  const stats = { total: leads.length, novos: leads.filter(l => l.status === 'novo').length, negociacao: leads.filter(l => l.status === 'negociacao').length, fechados: leads.filter(l => l.status === 'fechado').length };
+  const stats = {
+    total: leads.length,
+    novos: leads.filter(l => l.status === 'novo').length,
+    negociacao: leads.filter(l => l.status === 'negociacao').length,
+    fechados: leads.filter(l => l.status === 'fechado').length,
+  };
 
   return (
     <div className="app">
@@ -126,16 +224,15 @@ export default function CRM() {
         <div className="sidebar-header"><div className="logo">IT</div><div className="logo-text">ITskill<span>CRM</span></div></div>
         <div className="sidebar-section">
           <div className="section-label">Workspaces</div>
-          {WORKSPACES.map(w => {
-            const a = accounts.find(x => x.workspace === w.id);
-            return (
-              <button key={w.id} className={`ws-item${w.id === workspace ? ' active' : ''}`} onClick={() => { setWorkspace(w.id); setSidebarOpen(false); }}>
-                <span className="ws-dot" style={{ background: w.color }} />
-                <span>{w.name}</span>
-                {a?.connected && <span title="Gmail conectado" style={{ marginLeft: 'auto', width: 6, height: 6, borderRadius: 9, background: 'var(--success)' }} />}
-              </button>
-            );
-          })}
+          {workspaces.map(w => (
+            <button key={w.id} className={`ws-item${w.id === workspace ? ' active' : ''}`} onClick={() => { setWorkspace(w.id); setSidebarOpen(false); }}>
+              <span className="ws-dot" style={{ background: w.color }} />
+              <span>{w.name}</span>
+            </button>
+          ))}
+          <button className="ws-item" style={{ opacity: 0.6, fontSize: 12 }} onClick={() => { setView('workspaces'); setSidebarOpen(false); }}>
+            <Icon d={ICONS.plus} /><span>Novo workspace</span>
+          </button>
         </div>
         <div className="sidebar-section">
           <div className="section-label">Navegação</div>
@@ -151,17 +248,15 @@ export default function CRM() {
       <div className="main">
         <header className="topbar">
           <button className="btn menu-toggle" onClick={() => setSidebarOpen(true)}><Icon d='<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>' /></button>
-          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{ws.name} <span style={{ color: 'var(--text-muted)' }}>/</span> <strong style={{ color: 'var(--text)' }}>{view === 'leads' ? 'Leads' : view === 'inbox' ? 'Caixa de Entrada' : 'Configurações'}</strong></span>
-          {account?.connected
-            ? <span className="db-badge on">{account.email}</span>
-            : <span className="db-badge off">Gmail não conectado</span>}
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{ws?.name} <span style={{ color: 'var(--text-muted)' }}>/</span> <strong style={{ color: 'var(--text)' }}>{view === 'leads' ? 'Leads' : view === 'inbox' ? 'Caixa de Entrada' : view === 'workspaces' ? 'Workspaces' : 'Configurações'}</strong></span>
+          <span className={`db-badge ${gmailConfigured ? 'on' : 'off'}`}>{gmailConfigured ? '✉ E-mail ativo' : 'E-mail não configurado'}</span>
         </header>
 
         <div className="content"><div className="content-narrow">
           {view === 'leads' && (
             <>
               <div className="page-header">
-                <div><div className="page-title">Leads</div><div className="page-description">{ws.name} · {leads.length} contato(s)</div></div>
+                <div><div className="page-title">Leads</div><div className="page-description">{ws?.name} · {leads.length} contato(s)</div></div>
                 <div className="page-actions"><button className="btn btn-primary" onClick={() => { setEditing(null); setModalOpen(true); }}><Icon d={ICONS.plus} />Novo lead</button></div>
               </div>
               <div className="stats">
@@ -180,12 +275,31 @@ export default function CRM() {
                 <div className="table-wrap"><table className="data"><thead><tr><th>Lead</th><th>Contato</th><th>Status</th><th style={{ textAlign: 'right' }}>Ações</th></tr></thead><tbody>
                   {filtered.map(lead => (
                     <tr key={lead.id} onClick={() => { setEditing(lead); setModalOpen(true); }}>
-                      <td><div className="cell-primary">{lead.name}</div><div className="cell-secondary">{lead.company || '—'}{lead.role ? ` · ${lead.role}` : ''}</div></td>
-                      <td>{lead.email && <div className="cell-secondary">{lead.email}</div>}{lead.whatsapp && <div className="cell-secondary">+{lead.whatsapp}</div>}{!lead.email && !lead.whatsapp && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>}</td>
+                      <td>
+                        <div className="cell-primary">{lead.name}</div>
+                        <div className="cell-secondary">{lead.company || '—'}{lead.role ? ` · ${lead.role}` : ''}</div>
+                        {(lead.call_count || 0) > 0 && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>📞 {lead.call_count} ligação(ões) · último: {lead.last_contact ? new Date(lead.last_contact).toLocaleDateString('pt-BR') : '—'}</div>}
+                      </td>
+                      <td>
+                        {lead.email && <div className="cell-secondary">{lead.email}</div>}
+                        {(lead.whatsapp || lead.phone) && <div className="cell-secondary">{lead.whatsapp || lead.phone}</div>}
+                        {!lead.email && !lead.whatsapp && !lead.phone && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>}
+                      </td>
                       <td><span className={`badge badge-${lead.status}`}>{statusLabel(lead.status)}</span></td>
                       <td onClick={e => e.stopPropagation()}><div className="channel-icons">
-                        <button className="ch-icon enrich-btn" title={`Enriquecer: buscar telefone de ${lead.company || lead.name}`} disabled={enriching === lead.id} onClick={() => enrichLead(lead)}>{enriching === lead.id ? <span style={{fontSize:10}}>...</span> : <Icon d='<circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>' />}</button>
-                        <button className="ch-icon" disabled={!lead.email} title="E-mail" onClick={() => { setEditing(lead); setView('inbox'); }}><Icon d={ICONS.email} /></button>
+                        {/* Enriquecer */}
+                        <button className="ch-icon enrich-btn" title={`Enriquecer: buscar telefone de ${lead.company || lead.name}`} disabled={enriching === lead.id} onClick={() => enrichLead(lead)}>
+                          {enriching === lead.id ? <span style={{ fontSize: 10 }}>...</span> : <Icon d={ICONS.enrich} />}
+                        </button>
+                        {/* Ligar */}
+                        <button className="ch-icon phone-btn" title={lead.phone || lead.whatsapp ? `Ligar: ${lead.phone || lead.whatsapp}` : 'Registrar ligação'} onClick={() => { setCallModal(lead); setCallResult(''); setCallNotes(''); }}>
+                          <Icon d={ICONS.phone} />
+                        </button>
+                        {/* E-mail */}
+                        <button className="ch-icon email-btn" disabled={!lead.email} title={lead.email ? `E-mail: ${lead.email}` : 'Sem e-mail'} onClick={() => openEmailModal(lead)}>
+                          <Icon d={ICONS.email} />
+                        </button>
+                        {/* WhatsApp */}
                         <button className="ch-icon whatsapp-btn" disabled={!lead.whatsapp && !lead.phone} title={lead.whatsapp || lead.phone ? `WhatsApp: ${lead.whatsapp || lead.phone}` : 'Sem número'} onClick={() => {
                           const num = cleanPhone(lead.whatsapp || lead.phone || '');
                           const msg = encodeURIComponent(`Olá ${lead.name.split(' ')[0]}, tudo bem? Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e gostaria de apresentar uma solução de TMS que pode otimizar sua operação logística. Posso te mostrar em 15 minutos?`);
@@ -199,8 +313,7 @@ export default function CRM() {
             </>
           )}
 
-          {view === 'inbox' && <InboxView workspace={workspace} account={account} oauthConfigured={oauthConfigured} leads={leads} showToast={showToast} />}
-
+          {view === 'inbox' && <InboxView workspace={workspace} gmailConfigured={gmailConfigured} leads={leads} showToast={showToast} />}
           {view === 'search' && <SearchView workspace={workspace} onImport={async (newLeads: any[]) => {
             const now = Date.now();
             for (const nl of newLeads) {
@@ -208,141 +321,219 @@ export default function CRM() {
             }
             showToast(newLeads.length + ' lead(s) importado(s)');
           }} showToast={showToast} />}
-
-          {view === 'settings' && <SettingsView accounts={accounts} oauthConfigured={oauthConfigured} hasDb={hasDb} onReload={loadAccounts} showToast={showToast} />}
+          {view === 'workspaces' && <WorkspacesView workspaces={workspaces} onReload={async () => {
+            try { const r = await fetch('/api/workspaces'); const j = await r.json(); if (j.workspaces?.length) setWorkspaces(j.workspaces); } catch {}
+          }} showToast={showToast} />}
+          {view === 'settings' && <SettingsView gmailConfigured={gmailConfigured} hasDb={hasDb} showToast={showToast} />}
         </div></div>
       </div>
 
+      {/* Modal de Lead */}
       {modalOpen && <LeadModal lead={editing} workspace={workspace} onClose={() => setModalOpen(false)} onSave={async (l: Lead) => { await saveLead(l); setModalOpen(false); showToast(editing ? 'Lead atualizado' : 'Lead criado'); }} onDelete={editing ? async () => { await removeLead(editing.id); setModalOpen(false); } : undefined} />}
+
+      {/* Modal de Ligação */}
+      {callModal && (
+        <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) setCallModal(null); }}>
+          <div className="modal" style={{ maxWidth: 420 }}>
+            <div className="modal-header">
+              <div className="modal-title">📞 Registrar Ligação</div>
+              <button className="modal-close" onClick={() => setCallModal(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>{callModal.name}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>{callModal.company} · {callModal.role}</div>
+              {(callModal.phone || callModal.whatsapp) && (
+                <a href={`tel:${cleanPhone(callModal.phone || callModal.whatsapp || '')}`} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 16, textDecoration: 'none' }}>
+                  <Icon d={ICONS.phone} /> Ligar: {callModal.phone || callModal.whatsapp}
+                </a>
+              )}
+              <div className="field">
+                <label className="field-label">Resultado da ligação *</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {[
+                    { v: 'atendeu_interesse', label: '✅ Atendeu — tem interesse', color: '#079455' },
+                    { v: 'atendeu_sem_interesse', label: '🟡 Atendeu — sem interesse', color: '#b54708' },
+                    { v: 'nao_atendeu', label: '❌ Não atendeu', color: '#667085' },
+                    { v: 'caixa_postal', label: '📬 Caixa postal', color: '#667085' },
+                    { v: 'numero_errado', label: '🚫 Número errado', color: '#d92d20' },
+                  ].map(opt => (
+                    <button key={opt.v} onClick={() => setCallResult(opt.v)} style={{ textAlign: 'left', padding: '10px 14px', borderRadius: 8, border: `2px solid ${callResult === opt.v ? opt.color : 'var(--border)'}`, background: callResult === opt.v ? opt.color + '15' : 'var(--surface)', cursor: 'pointer', fontSize: 13, fontWeight: callResult === opt.v ? 600 : 400 }}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="field" style={{ marginTop: 12 }}>
+                <label className="field-label">Anotações (opcional)</label>
+                <textarea className="field-textarea" style={{ minHeight: 70 }} value={callNotes} onChange={e => setCallNotes(e.target.value)} placeholder="Ex: Vai apresentar para o board em 2 semanas..." />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn" onClick={() => setCallModal(null)}>Cancelar</button>
+              <button className="btn btn-primary" disabled={!callResult || savingCall} onClick={saveCall}>{savingCall ? 'Salvando...' : 'Salvar ligação'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de E-mail */}
+      {emailModal && (
+        <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) setEmailModal(null); }}>
+          <div className="modal" style={{ maxWidth: 560 }}>
+            <div className="modal-header">
+              <div className="modal-title">✉ Enviar E-mail</div>
+              <button className="modal-close" onClick={() => setEmailModal(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14 }}>Para: <strong>{emailModal.name}</strong> &lt;{emailModal.email}&gt;</div>
+              {!gmailConfigured && (
+                <div className="alert alert-warn" style={{ marginBottom: 12, fontSize: 12 }}>⚠ E-mail SMTP não configurado. Adicione GMAIL_USER e GMAIL_APP_PASSWORD nas variáveis de ambiente da Vercel.</div>
+              )}
+              <div className="field">
+                <label className="field-label">Assunto</label>
+                <input className="field-input" value={emailSubject} onChange={e => setEmailSubject(e.target.value)} />
+              </div>
+              <div className="field">
+                <label className="field-label">Mensagem</label>
+                <textarea className="field-textarea" style={{ minHeight: 200 }} value={emailBody} onChange={e => setEmailBody(e.target.value)} />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn" onClick={() => setEmailModal(null)}>Cancelar</button>
+              <button className="btn btn-primary" disabled={!emailModal.email || sendingEmail || !gmailConfigured} onClick={sendEmail}>
+                <Icon d={ICONS.send} />{sendingEmail ? 'Enviando...' : 'Enviar e-mail'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className={`toast${toast ? ' show' : ''}`}>{toast}</div>
     </div>
   );
 }
 
-// ---------- Caixa de Entrada (Gmail real) ----------
-function InboxView({ workspace, account, oauthConfigured, leads, showToast }: any) {
-  const [tab, setTab] = useState('inbox');
-  const [messages, setMessages] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+// ---------- Caixa de Entrada ----------
+function InboxView({ workspace, gmailConfigured, leads, showToast }: any) {
   const [compose, setCompose] = useState({ to: '', subject: '', body: '' });
   const [sending, setSending] = useState(false);
-
-  const loadInbox = useCallback(async () => {
-    if (!account?.connected) return;
-    setLoading(true);
-    try { const r = await fetch(`/api/gmail/inbox?workspace=${workspace}&max=25`); const j = await r.json(); setMessages(j.messages || []); }
-    catch { setMessages([]); }
-    setLoading(false);
-  }, [workspace, account]);
-
-  useEffect(() => { if (tab === 'inbox') loadInbox(); }, [tab, loadInbox]);
 
   const send = async () => {
     if (!compose.to) { showToast('Informe o destinatário'); return; }
     setSending(true);
     try {
-      const r = await fetch('/api/gmail/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workspace, ...compose }) });
+      const r = await fetch('/api/send-email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: compose.to, subject: compose.subject, body: compose.body }) });
       const j = await r.json();
-      if (j.ok) { showToast('E-mail enviado'); setCompose({ to: '', subject: '', body: '' }); setTab('inbox'); }
+      if (j.success) { showToast('E-mail enviado'); setCompose({ to: '', subject: '', body: '' }); }
       else showToast('Erro: ' + (j.error || 'falha no envio'));
     } catch { showToast('Erro ao enviar'); }
     setSending(false);
   };
 
-  if (!oauthConfigured) {
-    return (
-      <>
-        <div className="page-header"><div><div className="page-title">Caixa de Entrada</div><div className="page-description">Integração Gmail</div></div></div>
-        <div className="alert alert-warn">A integração com o Gmail ainda não foi configurada no servidor. Defina as credenciais do Google (veja o guia GUIA_GOOGLE.md) e adicione as variáveis de ambiente na Vercel.</div>
-      </>
-    );
-  }
-  if (!account?.connected) {
-    return (
-      <>
-        <div className="page-header"><div><div className="page-title">Caixa de Entrada</div><div className="page-description">Conecte o Gmail deste workspace</div></div></div>
-        <div className="empty-state">
-          <div className="empty-title">Gmail não conectado</div>
-          <div className="empty-text">Conecte a conta Google deste workspace para enviar e receber e-mails aqui.</div>
-          <a className="google-btn" href={`/api/auth/google?workspace=${workspace}`}>
-            <svg className="google-g" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-            Conectar com Google
-          </a>
-        </div>
-      </>
-    );
-  }
-
   return (
     <>
       <div className="page-header">
-        <div><div className="page-title">Caixa de Entrada</div><div className="page-description">{account.email}</div></div>
-        <div className="page-actions">
-          {tab === 'inbox' && <button className="btn" onClick={loadInbox}><Icon d={ICONS.refresh} />Atualizar</button>}
-          <button className="btn btn-primary" onClick={() => setTab(tab === 'compose' ? 'inbox' : 'compose')}><Icon d={tab === 'compose' ? ICONS.inbox : ICONS.send} />{tab === 'compose' ? 'Ver caixa' : 'Escrever'}</button>
-        </div>
+        <div><div className="page-title">Caixa de Entrada</div><div className="page-description">Envio de e-mail via SMTP</div></div>
       </div>
-
-      {tab === 'inbox' ? (
-        loading ? <div className="empty-state"><div className="empty-text">Carregando e-mails...</div></div>
-        : messages.length === 0 ? <div className="empty-state"><div className="empty-title">Caixa vazia</div><div className="empty-text">Nenhum e-mail recente encontrado</div></div>
-        : <div className="table-wrap"><div className="mail-list">{messages.map(m => (
-            <div className="mail-item" key={m.id}>
-              <div className={`mail-from${m.unread ? ' unread' : ''}`}>{(m.from || '').replace(/<.*>/, '').trim() || m.from}</div>
-              <div className="mail-subject">{m.subject || '(sem assunto)'} <span>— {m.snippet}</span></div>
-              <div className="mail-date">{new Date(m.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</div>
-            </div>
-          ))}</div></div>
-      ) : (
-        <div className="table-wrap" style={{ padding: 18, maxWidth: 640 }}>
-          <div className="field"><label className="field-label">Para</label>
-            <input className="field-input" list="lead-emails" value={compose.to} onChange={e => setCompose({ ...compose, to: e.target.value })} placeholder="cliente@empresa.com" />
-            <datalist id="lead-emails">{leads.filter((l: Lead) => l.email).map((l: Lead) => <option key={l.id} value={l.email}>{l.name}</option>)}</datalist>
-          </div>
-          <div className="field"><label className="field-label">Assunto</label><input className="field-input" value={compose.subject} onChange={e => setCompose({ ...compose, subject: e.target.value })} /></div>
-          <div className="field"><label className="field-label">Mensagem</label><textarea className="field-textarea" style={{ minHeight: 180 }} value={compose.body} onChange={e => setCompose({ ...compose, body: e.target.value })} /></div>
-          <button className="btn btn-primary" onClick={send} disabled={sending}><Icon d={ICONS.send} />{sending ? 'Enviando...' : `Enviar de ${account.email}`}</button>
+      {!gmailConfigured && (
+        <div className="alert alert-warn">
+          <strong>E-mail SMTP não configurado.</strong> Para ativar o envio de e-mails, adicione as variáveis <code>GMAIL_USER</code> e <code>GMAIL_APP_PASSWORD</code> nas configurações de ambiente da Vercel e faça um novo deploy.
+          <br /><br />
+          <strong>Como gerar a App Password:</strong><br />
+          1. Acesse <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer">myaccount.google.com/apppasswords</a><br />
+          2. Digite o nome <code>ITskillTech CRM</code> e clique em Criar<br />
+          3. Copie a senha de 16 caracteres e adicione como <code>GMAIL_APP_PASSWORD</code> na Vercel
         </div>
       )}
+      <div className="table-wrap" style={{ padding: 18, maxWidth: 640 }}>
+        <div className="field"><label className="field-label">Para</label>
+          <input className="field-input" list="lead-emails-inbox" value={compose.to} onChange={e => setCompose({ ...compose, to: e.target.value })} placeholder="cliente@empresa.com" />
+          <datalist id="lead-emails-inbox">{leads.filter((l: Lead) => l.email).map((l: Lead) => <option key={l.id} value={l.email}>{l.name}</option>)}</datalist>
+        </div>
+        <div className="field"><label className="field-label">Assunto</label><input className="field-input" value={compose.subject} onChange={e => setCompose({ ...compose, subject: e.target.value })} /></div>
+        <div className="field"><label className="field-label">Mensagem</label><textarea className="field-textarea" style={{ minHeight: 180 }} value={compose.body} onChange={e => setCompose({ ...compose, body: e.target.value })} /></div>
+        <button className="btn btn-primary" onClick={send} disabled={sending || !gmailConfigured}><Icon d={ICONS.send} />{sending ? 'Enviando...' : 'Enviar e-mail'}</button>
+      </div>
+    </>
+  );
+}
+
+// ---------- Workspaces ----------
+function WorkspacesView({ workspaces, onReload, showToast }: any) {
+  const [name, setName] = useState('');
+  const [color, setColor] = useState('#0066ff');
+  const [saving, setSaving] = useState(false);
+
+  const create = async () => {
+    if (!name.trim()) { showToast('Nome obrigatório'); return; }
+    setSaving(true);
+    const id = name.toLowerCase().replace(/[^a-z0-9]/g, '_').slice(0, 20) + '_' + Date.now().toString(36);
+    try {
+      await fetch('/api/workspaces', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, name: name.trim(), color }) });
+      await onReload();
+      setName(''); showToast('Workspace criado: ' + name.trim());
+    } catch { showToast('Erro ao criar workspace'); }
+    setSaving(false);
+  };
+
+  const remove = async (id: string) => {
+    if (!confirm('Excluir este workspace?')) return;
+    try {
+      await fetch(`/api/workspaces?id=${id}`, { method: 'DELETE' });
+      await onReload(); showToast('Workspace excluído');
+    } catch { showToast('Erro ao excluir'); }
+  };
+
+  return (
+    <>
+      <div className="page-header"><div><div className="page-title">Workspaces</div><div className="page-description">Gerencie seus espaços de trabalho</div></div></div>
+      <div className="table-wrap" style={{ padding: 16, marginBottom: 16 }}>
+        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>Criar novo workspace</div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div className="field" style={{ flex: 1, minWidth: 180 }}><label className="field-label">Nome</label><input className="field-input" value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Clientes Varejo" /></div>
+          <div className="field"><label className="field-label">Cor</label><input type="color" value={color} onChange={e => setColor(e.target.value)} style={{ width: 44, height: 38, border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', padding: 2 }} /></div>
+          <button className="btn btn-primary" onClick={create} disabled={saving}><Icon d={ICONS.plus} />{saving ? 'Criando...' : 'Criar'}</button>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {workspaces.map((w: Workspace) => (
+          <div key={w.id} className="account-card">
+            <span className="ws-dot" style={{ background: w.color, width: 12, height: 12, borderRadius: '50%', flexShrink: 0 }} />
+            <div className="account-info"><div className="account-ws">{w.name}</div><div className="account-email" style={{ fontSize: 11 }}>ID: {w.id}</div></div>
+            {!['lottus', 'iota', 'splice'].includes(w.id) && (
+              <button className="btn btn-danger btn-sm" onClick={() => remove(w.id)}><Icon d={ICONS.trash} /></button>
+            )}
+          </div>
+        ))}
+      </div>
     </>
   );
 }
 
 // ---------- Configurações ----------
-function SettingsView({ accounts, oauthConfigured, hasDb, onReload, showToast }: any) {
-  const disconnect = async (ws: string) => {
-    if (!confirm('Desconectar esta conta Google?')) return;
-    await fetch(`/api/accounts?workspace=${ws}`, { method: 'DELETE' });
-    await onReload(); showToast('Conta desconectada');
-  };
-
+function SettingsView({ gmailConfigured, hasDb, showToast }: any) {
   return (
     <>
-      <div className="page-header"><div><div className="page-title">Configurações</div><div className="page-description">Contas de e-mail e integrações</div></div></div>
+      <div className="page-header"><div><div className="page-title">Configurações</div><div className="page-description">Integrações e banco de dados</div></div></div>
 
-      {!oauthConfigured && (
-        <div className="alert alert-warn">As credenciais do Google ainda não foram configuradas. Siga o guia <strong>GUIA_GOOGLE.md</strong> para criar o Client ID/Secret e adicione como variáveis de ambiente na Vercel (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET).</div>
+      <div style={{ fontSize: 13, fontWeight: 600, margin: '8px 0 12px' }}>E-mail (SMTP)</div>
+      <div className="account-card">
+        <div className="account-info">
+          <div className="account-ws">Gmail SMTP</div>
+          <div className="account-email">{gmailConfigured ? 'Configurado e ativo — envio de e-mails habilitado' : 'Não configurado — adicione GMAIL_USER e GMAIL_APP_PASSWORD na Vercel'}</div>
+        </div>
+        <span className={`account-status ${gmailConfigured ? 'connected' : 'disconnected'}`}>{gmailConfigured ? 'Ativo' : 'Inativo'}</span>
+      </div>
+
+      {!gmailConfigured && (
+        <div className="alert alert-warn" style={{ marginTop: 12, fontSize: 12 }}>
+          <strong>Para ativar o envio de e-mails:</strong><br />
+          1. Acesse <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer">myaccount.google.com/apppasswords</a><br />
+          2. Crie uma App Password com o nome <code>ITskillTech CRM</code><br />
+          3. Na Vercel, adicione: <code>GMAIL_USER=seu@gmail.com</code> e <code>GMAIL_APP_PASSWORD=senha16chars</code><br />
+          4. Faça um novo deploy
+        </div>
       )}
-
-      <div style={{ fontSize: 13, fontWeight: 600, margin: '8px 0 12px' }}>Contas Google por workspace</div>
-      {WORKSPACES.map(w => {
-        const a = accounts.find((x: any) => x.workspace === w.id);
-        return (
-          <div className="account-card" key={w.id}>
-            <span className="ws-dot" style={{ background: w.color, width: 10, height: 10 }} />
-            <div className="account-info">
-              <div className="account-ws">{w.name}</div>
-              <div className="account-email">{a?.connected ? a.email : 'Nenhuma conta conectada'}</div>
-            </div>
-            {a?.connected
-              ? <button className="btn btn-danger btn-sm" onClick={() => disconnect(w.id)}>Desconectar</button>
-              : <a className="google-btn" href={`/api/auth/google?workspace=${w.id}`} style={{ pointerEvents: oauthConfigured ? 'auto' : 'none', opacity: oauthConfigured ? 1 : 0.5 }}>
-                  <svg className="google-g" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-                  Conectar
-                </a>}
-          </div>
-        );
-      })}
 
       <div style={{ fontSize: 13, fontWeight: 600, margin: '24px 0 12px' }}>Banco de dados</div>
       <div className="account-card">
@@ -351,6 +542,15 @@ function SettingsView({ accounts, oauthConfigured, hasDb, onReload, showToast }:
           <div className="account-email">{hasDb ? 'Postgres conectado — dados na nuvem' : 'Modo local — dados salvos no navegador'}</div>
         </div>
         <span className={`account-status ${hasDb ? 'connected' : 'disconnected'}`}>{hasDb ? 'Nuvem' : 'Local'}</span>
+      </div>
+
+      <div style={{ fontSize: 13, fontWeight: 600, margin: '24px 0 12px' }}>WhatsApp</div>
+      <div className="account-card">
+        <div className="account-info">
+          <div className="account-ws">WhatsApp Web (link direto)</div>
+          <div className="account-email">Ativo — clique no ícone verde em qualquer lead para abrir conversa com mensagem pré-pronta</div>
+        </div>
+        <span className="account-status connected">Ativo</span>
       </div>
     </>
   );
@@ -406,13 +606,11 @@ function SearchView({ workspace, onImport, showToast }: any) {
       <div className="page-header">
         <div><div className="page-title">Buscar Leads</div><div className="page-description">Prospecção e importação de contatos</div></div>
       </div>
-
       <div className="filter-group" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
         <button className={`filter-tab${tab === 'buscar' ? ' active' : ''}`} onClick={() => setTab('buscar')}>Buscar (API)</button>
         <button className={`filter-tab${tab === 'briefing' ? ' active' : ''}`} onClick={() => setTab('briefing')}>Briefing</button>
         <button className={`filter-tab${tab === 'importar' ? ' active' : ''}`} onClick={() => setTab('importar')}>Importar</button>
       </div>
-
       {(tab === 'buscar' || tab === 'briefing') && (
         <div className="table-wrap" style={{ padding: 16, marginBottom: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
@@ -431,14 +629,12 @@ function SearchView({ workspace, onImport, showToast }: any) {
           )}
         </div>
       )}
-
       {tab === 'briefing' && briefing && (
         <div className="table-wrap" style={{ padding: 16 }}>
           <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, padding: 14, fontFamily: 'monospace', fontSize: 13, whiteSpace: 'pre-wrap', marginBottom: 12 }}>{briefing}</div>
           <button className="btn" onClick={() => { navigator.clipboard?.writeText(briefing); showToast('Briefing copiado'); }}>Copiar briefing</button>
         </div>
       )}
-
       {tab === 'buscar' && results.length > 0 && (
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8 }}>
@@ -449,39 +645,26 @@ function SearchView({ workspace, onImport, showToast }: any) {
             {results.map((r, i) => (
               <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 14px', boxShadow: '0 1px 3px rgba(0,0,0,.06)' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
-                  {r.logo && (
-                    <img src={r.logo} alt="" style={{ width: 38, height: 38, borderRadius: 8, objectFit: 'contain', background: '#fff', border: '1px solid var(--border)', flexShrink: 0 }}
-                      onError={(e: any) => { e.target.style.display = 'none'; }} />
-                  )}
+                  {r.logo && <img src={r.logo} alt="" style={{ width: 38, height: 38, borderRadius: 8, objectFit: 'contain', background: '#fff', border: '1px solid var(--border)', flexShrink: 0 }} onError={(e: any) => { e.target.style.display = 'none'; }} />}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3 }}>{r.name || r.company}</div>
                     {r.industry && <div style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 500, marginTop: 2 }}>{r.industry}</div>}
                   </div>
                   <button className="btn btn-sm" style={{ flexShrink: 0, fontSize: 11, padding: '5px 10px', borderRadius: 8 }} onClick={() => onImport([r])}>+ Lead</button>
                 </div>
-                {(r.city || r.employees || r.revenue) && (
+                {(r.city || r.employees) && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px 10px', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
-                    {r.city && <span>📍 {r.city}{r.country ? `, ${r.country}` : ''}</span>}
+                    {r.city && <span>📍 {r.city}</span>}
                     {r.employees && <span>👥 {r.employees}</span>}
-                    {r.revenue && <span>💰 {r.revenue}</span>}
                   </div>
                 )}
-                {r.email && (
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>✉️ {r.email}</div>
-                )}
-                {r.website && (
-                  <a href={r.website.startsWith('http') ? r.website : `https://${r.website}`} target="_blank" rel="noreferrer"
-                    style={{ fontSize: 12, color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block', marginBottom: 4 }}>🌐 {r.website}</a>
-                )}
-                {r.description && (
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.description}</div>
-                )}
+                {r.email && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4 }}>✉️ {r.email}</div>}
+                {r.website && <a href={r.website.startsWith('http') ? r.website : `https://${r.website}`} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: 'var(--primary)', display: 'block', marginBottom: 4 }}>🌐 {r.website}</a>}
               </div>
             ))}
           </div>
         </>
       )}
-
       {tab === 'importar' && (
         <div className="table-wrap" style={{ padding: 16 }}>
           <div className="alert alert-info" style={{ fontSize: 13 }}>Envie uma planilha (CSV ou Excel). Colunas reconhecidas: nome, empresa, cargo, email, telefone/whatsapp, linkedin.</div>
@@ -503,8 +686,8 @@ function SearchView({ workspace, onImport, showToast }: any) {
                     {r.email && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>✉️ {r.email}</div>}
                   </div>
                 ))}
+                {importPreview.length > 10 && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>...e mais {importPreview.length - 10}</div>}
               </div>
-              {importPreview.length > 10 && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>...e mais {importPreview.length - 10}</div>}
             </div>
           )}
         </div>
@@ -520,17 +703,29 @@ function LeadModal({ lead, workspace, onClose, onSave, onDelete }: any) {
   const submit = () => {
     if (!f.name?.trim()) { alert('Nome é obrigatório'); return; }
     const now = Date.now();
-    onSave({ id: f.id || uid(), workspace, name: f.name.trim(), company: f.company || '', role: f.role || '', email: f.email || '', whatsapp: cleanPhone(f.whatsapp || ''), linkedin: f.linkedin || '', phone: f.phone || '', source: f.source || '', notes: f.notes || '', status: f.status || 'novo', created_at: f.created_at || now, updated_at: now });
+    onSave({ id: f.id || uid(), workspace, name: f.name.trim(), company: f.company || '', role: f.role || '', email: f.email || '', whatsapp: cleanPhone(f.whatsapp || ''), linkedin: f.linkedin || '', phone: f.phone || '', source: f.source || '', notes: f.notes || '', status: f.status || 'novo', created_at: f.created_at || now, updated_at: now, call_count: f.call_count || 0, last_contact: f.last_contact || null });
   };
   return (
     <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal">
         <div className="modal-header"><div className="modal-title">{lead ? 'Editar lead' : 'Novo lead'}</div><button className="modal-close" onClick={onClose}>×</button></div>
         <div className="modal-body">
-          <div className="field-row"><div className="field"><label className="field-label">Nome *</label><input className="field-input" value={f.name || ''} onChange={e => set('name', e.target.value)} /></div><div className="field"><label className="field-label">Empresa</label><input className="field-input" value={f.company || ''} onChange={e => set('company', e.target.value)} /></div></div>
-          <div className="field-row"><div className="field"><label className="field-label">Cargo</label><input className="field-input" value={f.role || ''} onChange={e => set('role', e.target.value)} /></div><div className="field"><label className="field-label">Status</label><select className="field-select" value={f.status || 'novo'} onChange={e => set('status', e.target.value)}><option value="novo">Novo</option><option value="contatado">Contatado</option><option value="negociacao">Em negociação</option><option value="fechado">Fechado</option><option value="perdido">Perdido</option></select></div></div>
-          <div className="field-row"><div className="field"><label className="field-label">E-mail</label><input className="field-input" type="email" value={f.email || ''} onChange={e => set('email', e.target.value)} /></div><div className="field"><label className="field-label">WhatsApp</label><input className="field-input" type="tel" placeholder="5541999999999" value={f.whatsapp || ''} onChange={e => set('whatsapp', e.target.value)} /></div></div>
-          <div className="field-row"><div className="field"><label className="field-label">LinkedIn</label><input className="field-input" value={f.linkedin || ''} onChange={e => set('linkedin', e.target.value)} /></div><div className="field"><label className="field-label">Telefone</label><input className="field-input" type="tel" value={f.phone || ''} onChange={e => set('phone', e.target.value)} /></div></div>
+          <div className="field-row">
+            <div className="field"><label className="field-label">Nome *</label><input className="field-input" value={f.name || ''} onChange={e => set('name', e.target.value)} /></div>
+            <div className="field"><label className="field-label">Empresa</label><input className="field-input" value={f.company || ''} onChange={e => set('company', e.target.value)} /></div>
+          </div>
+          <div className="field-row">
+            <div className="field"><label className="field-label">Cargo</label><input className="field-input" value={f.role || ''} onChange={e => set('role', e.target.value)} /></div>
+            <div className="field"><label className="field-label">Status</label><select className="field-select" value={f.status || 'novo'} onChange={e => set('status', e.target.value)}><option value="novo">Novo</option><option value="contatado">Contatado</option><option value="negociacao">Em negociação</option><option value="fechado">Fechado</option><option value="perdido">Perdido</option></select></div>
+          </div>
+          <div className="field-row">
+            <div className="field"><label className="field-label">E-mail</label><input className="field-input" type="email" value={f.email || ''} onChange={e => set('email', e.target.value)} /></div>
+            <div className="field"><label className="field-label">WhatsApp</label><input className="field-input" type="tel" placeholder="5541999999999" value={f.whatsapp || ''} onChange={e => set('whatsapp', e.target.value)} /></div>
+          </div>
+          <div className="field-row">
+            <div className="field"><label className="field-label">Telefone</label><input className="field-input" type="tel" value={f.phone || ''} onChange={e => set('phone', e.target.value)} /></div>
+            <div className="field"><label className="field-label">LinkedIn</label><input className="field-input" value={f.linkedin || ''} onChange={e => set('linkedin', e.target.value)} /></div>
+          </div>
           <div className="field"><label className="field-label">Anotações</label><textarea className="field-textarea" value={f.notes || ''} onChange={e => set('notes', e.target.value)} /></div>
         </div>
         <div className="modal-footer">{onDelete && <button className="btn btn-danger" onClick={onDelete} style={{ marginRight: 'auto' }}>Excluir</button>}<button className="btn" onClick={onClose}>Cancelar</button><button className="btn btn-primary" onClick={submit}>Salvar</button></div>

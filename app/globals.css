@@ -130,6 +130,10 @@ table.data tbody tr:hover { background: var(--surface-hover); }
 .ch-icon.whatsapp-btn:not(:disabled):hover { background: #25D366; color: #fff; }
 .ch-icon.enrich-btn:not(:disabled) { color: #f59e0b; border-color: #f59e0b; }
 .ch-icon.enrich-btn:not(:disabled):hover { background: #f59e0b; color: #fff; }
+.ch-icon.phone-btn:not(:disabled) { color: #0066ff; border-color: #0066ff; }
+.ch-icon.phone-btn:not(:disabled):hover { background: #0066ff; color: #fff; }
+.ch-icon.email-btn:not(:disabled) { color: #1a56db; border-color: #1a56db; }
+.ch-icon.email-btn:not(:disabled):hover { background: #1a56db; color: #fff; }
 
 /* EMPTY */
 .empty-state { padding: 60px 20px; text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); }
