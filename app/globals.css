@@ -128,6 +128,8 @@ table.data tbody tr:hover { background: var(--surface-hover); }
 .ch-icon:disabled { opacity: 0.35; cursor: not-allowed; }
 .ch-icon.whatsapp-btn:not(:disabled) { color: #25D366; border-color: #25D366; }
 .ch-icon.whatsapp-btn:not(:disabled):hover { background: #25D366; color: #fff; }
+.ch-icon.enrich-btn:not(:disabled) { color: #f59e0b; border-color: #f59e0b; }
+.ch-icon.enrich-btn:not(:disabled):hover { background: #f59e0b; color: #fff; }
 
 /* EMPTY */
 .empty-state { padding: 60px 20px; text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); }

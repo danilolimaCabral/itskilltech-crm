@@ -23,6 +23,7 @@ const Icon = ({ d, fill }: { d: string; fill?: boolean }) => (
   <svg viewBox="0 0 24 24" fill={fill ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: d }} />
 );
 const ICONS: any = {
+  enrich: '<path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm1-13h-2v5l4.25 2.52.75-1.23-3-1.79z"/>',
   leads: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
   inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
   send: '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
@@ -49,8 +50,25 @@ export default function CRM() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [enriching, setEnriching] = useState<string | null>(null);
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2600); };
+
+  const enrichLead = async (lead: Lead) => {
+    if (!lead.company) { showToast('Lead sem empresa — não é possível enriquecer'); return; }
+    setEnriching(lead.id);
+    try {
+      const r = await fetch('/api/enrich', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company: lead.company, cnpj: (lead as any).cnpj }) });
+      const d = await r.json();
+      if (!d.ok) { showToast(d.error || 'Dados não encontrados'); return; }
+      const updated: Lead = { ...lead, phone: d.telefone || lead.phone || '', updated_at: Date.now() } as any;
+      if (d.email && !lead.email) (updated as any).email = d.email;
+      if (d.razao_social && !lead.company) updated.company = d.razao_social;
+      await saveLead(updated);
+      showToast(`✓ Enriquecido: ${d.telefone || 'sem telefone'} · ${d.source}`);
+    } catch { showToast('Erro ao enriquecer'); }
+    setEnriching(null);
+  };
   const ws = WORKSPACES.find(w => w.id === workspace)!;
   const account = accounts.find(a => a.workspace === workspace);
 
@@ -166,6 +184,7 @@ export default function CRM() {
                       <td>{lead.email && <div className="cell-secondary">{lead.email}</div>}{lead.whatsapp && <div className="cell-secondary">+{lead.whatsapp}</div>}{!lead.email && !lead.whatsapp && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>}</td>
                       <td><span className={`badge badge-${lead.status}`}>{statusLabel(lead.status)}</span></td>
                       <td onClick={e => e.stopPropagation()}><div className="channel-icons">
+                        <button className="ch-icon enrich-btn" title={`Enriquecer: buscar telefone de ${lead.company || lead.name}`} disabled={enriching === lead.id} onClick={() => enrichLead(lead)}>{enriching === lead.id ? <span style={{fontSize:10}}>...</span> : <Icon d='<circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>' />}</button>
                         <button className="ch-icon" disabled={!lead.email} title="E-mail" onClick={() => { setEditing(lead); setView('inbox'); }}><Icon d={ICONS.email} /></button>
                         <button className="ch-icon whatsapp-btn" disabled={!lead.whatsapp && !lead.phone} title={lead.whatsapp || lead.phone ? `WhatsApp: ${lead.whatsapp || lead.phone}` : 'Sem número'} onClick={() => {
                           const num = cleanPhone(lead.whatsapp || lead.phone || '');
