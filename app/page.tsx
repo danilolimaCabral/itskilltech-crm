@@ -37,7 +37,7 @@ const LEGACY_MAP: any = { novo: 'prospeccao', contatado: 'qualificacao', negocia
 const normalizeStatus = (s: string) => FUNNEL_MAP[s] ? s : (LEGACY_MAP[s] || 'prospeccao');
 const statusLabel = (s: string) => FUNNEL_MAP[normalizeStatus(s)]?.short || s;
 
-const Icon = ({ d, fill }: { d: string; fill?: boolean }) => (
+const Icon = ({ d, fill, size, color }: { d: string; fill?: boolean; size?: number; color?: string }) => (
   <svg viewBox="0 0 24 24" fill={fill ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: d }} />
 );
 
@@ -97,6 +97,8 @@ export default function CRM() {
   const [showWhatsTemplates, setShowWhatsTemplates] = useState(false);
   const [whatsModal, setWhatsModal] = useState<Lead | null>(null);
   const [whatsBody, setWhatsBody] = useState('');
+  const [sendingWhats, setSendingWhats] = useState(false);
+  const [zapiConfigured, setZapiConfigured] = useState(false);
   // Painel lateral de lead
   const [leadPanel, setLeadPanel] = useState<Lead | null>(null);
   const [panelAnalysis, setPanelAnalysis] = useState<any>(null);
@@ -179,6 +181,12 @@ export default function CRM() {
         if (Array.isArray(j)) setTemplates(j);
         else setTemplates([]);
       } catch { setTemplates([]); }
+      // check z-api
+      try {
+        const r = await fetch('/api/whatsapp?action=status');
+        const j = await r.json();
+        setZapiConfigured(!!j.configured);
+      } catch { setZapiConfigured(false); }
     })();
     const params = new URLSearchParams(window.location.search);
     if (params.get('auth') === 'ok') { showToast('Conta conectada'); window.history.replaceState({}, '', '/'); }
@@ -324,6 +332,45 @@ export default function CRM() {
       setWhatsBody(`Olá ${lead.name.split(' ')[0]}, tudo bem?\n\nMeu nome é Danilo, da ${wsNameW}. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar a operação logística de vocês.\n\nPosso te mostrar em 15 minutos como estamos ajudando empresas do mesmo segmento?\n\nQualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
     }
     setShowWhatsTemplates(false);
+  };
+
+  // Enviar WhatsApp via Z-API ou abrir no WhatsApp Web
+  const sendWhatsApp = async (lead: Lead, message: string, useApi: boolean) => {
+    const num = cleanPhone(lead.whatsapp || lead.phone || '');
+    if (!num) { showToast('Lead sem número de telefone'); return; }
+    if (useApi && zapiConfigured) {
+      setSendingWhats(true);
+      try {
+        const r = await fetch('/api/whatsapp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: num, message, leadName: lead.name, companyName: lead.company }),
+        });
+        const j = await r.json();
+        if (j.ok) {
+          // Registrar na timeline
+          const timeline = JSON.parse(lead.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+          timeline.unshift({ type: 'whatsapp', label: `WhatsApp enviado via Z-API`, ts: Date.now() });
+          const notesClean = (lead.notes || '').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
+          await saveLead({ ...lead, updated_at: Date.now(), notes: notesClean + `\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]` });
+          showToast('✓ WhatsApp enviado via Z-API!');
+          setWhatsModal(null);
+        } else {
+          showToast('Erro Z-API: ' + (j.error || j.message || 'falha'));
+        }
+      } catch (e: any) { showToast('Erro ao enviar: ' + e.message); }
+      setSendingWhats(false);
+    } else {
+      // Fallback: abrir no WhatsApp Web
+      const msg = encodeURIComponent(message);
+      window.open(`https://wa.me/55${num}?text=${msg}`, '_blank');
+      // Registrar na timeline mesmo assim
+      const timeline = JSON.parse(lead.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+      timeline.unshift({ type: 'whatsapp', label: `WhatsApp aberto no WhatsApp Web`, ts: Date.now() });
+      const notesClean = (lead.notes || '').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
+      await saveLead({ ...lead, updated_at: Date.now(), notes: notesClean + `\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]` });
+      setWhatsModal(null);
+    }
   };
 
   // Analisar empresa
@@ -543,15 +590,9 @@ export default function CRM() {
                           <Icon d={ICONS.email} />
                         </button>
                         {/* WhatsApp */}
-                        <button className="ch-icon whatsapp-btn" title={lead.whatsapp || lead.phone ? `WhatsApp: ${lead.whatsapp || lead.phone}` : 'Abrir WhatsApp (sem número)'} onClick={() => {
-                          const num = cleanPhone(lead.whatsapp || lead.phone || '');
-                          const msg = encodeURIComponent(`Olá ${lead.name.split(' ')[0]}, tudo bem?\n\nMeu nome é Danilo, da ${ws?.name || 'getLOG/Lottustech'}. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar a operação logística de vocês.\n\nPosso te mostrar em 15 minutos como estamos ajudando empresas do mesmo segmento?\n\nQualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
-                          if (num) {
-                            window.open(`https://wa.me/${num}?text=${msg}`, '_blank');
-                          } else {
-                            window.open(`https://web.whatsapp.com/send?text=${msg}`, '_blank');
-                          }
-                        }}><Icon d={ICONS.whatsapp} /></button>
+                        <button className="ch-icon whatsapp-btn" title={lead.whatsapp || lead.phone ? `WhatsApp: ${lead.whatsapp || lead.phone}` : 'Sem número'} onClick={() => openWhatsModal(lead)}>
+                          <Icon d={ICONS.whatsapp} />
+                        </button>
                       </div></td>
                     </tr>
                   ))}
@@ -853,11 +894,75 @@ export default function CRM() {
         </div>
       )}
 
+            {/* Modal WhatsApp */}
+      {whatsModal && (
+        <div className="modal-overlay" onClick={() => setWhatsModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <div className="modal-header">
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 28, height: 28, borderRadius: '50%', background: '#25d366', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="#fff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d={ICONS.whatsapp} /></svg>
+                </span>
+                Enviar WhatsApp
+              </span>
+              <button className="modal-close" onClick={() => setWhatsModal(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14 }}>
+                Para: <strong>{whatsModal.name}</strong>
+                {(whatsModal.whatsapp || whatsModal.phone) && <> · <span style={{ color: '#25d366' }}>{whatsModal.whatsapp || whatsModal.phone}</span></>}
+                {!whatsModal.whatsapp && !whatsModal.phone && <span style={{ color: '#f79009', marginLeft: 8 }}>⚠ Sem número cadastrado</span>}
+              </div>
+              {/* Seletor de templates WhatsApp */}
+              {templates.filter(t => t.type === 'whatsapp').length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Templates</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {templates.filter(t => t.type === 'whatsapp').map((tpl: any) => (
+                      <button key={tpl.id} className="btn btn-sm" style={{ fontSize: 11, background: '#25d366', color: '#fff', border: 'none' }} onClick={() => {
+                        const body = tpl.body.replace(/\{\{nome\}\}/g, whatsModal.name.split(' ')[0]).replace(/\{\{empresa\}\}/g, whatsModal.company || 'sua empresa').replace(/\{\{cargo\}\}/g, whatsModal.role || 'decisor');
+                        setWhatsBody(body);
+                      }}>{tpl.name || 'Template'}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="field-group">
+                <label className="field-label">Mensagem</label>
+                <textarea className="field-input" rows={8} value={whatsBody} onChange={e => setWhatsBody(e.target.value)}
+                  style={{ resize: 'vertical', fontFamily: 'inherit', fontSize: 13 }} />
+              </div>
+              {zapiConfigured ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#079455', marginTop: 8 }}>
+                  <span>●</span> Z-API configurada — envio automático disponível
+                </div>
+              ) : (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8, padding: '8px 10px', background: 'var(--surface-2, #f9fafb)', borderRadius: 8 }}>
+                  💡 <strong>Z-API não configurada</strong> — o botão abrirá o WhatsApp Web com a mensagem pronta.
+                  Configure em <strong>Agente IA → WhatsApp</strong> para envio automático.
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn" onClick={() => setWhatsModal(null)}>Cancelar</button>
+              {(whatsModal.whatsapp || whatsModal.phone) ? (
+                <button className="btn btn-primary" style={{ background: '#25d366', borderColor: '#25d366' }}
+                  disabled={sendingWhats || !whatsBody.trim()}
+                  onClick={() => sendWhatsApp(whatsModal, whatsBody, zapiConfigured)}>
+                  <Icon d={ICONS.whatsapp} />
+                  {sendingWhats ? 'Enviando...' : zapiConfigured ? 'Enviar via Z-API' : 'Abrir no WhatsApp Web'}
+                </button>
+              ) : (
+                <button className="btn" disabled style={{ opacity: 0.5 }}>Sem número cadastrado</button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <div className={`toast${toast ? ' show' : ''}`}>{toast}</div>
     </div>
   );
 }
-
 // ---------- Caixa de Entrada ----------
 function InboxView({ workspace, gmailConfigured, leads, showToast }: any) {
   const [compose, setCompose] = useState({ to: '', subject: '', body: '' });
