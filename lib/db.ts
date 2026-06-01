@@ -248,3 +248,105 @@ export async function deleteTemplate(id: string) {
   await sql`DELETE FROM templates WHERE id = ${id};`;
   return { id };
 }
+
+// ---- Agente de Prospecção Automática ----
+export async function initAgentTables() {
+  if (!hasDatabase) return;
+  try {
+    await sql`
+      CREATE TABLE IF NOT EXISTS agent_config (
+        workspace TEXT PRIMARY KEY,
+        enabled BOOLEAN DEFAULT false,
+        industry TEXT DEFAULT 'logistica',
+        source TEXT DEFAULT 'cnpja',
+        daily_limit INTEGER DEFAULT 10,
+        email_template TEXT DEFAULT '',
+        email_subject TEXT DEFAULT '',
+        send_email BOOLEAN DEFAULT true,
+        last_run BIGINT,
+        updated_at BIGINT
+      );
+    `;
+    await sql`
+      CREATE TABLE IF NOT EXISTS agent_runs (
+        id TEXT PRIMARY KEY,
+        workspace TEXT NOT NULL,
+        started_at BIGINT NOT NULL,
+        finished_at BIGINT,
+        status TEXT DEFAULT 'running',
+        leads_found INTEGER DEFAULT 0,
+        leads_imported INTEGER DEFAULT 0,
+        emails_sent INTEGER DEFAULT 0,
+        errors INTEGER DEFAULT 0,
+        log TEXT DEFAULT ''
+      );
+    `;
+    // Adicionar coluna source se não existir (migration segura)
+    try { await sql`ALTER TABLE agent_config ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'cnpja';`; } catch {}
+  } catch {}
+}
+
+export async function getAgentConfig(workspace: string) {
+  if (!hasDatabase) return null;
+  try {
+    const { rows } = await sql`SELECT * FROM agent_config WHERE workspace = ${workspace};`;
+    return rows[0] || null;
+  } catch { return null; }
+}
+
+export async function upsertAgentConfig(config: any) {
+  if (!hasDatabase) return null;
+  await sql`
+    INSERT INTO agent_config (workspace, enabled, industry, source, daily_limit, email_template, email_subject, send_email, last_run, updated_at)
+    VALUES (${config.workspace}, ${config.enabled ?? false}, ${config.industry || 'logistica'}, ${config.source || 'cnpja'}, ${config.daily_limit || 10}, ${config.email_template || ''}, ${config.email_subject || ''}, ${config.send_email ?? true}, ${config.last_run || null}, ${Date.now()})
+    ON CONFLICT (workspace) DO UPDATE SET
+      enabled = EXCLUDED.enabled, industry = EXCLUDED.industry, source = EXCLUDED.source,
+      daily_limit = EXCLUDED.daily_limit, email_template = EXCLUDED.email_template,
+      email_subject = EXCLUDED.email_subject, send_email = EXCLUDED.send_email,
+      last_run = EXCLUDED.last_run, updated_at = EXCLUDED.updated_at;
+  `;
+  return config;
+}
+
+export async function insertAgentRun(run: any) {
+  if (!hasDatabase) return null;
+  await sql`
+    INSERT INTO agent_runs (id, workspace, started_at, finished_at, status, leads_found, leads_imported, emails_sent, errors, log)
+    VALUES (${run.id}, ${run.workspace}, ${run.started_at}, ${run.finished_at || null}, ${run.status || 'running'}, ${run.leads_found || 0}, ${run.leads_imported || 0}, ${run.emails_sent || 0}, ${run.errors || 0}, ${run.log || ''});
+  `;
+  return run;
+}
+
+export async function updateAgentRun(id: string, updates: any) {
+  if (!hasDatabase) return null;
+  await sql`
+    UPDATE agent_runs SET
+      finished_at = ${updates.finished_at || null},
+      status = ${updates.status || 'done'},
+      leads_found = ${updates.leads_found || 0},
+      leads_imported = ${updates.leads_imported || 0},
+      emails_sent = ${updates.emails_sent || 0},
+      errors = ${updates.errors || 0},
+      log = ${updates.log || ''}
+    WHERE id = ${id};
+  `;
+  return { id, ...updates };
+}
+
+export async function getAgentRuns(workspace: string, limit = 20) {
+  if (!hasDatabase) return [];
+  try {
+    const { rows } = await sql`
+      SELECT * FROM agent_runs WHERE workspace = ${workspace} ORDER BY started_at DESC LIMIT ${limit};
+    `;
+    return rows;
+  } catch { return []; }
+}
+
+export async function getLeadEmails(workspace: string): Promise<string[]> {
+  if (!hasDatabase) return [];
+  try {
+    const { rows } = await sql`SELECT email FROM leads WHERE workspace = ${workspace} AND email != '' AND email IS NOT NULL;`;
+    return rows.map((r: any) => r.email).filter(Boolean);
+  } catch { return []; }
+}
