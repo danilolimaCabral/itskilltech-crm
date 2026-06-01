@@ -673,70 +673,86 @@ function SettingsView({ gmailConfigured, hasDb, showToast }: any) {
 
 // ---------- Buscar Leads ----------
 function SearchView({ workspace, onImport, showToast }: any) {
-  const [tab, setTab] = useState('buscar');
-  const [filters, setFilters] = useState({ country: 'Brasil', department: 'ti', level: 'decisores', industry: '', qty: '25' });
-  const [briefing, setBriefing] = useState('');
-  const [searching, setSearching] = useState(false);
-  const [results, setResults] = useState<any[]>([]);
+  const [tab, setTab] = useState('empresa');
+  // Busca unificada por empresa
+  const [query, setQuery] = useState('');
+  const [queryMode, setQueryMode] = useState<'cnpj' | 'name' | 'segment'>('name');
+  const [stateFilter, setStateFilter] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchDetail, setSearchDetail] = useState<any>(null);
+  const [searchError, setSearchError] = useState('');
+  const [searchTotal, setSearchTotal] = useState(0);
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
+  // Importar planilha
   const [importPreview, setImportPreview] = useState<any[]>([]);
-  // CNPJ.já
-  const [cnpjaQuery, setCnpjaQuery] = useState('');
-  const [cnpjaMode, setCnpjaMode] = useState<'cnpj' | 'name'>('cnpj');
-  const [cnpjaLoading, setCnpjaLoading] = useState(false);
-  const [cnpjaResult, setCnpjaResult] = useState<any>(null);
-  const [cnpjaError, setCnpjaError] = useState('');
+  // Apollo
+  const [filters, setFilters] = useState({ country: 'Brasil', department: 'ti', level: 'decisores', industry: '', qty: '25' });
+  const [searching, setSearching] = useState(false);
+  const [apolloResults, setApolloResults] = useState<any[]>([]);
 
-  const searchCnpja = async () => {
-    if (!cnpjaQuery.trim()) return;
-    setCnpjaLoading(true); setCnpjaResult(null); setCnpjaError('');
-    try {
-      const param = cnpjaMode === 'cnpj' ? `cnpj=${encodeURIComponent(cnpjaQuery.replace(/\D/g,''))}` : `name=${encodeURIComponent(cnpjaQuery)}`;
-      const r = await fetch(`/api/cnpja?${param}`);
-      const j = await r.json();
-      if (!r.ok) { setCnpjaError(j.error || 'Erro na consulta'); }
-      else { setCnpjaResult(j); showToast('Dados encontrados!'); }
-    } catch { setCnpjaError('Erro de conexão'); }
-    setCnpjaLoading(false);
-  };
+  const STATES = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 
-  const importFromCnpja = (data: any) => {
-    const lead = {
-      name: data.alias || data.name || '',
-      company: data.name || data.alias || '',
-      role: data.members?.[0] ? `${data.members[0].role} — ${data.members[0].name}` : '',
-      email: data.email || '',
-      phone: data.phone || '',
-      whatsapp: data.phone ? data.phone.replace(/\D/g,'') : '',
-      notes: [
-        data.cnpj ? `CNPJ: ${data.cnpj}` : '',
-        data.cnae ? `CNAE: ${data.cnae}` : '',
-        data.street ? `Endereço: ${data.street}, ${data.district || ''}, ${data.city}/${data.state}` : '',
-        data.size ? `Porte: ${data.size}` : '',
-        data.founded ? `Fundada: ${data.founded}` : '',
-        data.members?.length ? `Sócios: ${data.members.map((m: any) => `${m.name} (${m.role})`).join(', ')}` : ''
-      ].filter(Boolean).join('\n'),
-      source: 'CNPJ.já'
-    };
+  const buildFromCnpja = (data: any) => ({
+    name: data.alias || data.name || '',
+    company: data.name || data.alias || '',
+    role: data.members?.[0] ? `${data.members[0].role} — ${data.members[0].name}` : '',
+    email: data.email || '',
+    phone: data.phone || '',
+    whatsapp: data.phone ? data.phone.replace(/\D/g,'') : '',
+    notes: [
+      data.cnpj ? `CNPJ: ${data.cnpj}` : '',
+      data.cnae ? `CNAE: ${data.cnae}` : '',
+      data.street ? `Endereço: ${data.street}, ${data.district || ''}, ${data.city}/${data.state}` : '',
+      data.size ? `Porte: ${data.size}` : '',
+      data.founded ? `Fundada: ${data.founded}` : '',
+      data.members?.length ? `Sócios: ${data.members.map((m: any) => `${m.name} (${m.role})`).join(', ')}` : ''
+    ].filter(Boolean).join('\n'),
+    source: 'CNPJ.já'
+  });
+
+  const addToCart = (data: any) => {
+    const lead = buildFromCnpja(data);
     onImport([lead]);
-    showToast('Lead importado!');
+    setAddedIds(prev => new Set([...prev, data.cnpj || data.name]));
+    showToast('Lead adicionado à carteira!');
   };
 
-  const labels: any = {
-    country: filters.country,
-    department: ({ ti: 'TI / Tecnologia', operacoes: 'Operações', logistica: 'Logística', comercial: 'Comercial' } as any)[filters.department],
-    level: ({ decisores: 'Decisores (C-level, Diretor, VP)', donos: 'Donos / Fundadores', gerencia: 'Gerência' } as any)[filters.level],
-  };
-
-  const genBriefing = () => {
-    setBriefing(`Buscar ${filters.qty} leads (prospects):\n- País: ${labels.country}\n- Departamento: ${labels.department}\n- Nível: ${labels.level}${filters.industry ? `\n- Setor: ${filters.industry}` : ''}`);
+  const doSearch = async () => {
+    if (!query.trim()) return;
+    setLoading(true); setSearchResults([]); setSearchDetail(null); setSearchError('');
+    try {
+      let url = '';
+      if (queryMode === 'cnpj') {
+        url = `/api/cnpja?cnpj=${encodeURIComponent(query.replace(/\D/g,''))}`;
+      } else if (queryMode === 'name') {
+        url = `/api/cnpja?name=${encodeURIComponent(query)}${stateFilter ? `&state=${stateFilter}` : ''}`;
+      } else {
+        url = `/api/cnpja?segment=${encodeURIComponent(query)}${stateFilter ? `&state=${stateFilter}` : ''}&limit=15`;
+      }
+      const r = await fetch(url);
+      const j = await r.json();
+      if (!r.ok) { setSearchError(j.error || 'Erro na consulta'); }
+      else if (j.results) {
+        setSearchResults(j.results);
+        setSearchTotal(j.total || j.results.length);
+        if (j.results.length === 0) setSearchError(j.message || 'Nenhuma empresa encontrada.');
+        else showToast(`${j.results.length} empresa(s) encontrada(s)`);
+      } else {
+        // Resultado único (CNPJ direto)
+        setSearchDetail(j);
+        showToast('Empresa encontrada!');
+      }
+    } catch { setSearchError('Erro de conexão. Tente novamente.'); }
+    setLoading(false);
   };
 
   const realSearch = async () => {
-    setSearching(true); setResults([]);
+    setSearching(true); setApolloResults([]);
     try {
       const r = await fetch('/api/prospect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(filters) });
       const j = await r.json();
-      if (j.ok) { setResults(j.leads || []); showToast(`${j.count} leads encontrados`); }
+      if (j.ok) { setApolloResults(j.leads || []); showToast(`${j.count} leads encontrados`); }
       else showToast('Busca: ' + (j.error || 'falhou'));
     } catch { showToast('Erro na busca'); }
     setSearching(false);
@@ -757,133 +773,213 @@ function SearchView({ workspace, onImport, showToast }: any) {
     showToast(`${mapped.length} linha(s) lida(s)`);
   };
 
+  const modeLabels: any = { cnpj: 'CNPJ', name: 'Nome da empresa', segment: 'Segmento / CNAE' };
+  const modePlaceholders: any = {
+    cnpj: 'Ex: 53.113.791/0001-22',
+    name: 'Ex: TOTVS, Grupo Alltech, Localfrio...',
+    segment: 'Ex: transporte, logística, atacado, TMS, 4930...'
+  };
+
   return (
     <>
       <div className="page-header">
-        <div><div className="page-title">Buscar Leads</div><div className="page-description">Prospecção e importação de contatos</div></div>
+        <div>
+          <div className="page-title">Buscar Leads</div>
+          <div className="page-description">Encontre empresas por CNPJ, nome ou segmento e adicione à sua carteira</div>
+        </div>
       </div>
+
+      {/* Abas */}
       <div className="filter-group" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
-        <button className={`filter-tab${tab === 'cnpja' ? ' active' : ''}`} onClick={() => setTab('cnpja')} style={{ fontWeight: 700 }}>CNPJ.já</button>
-        <button className={`filter-tab${tab === 'buscar' ? ' active' : ''}`} onClick={() => setTab('buscar')}>Buscar (API)</button>
-        <button className={`filter-tab${tab === 'briefing' ? ' active' : ''}`} onClick={() => setTab('briefing')}>Briefing</button>
-        <button className={`filter-tab${tab === 'importar' ? ' active' : ''}`} onClick={() => setTab('importar')}>Importar</button>
+        <button className={`filter-tab${tab === 'empresa' ? ' active' : ''}`} onClick={() => setTab('empresa')} style={{ fontWeight: 700 }}>🔍 Buscar empresa</button>
+        <button className={`filter-tab${tab === 'apollo' ? ' active' : ''}`} onClick={() => setTab('apollo')}>Apollo.io</button>
+        <button className={`filter-tab${tab === 'importar' ? ' active' : ''}`} onClick={() => setTab('importar')}>Importar planilha</button>
       </div>
-      {tab === 'cnpja' && (
-        <div className="table-wrap" style={{ padding: 16, marginBottom: 16 }}>
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-              <button className={`filter-tab${cnpjaMode === 'cnpj' ? ' active' : ''}`} onClick={() => { setCnpjaMode('cnpj'); setCnpjaResult(null); setCnpjaError(''); }}>Por CNPJ</button>
-              <button className={`filter-tab${cnpjaMode === 'name' ? ' active' : ''}`} onClick={() => { setCnpjaMode('name'); setCnpjaResult(null); setCnpjaError(''); }}>Por Nome</button>
+
+      {/* ── Aba principal: Busca por empresa ── */}
+      {tab === 'empresa' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Tipo de busca */}
+          <div className="table-wrap" style={{ padding: 16 }}>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Buscar por</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {(['cnpj', 'name', 'segment'] as const).map(m => (
+                  <button key={m} className={`filter-tab${queryMode === m ? ' active' : ''}`}
+                    onClick={() => { setQueryMode(m); setSearchResults([]); setSearchDetail(null); setSearchError(''); }}>
+                    {m === 'cnpj' ? '🔢 CNPJ' : m === 'name' ? '🏢 Nome' : '🏭 Segmento'}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div style={{ display: 'flex', gap: 8 }}>
+
+            {/* Campo de busca */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
               <input
                 className="field-input"
                 style={{ flex: 1 }}
-                placeholder={cnpjaMode === 'cnpj' ? 'Digite o CNPJ (ex: 53.113.791/0001-22)' : 'Digite o nome da empresa (ex: TOTVS)'}
-                value={cnpjaQuery}
-                onChange={e => setCnpjaQuery(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && searchCnpja()}
+                placeholder={modePlaceholders[queryMode]}
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && doSearch()}
               />
-              <button className="btn btn-primary" onClick={searchCnpja} disabled={cnpjaLoading} style={{ flexShrink: 0 }}>
-                {cnpjaLoading ? 'Buscando...' : 'Consultar'}
+              {queryMode !== 'cnpj' && (
+                <select className="field-select" style={{ width: 90, flexShrink: 0 }} value={stateFilter} onChange={e => setStateFilter(e.target.value)}>
+                  <option value="">UF</option>
+                  {STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              )}
+              <button className="btn btn-primary" onClick={doSearch} disabled={loading} style={{ flexShrink: 0, minWidth: 110 }}>
+                {loading ? (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,.4)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
+                    Buscando...
+                  </span>
+                ) : <><Icon d={ICONS.search2} />Buscar</>}
               </button>
             </div>
-            {cnpjaError && <div style={{ color: '#ef4444', fontSize: 13, marginTop: 8 }}>{cnpjaError}</div>}
+
+            {queryMode === 'segment' && (
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', background: 'var(--surface-2)', borderRadius: 8, padding: '8px 12px' }}>
+                💡 Exemplos de segmentos: <strong>transporte</strong>, <strong>logística</strong>, <strong>atacado</strong>, <strong>tecnologia</strong>, <strong>saúde</strong>, <strong>varejo</strong>, <strong>construção</strong>, <strong>agro</strong> — ou código CNAE (ex: <strong>4930</strong>)
+              </div>
+            )}
+
+            {searchError && (
+              <div style={{ color: '#ef4444', fontSize: 13, marginTop: 8, padding: '8px 12px', background: '#fef2f2', borderRadius: 8, border: '1px solid #fecaca' }}>
+                {searchError}
+              </div>
+            )}
           </div>
-          {cnpjaResult && !cnpjaResult.results && (
-            <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 12, padding: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+
+          {/* Resultado único (CNPJ direto) */}
+          {searchDetail && (
+            <div className="table-wrap" style={{ padding: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: 16 }}>{cnpjaResult.alias || cnpjaResult.name}</div>
-                  {cnpjaResult.alias !== cnpjaResult.name && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{cnpjaResult.name}</div>}
-                  <div style={{ fontSize: 12, color: 'var(--primary)', marginTop: 4, fontWeight: 600 }}>CNPJ: {cnpjaResult.cnpj?.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')}</div>
+                  <div style={{ fontWeight: 700, fontSize: 17 }}>{searchDetail.alias || searchDetail.name}</div>
+                  {searchDetail.alias !== searchDetail.name && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{searchDetail.name}</div>}
+                  <div style={{ fontSize: 12, color: 'var(--primary)', marginTop: 4, fontWeight: 600 }}>CNPJ: {searchDetail.cnpj?.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')}</div>
                 </div>
-                <button className="btn btn-primary btn-sm" onClick={() => importFromCnpja(cnpjaResult)}>+ Importar Lead</button>
+                <button
+                  className={`btn ${addedIds.has(searchDetail.cnpj || searchDetail.name) ? '' : 'btn-primary'}`}
+                  onClick={() => addToCart(searchDetail)}
+                  disabled={addedIds.has(searchDetail.cnpj || searchDetail.name)}
+                  style={{ flexShrink: 0 }}
+                >
+                  {addedIds.has(searchDetail.cnpj || searchDetail.name) ? '✓ Adicionado' : '+ Adicionar à carteira'}
+                </button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', fontSize: 13, marginBottom: 12 }}>
-                {cnpjaResult.phone && <div><span style={{ color: 'var(--text-muted)' }}>Telefone:</span> <strong>{cnpjaResult.phone}</strong></div>}
-                {cnpjaResult.email && <div><span style={{ color: 'var(--text-muted)' }}>E-mail:</span> <strong>{cnpjaResult.email}</strong></div>}
-                {cnpjaResult.city && <div><span style={{ color: 'var(--text-muted)' }}>Cidade:</span> <strong>{cnpjaResult.city}/{cnpjaResult.state}</strong></div>}
-                {cnpjaResult.cnae && <div style={{ gridColumn: '1/-1' }}><span style={{ color: 'var(--text-muted)' }}>CNAE:</span> <strong>{cnpjaResult.cnae}</strong></div>}
-                {cnpjaResult.size && <div><span style={{ color: 'var(--text-muted)' }}>Porte:</span> <strong>{cnpjaResult.size}</strong></div>}
-                {cnpjaResult.status && <div><span style={{ color: 'var(--text-muted)' }}>Situação:</span> <strong style={{ color: cnpjaResult.status === 'Ativa' ? '#22c55e' : '#ef4444' }}>{cnpjaResult.status}</strong></div>}
-                {cnpjaResult.founded && <div><span style={{ color: 'var(--text-muted)' }}>Fundação:</span> <strong>{cnpjaResult.founded}</strong></div>}
-                {cnpjaResult.street && <div style={{ gridColumn: '1/-1' }}><span style={{ color: 'var(--text-muted)' }}>Endereço:</span> <strong>{cnpjaResult.street}, {cnpjaResult.district} — {cnpjaResult.zip}</strong></div>}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', fontSize: 13, marginBottom: 14 }}>
+                {searchDetail.phone && <div><span style={{ color: 'var(--text-muted)' }}>Telefone:</span> <strong>{searchDetail.phone}</strong></div>}
+                {searchDetail.email && <div><span style={{ color: 'var(--text-muted)' }}>E-mail:</span> <strong>{searchDetail.email}</strong></div>}
+                {searchDetail.city && <div><span style={{ color: 'var(--text-muted)' }}>Cidade:</span> <strong>{searchDetail.city}/{searchDetail.state}</strong></div>}
+                {searchDetail.size && <div><span style={{ color: 'var(--text-muted)' }}>Porte:</span> <strong>{searchDetail.size}</strong></div>}
+                {searchDetail.status && <div><span style={{ color: 'var(--text-muted)' }}>Situação:</span> <strong style={{ color: searchDetail.status === 'Ativa' ? '#22c55e' : '#ef4444' }}>{searchDetail.status}</strong></div>}
+                {searchDetail.founded && <div><span style={{ color: 'var(--text-muted)' }}>Fundação:</span> <strong>{searchDetail.founded}</strong></div>}
+                {searchDetail.cnae && <div style={{ gridColumn: '1/-1' }}><span style={{ color: 'var(--text-muted)' }}>CNAE:</span> <strong>{searchDetail.cnae}</strong></div>}
+                {searchDetail.street && <div style={{ gridColumn: '1/-1' }}><span style={{ color: 'var(--text-muted)' }}>Endereço:</span> <strong>{searchDetail.street}, {searchDetail.district} — {searchDetail.zip}</strong></div>}
               </div>
-              {cnpjaResult.members?.length > 0 && (
-                <div style={{ marginBottom: 10 }}>
+              {searchDetail.members?.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Sócios / Diretores</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {cnpjaResult.members.map((m: any, i: number) => (
-                      <div key={i} style={{ fontSize: 13, display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ fontWeight: 500 }}>{m.name}</span>
-                        <span style={{ color: 'var(--text-muted)' }}>{m.role}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {cnpjaResult.sideActivities?.length > 0 && (
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Atividades Secundárias</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{cnpjaResult.sideActivities.join(' • ')}</div>
-                </div>
-              )}
-              <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-muted)', textAlign: 'right' }}>Fonte: {cnpjaResult.source}</div>
-            </div>
-          )}
-          {cnpjaResult?.results && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {cnpjaResult.results.map((r: any, i: number) => (
-                <div key={i} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>{r.alias || r.name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.cnpj} • {r.city}/{r.state}</div>
-                      {r.phone && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>Tel: {r.phone}</div>}
-                      {r.email && <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Email: {r.email}</div>}
+                  {searchDetail.members.map((m: any, i: number) => (
+                    <div key={i} style={{ fontSize: 13, display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+                      <span style={{ fontWeight: 500 }}>{m.name}</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{m.role}{m.since ? ` · desde ${m.since?.slice(0,4)}` : ''}</span>
                     </div>
-                    <button className="btn btn-sm" onClick={() => importFromCnpja(r)}>+ Lead</button>
-                  </div>
+                  ))}
                 </div>
-              ))}
+              )}
+              {searchDetail.sideActivities?.length > 0 && (
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>Atividades secundárias: </span>
+                  {searchDetail.sideActivities.join(' • ')}
+                </div>
+              )}
+              <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-muted)', textAlign: 'right' }}>Fonte: {searchDetail.source}</div>
+            </div>
+          )}
+
+          {/* Lista de resultados (busca por nome ou segmento) */}
+          {searchResults.length > 0 && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                  <strong style={{ color: 'var(--text)' }}>{searchResults.length}</strong> resultado(s){searchTotal > searchResults.length ? ` de ${searchTotal.toLocaleString()} encontrados` : ''}
+                </div>
+                <button className="btn btn-primary btn-sm" onClick={() => { searchResults.forEach(r => onImport([buildFromCnpja(r)])); setAddedIds(new Set(searchResults.map(r => r.cnpj || r.name))); showToast(`${searchResults.length} leads adicionados!`); }}>
+                  <Icon d={ICONS.download} />Adicionar todos
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {searchResults.map((r: any, i: number) => {
+                  const key = r.cnpj || r.name;
+                  const added = addedIds.has(key);
+                  return (
+                    <div key={i} style={{ background: 'var(--surface)', border: `1px solid ${added ? '#22c55e44' : 'var(--border)'}`, borderRadius: 12, padding: '12px 14px', boxShadow: '0 1px 3px rgba(0,0,0,.06)', transition: 'border-color .2s' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14 }}>{r.alias || r.name}</div>
+                          {r.alias && r.alias !== r.name && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{r.name}</div>}
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 10px', fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+                            {r.cnpj && <span>CNPJ: {r.cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')}</span>}
+                            {r.city && <span>📍 {r.city}/{r.state}</span>}
+                            {r.size && <span>🏢 {r.size}</span>}
+                          </div>
+                          {r.cnae && <div style={{ fontSize: 11, color: 'var(--primary)', marginTop: 3, fontWeight: 500 }}>{r.cnae}</div>}
+                          <div style={{ display: 'flex', gap: 12, marginTop: 5, fontSize: 12, color: 'var(--text-secondary)' }}>
+                            {r.phone && <span>📞 {r.phone}</span>}
+                            {r.email && <span>✉️ {r.email}</span>}
+                          </div>
+                          {r.members?.length > 0 && (
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                              👤 {r.members.slice(0,2).map((m: any) => `${m.name} (${m.role})`).join(' · ')}
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          className={`btn btn-sm${added ? '' : ' btn-primary'}`}
+                          style={{ flexShrink: 0, minWidth: 110 }}
+                          onClick={() => addToCart(r)}
+                          disabled={added}
+                        >
+                          {added ? '✓ Adicionado' : '+ Adicionar'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
       )}
-      {(tab === 'buscar' || tab === 'briefing') && (
-        <div className="table-wrap" style={{ padding: 16, marginBottom: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div className="field"><label className="field-label">País</label><select className="field-select" value={filters.country} onChange={e => setFilters({ ...filters, country: e.target.value })}><option>Brasil</option><option>Estados Unidos</option><option>Portugal</option></select></div>
-            <div className="field"><label className="field-label">Setor</label><select className="field-select" value={filters.department} onChange={e => setFilters({ ...filters, department: e.target.value })}><option value="ti">TI / Tecnologia</option><option value="operacoes">Operações</option><option value="logistica">Logística</option><option value="comercial">Comercial</option></select></div>
-            <div className="field"><label className="field-label">Nível</label><select className="field-select" value={filters.level} onChange={e => setFilters({ ...filters, level: e.target.value })}><option value="decisores">C-level / Diretor</option><option value="donos">Donos / Fundadores</option><option value="gerencia">Gerência</option></select></div>
-            <div className="field"><label className="field-label">Qtd</label><select className="field-select" value={filters.qty} onChange={e => setFilters({ ...filters, qty: e.target.value })}><option>25</option><option>50</option><option>100</option></select></div>
-          </div>
-          <div className="field" style={{ marginTop: 10 }}><label className="field-label">Segmento (opcional)</label><input className="field-input" value={filters.industry} onChange={e => setFilters({ ...filters, industry: e.target.value })} placeholder="Ex: varejo, saúde, indústria..." /></div>
-          {tab === 'buscar' ? (
+
+      {/* ── Aba Apollo.io ── */}
+      {tab === 'apollo' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div className="table-wrap" style={{ padding: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="field"><label className="field-label">País</label><select className="field-select" value={filters.country} onChange={e => setFilters({ ...filters, country: e.target.value })}><option>Brasil</option><option>Estados Unidos</option><option>Portugal</option></select></div>
+              <div className="field"><label className="field-label">Setor</label><select className="field-select" value={filters.department} onChange={e => setFilters({ ...filters, department: e.target.value })}><option value="ti">TI / Tecnologia</option><option value="operacoes">Operações</option><option value="logistica">Logística</option><option value="comercial">Comercial</option></select></div>
+              <div className="field"><label className="field-label">Nível</label><select className="field-select" value={filters.level} onChange={e => setFilters({ ...filters, level: e.target.value })}><option value="decisores">C-level / Diretor</option><option value="donos">Donos / Fundadores</option><option value="gerencia">Gerência</option></select></div>
+              <div className="field"><label className="field-label">Qtd</label><select className="field-select" value={filters.qty} onChange={e => setFilters({ ...filters, qty: e.target.value })}><option>25</option><option>50</option><option>100</option></select></div>
+            </div>
+            <div className="field" style={{ marginTop: 10 }}><label className="field-label">Segmento (opcional)</label><input className="field-input" value={filters.industry} onChange={e => setFilters({ ...filters, industry: e.target.value })} placeholder="Ex: varejo, saúde, indústria..." /></div>
             <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 12 }} onClick={realSearch} disabled={searching}>
-              <Icon d={ICONS.search2} />{searching ? 'Buscando...' : 'Buscar leads reais'}
+              <Icon d={ICONS.search2} />{searching ? 'Buscando...' : 'Buscar via Apollo.io'}
             </button>
-          ) : (
-            <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 12 }} onClick={genBriefing}><Icon d={ICONS.search2} />Gerar briefing</button>
-          )}
-        </div>
-      )}
-      {tab === 'briefing' && briefing && (
-        <div className="table-wrap" style={{ padding: 16 }}>
-          <div style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, padding: 14, fontFamily: 'monospace', fontSize: 13, whiteSpace: 'pre-wrap', marginBottom: 12 }}>{briefing}</div>
-          <button className="btn" onClick={() => { navigator.clipboard?.writeText(briefing); showToast('Briefing copiado'); }}>Copiar briefing</button>
-        </div>
-      )}
-      {tab === 'buscar' && results.length > 0 && (
-        <>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 8 }}>
-            <strong style={{ fontSize: 13 }}>{results.length} resultado(s)</strong>
-            <button className="btn btn-primary btn-sm" onClick={() => onImport(results)}><Icon d={ICONS.download} />Importar todos</button>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {results.map((r, i) => (
-              <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 14px', boxShadow: '0 1px 3px rgba(0,0,0,.06)' }}>
+          {apolloResults.length > 0 && (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <strong style={{ fontSize: 13 }}>{apolloResults.length} resultado(s)</strong>
+                <button className="btn btn-primary btn-sm" onClick={() => onImport(apolloResults)}><Icon d={ICONS.download} />Importar todos</button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {apolloResults.map((r, i) => (
+                  <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 14px', boxShadow: '0 1px 3px rgba(0,0,0,.06)' }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
                   {r.logo && <img src={r.logo} alt="" style={{ width: 38, height: 38, borderRadius: 8, objectFit: 'contain', background: '#fff', border: '1px solid var(--border)', flexShrink: 0 }} onError={(e: any) => { e.target.style.display = 'none'; }} />}
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -905,6 +1001,10 @@ function SearchView({ workspace, onImport, showToast }: any) {
           </div>
         </>
       )}
+        </div>
+      )}
+
+      {/* ── Aba Importar planilha ── */}
       {tab === 'importar' && (
         <div className="table-wrap" style={{ padding: 16 }}>
           <div className="alert alert-info" style={{ fontSize: 13 }}>Envie uma planilha (CSV ou Excel). Colunas reconhecidas: nome, empresa, cargo, email, telefone/whatsapp, linkedin.</div>
