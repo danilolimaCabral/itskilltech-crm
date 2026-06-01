@@ -3,18 +3,68 @@ import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-const WORKSPACE_SENDERS: Record<string, { email: string; name: string }> = {
-  lottus: { email: 'crm@grandy.ia.br', name: 'Danilo | getLOG/Lottustech' },
-  iota: { email: 'crm@grandy.ia.br', name: 'Danilo | IOTA' },
-  splice: { email: 'crm@grandy.ia.br', name: 'Danilo | Splice' },
-  connect: { email: 'crm@grandy.ia.br', name: 'Danilo | Connect' },
+interface WorkspaceSender {
+  email: string
+  name: string
+  displayName: string
+  contactEmail: string
+  phone: string
+  color: string
+  colorLight: string
 }
 
-const DEFAULT_SENDER = { email: 'crm@grandy.ia.br', name: 'ITskillTech CRM' }
+const WORKSPACE_SENDERS: Record<string, WorkspaceSender> = {
+  lottus: {
+    email: 'crm@grandy.ia.br',
+    name: 'getLOG/Lottustech',
+    displayName: 'Danilo Cabral',
+    contactEmail: 'danilo@lottustech.com.br',
+    phone: '(41) 99949-9815',
+    color: '#1a56db',
+    colorLight: '#1e40af',
+  },
+  iota: {
+    email: 'crm@grandy.ia.br',
+    name: 'IOTA',
+    displayName: 'Danilo Cabral',
+    contactEmail: 'danilo@iota.com.br',
+    phone: '(41) 99949-9815',
+    color: '#0e7490',
+    colorLight: '#0891b2',
+  },
+  splice: {
+    email: 'crm@grandy.ia.br',
+    name: 'Splice',
+    displayName: 'Danilo Cabral',
+    contactEmail: 'danilo@lottustech.com.br',
+    phone: '(41) 99949-9815',
+    color: '#7c3aed',
+    colorLight: '#6d28d9',
+  },
+  connect: {
+    email: 'crm@grandy.ia.br',
+    name: 'Connect',
+    displayName: 'Danilo Cabral',
+    contactEmail: 'danilo@lottustech.com.br',
+    phone: '(41) 99949-9815',
+    color: '#059669',
+    colorLight: '#047857',
+  },
+}
+
+const DEFAULT_SENDER: WorkspaceSender = {
+  email: 'crm@grandy.ia.br',
+  name: 'getLOG/Lottustech',
+  displayName: 'Danilo Cabral',
+  contactEmail: 'danilo@lottustech.com.br',
+  phone: '(41) 99949-9815',
+  color: '#1a56db',
+  colorLight: '#1e40af',
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const { to, toName, subject, body, fromName, workspaceSlug } = await req.json()
+    const { to, toName, subject, body, workspaceSlug } = await req.json()
 
     if (!to || !subject || !body) {
       return NextResponse.json({ error: 'Campos obrigatórios: to, subject, body' }, { status: 400 })
@@ -22,15 +72,13 @@ export async function POST(req: NextRequest) {
 
     if (!process.env.RESEND_API_KEY) {
       return NextResponse.json(
-        { error: 'Resend não configurado. Configure RESEND_API_KEY nas variáveis de ambiente.' },
+        { error: 'Serviço de e-mail não configurado.' },
         { status: 503 }
       )
     }
 
     const sender = workspaceSlug ? (WORKSPACE_SENDERS[workspaceSlug] || DEFAULT_SENDER) : DEFAULT_SENDER
-    // Usa o nome do workspace passado pelo frontend, ou o nome padrão do workspace
-    const displayName = fromName || sender.name
-    const fromEmail = `${displayName} <${sender.email}>`
+    const fromEmail = `${sender.displayName} | ${sender.name} <${sender.email}>`
 
     const htmlBody = `<!DOCTYPE html>
 <html>
@@ -42,27 +90,38 @@ export async function POST(req: NextRequest) {
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f4f4f5; color: #18181b; line-height: 1.6; }
     .wrapper { max-width: 640px; margin: 32px auto; padding: 0 16px; }
     .card { background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-    .header { background: linear-gradient(135deg, #1a56db 0%, #1e40af 100%); padding: 28px 32px; }
-    .header-logo { font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px; }
-    .header-logo span { color: #93c5fd; }
+    .header { background: linear-gradient(135deg, ${sender.color} 0%, ${sender.colorLight} 100%); padding: 28px 32px; }
+    .header-company { font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px; }
     .content { padding: 32px; }
     .content p { margin-bottom: 16px; font-size: 15px; color: #374151; }
-    .footer { background: #fafafa; padding: 20px 32px; border-top: 1px solid #f3f4f6; }
-    .footer p { font-size: 12px; color: #9ca3af; text-align: center; }
-    .footer a { color: #6b7280; text-decoration: none; }
+    .signature { margin-top: 28px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
+    .sig-name { font-weight: 600; font-size: 15px; color: #111827; }
+    .sig-title { font-size: 13px; color: #6b7280; margin-top: 2px; }
+    .sig-contact { margin-top: 8px; font-size: 13px; color: #374151; }
+    .sig-contact a { color: ${sender.color}; text-decoration: none; }
+    .footer { background: #fafafa; padding: 16px 32px; border-top: 1px solid #f3f4f6; }
+    .footer p { font-size: 11px; color: #d1d5db; text-align: center; }
   </style>
 </head>
 <body>
   <div class="wrapper">
     <div class="card">
       <div class="header">
-        <div class="header-logo">ITskill<span>Tech</span></div>
+        <div class="header-company">${sender.name}</div>
       </div>
       <div class="content">
         ${body.split('\n').map((line: string) => line.trim() ? `<p>${line}</p>` : '<br>').join('')}
+        <div class="signature">
+          <div class="sig-name">${sender.displayName}</div>
+          <div class="sig-title">${sender.name}</div>
+          <div class="sig-contact">
+            <a href="mailto:${sender.contactEmail}">${sender.contactEmail}</a><br>
+            <a href="tel:${sender.phone.replace(/\D/g, '')}">${sender.phone}</a>
+          </div>
+        </div>
       </div>
       <div class="footer">
-        <p>Enviado via <a href="https://itskilltech-crm.vercel.app">ITskillTech CRM</a> &middot; ${sender.name}</p>
+        <p>&copy; ${new Date().getFullYear()} ${sender.name}. Todos os direitos reservados.</p>
       </div>
     </div>
   </div>
