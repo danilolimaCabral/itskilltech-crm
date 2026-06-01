@@ -14,7 +14,7 @@ const ICONS: any = {
 };
 
 // ---------- Templates ----------
-export function TemplatesView({ workspace, templates, onReload, showToast }: any) {
+export function TemplatesView({ workspace, workspaceName, templates, onReload, showToast }: any) {
   const [tab, setTab] = useState<'whatsapp' | 'email'>('whatsapp');
   const [editing, setEditing] = useState<any | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -31,7 +31,7 @@ export function TemplatesView({ workspace, templates, onReload, showToast }: any
       const r = await fetch('/api/generate-template', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: tab, tone: aiTone, context: aiContext, workspace }),
+        body: JSON.stringify({ type: tab, tone: aiTone, context: aiContext, workspace, workspaceName }),
       });
       const j = await r.json();
       if (j.template) {

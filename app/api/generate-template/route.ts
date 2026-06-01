@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(req: NextRequest) {
-  const { type, tone, objective, product, audience, workspace, count = 3 } = await req.json();
+  const { type, tone, objective, product, audience, workspace, workspaceName, count = 3 } = await req.json();
 
   const isEmail = type === 'email';
   const toneLabel = tone || 'profissional e direto';
   const objectiveLabel = objective || 'apresentar solução de TMS logístico';
-  const productLabel = product || 'ITskillTech TMS — sistema de gestão de transporte';
+  const productLabel = product || 'TMS — sistema de gestão de transporte';
   const audienceLabel = audience || 'decisores de logística e TI em empresas atacadistas';
-  const workspaceLabel = workspace || 'ITskillTech';
+  const workspaceLabel = workspaceName || workspace || 'getLOG/Lottustech';
 
   const systemPrompt = isEmail
     ? `Você é um especialista em copywriting B2B para vendas de software. Crie templates de e-mail de prospecção frios (cold email) em português brasileiro para a empresa ${workspaceLabel}.`

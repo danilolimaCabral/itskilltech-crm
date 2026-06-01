@@ -476,7 +476,7 @@ export default function CRM() {
           {view === 'workspaces' && <WorkspacesView workspaces={workspaces} onReload={async () => {
             try { const r = await fetch('/api/workspaces'); const j = await r.json(); if (j.workspaces?.length) setWorkspaces(j.workspaces); } catch {}
           }} showToast={showToast} />}
-          {view === 'templates' && <TemplatesView workspace={workspace} templates={templates} onReload={() => loadTemplates(workspace)} showToast={showToast} />}
+          {view === 'templates' && <TemplatesView workspace={workspace} workspaceName={ws?.name} templates={templates} onReload={() => loadTemplates(workspace)} showToast={showToast} />}
           {view === 'bi' && <BIView workspace={workspace} leads={leads} />}
           {view === 'settings' && <SettingsView gmailConfigured={gmailConfigured} hasDb={hasDb} showToast={showToast} />}
         </div></div>
