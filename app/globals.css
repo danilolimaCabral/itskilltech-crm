@@ -126,6 +126,8 @@ table.data tbody tr:hover { background: var(--surface-hover); }
 .ch-icon:hover { background: var(--surface-2); color: var(--text); }
 .ch-icon svg { width: 12px; height: 12px; }
 .ch-icon:disabled { opacity: 0.35; cursor: not-allowed; }
+.ch-icon.whatsapp-btn:not(:disabled) { color: #25D366; border-color: #25D366; }
+.ch-icon.whatsapp-btn:not(:disabled):hover { background: #25D366; color: #fff; }
 
 /* EMPTY */
 .empty-state { padding: 60px 20px; text-align: center; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); }

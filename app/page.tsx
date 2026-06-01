@@ -167,7 +167,11 @@ export default function CRM() {
                       <td><span className={`badge badge-${lead.status}`}>{statusLabel(lead.status)}</span></td>
                       <td onClick={e => e.stopPropagation()}><div className="channel-icons">
                         <button className="ch-icon" disabled={!lead.email} title="E-mail" onClick={() => { setEditing(lead); setView('inbox'); }}><Icon d={ICONS.email} /></button>
-                        <button className="ch-icon" disabled={!lead.whatsapp} title="WhatsApp" onClick={() => window.open(`https://wa.me/${lead.whatsapp}`, '_blank')}><Icon d={ICONS.whatsapp} /></button>
+                        <button className="ch-icon whatsapp-btn" disabled={!lead.whatsapp && !lead.phone} title={lead.whatsapp || lead.phone ? `WhatsApp: ${lead.whatsapp || lead.phone}` : 'Sem número'} onClick={() => {
+                          const num = cleanPhone(lead.whatsapp || lead.phone || '');
+                          const msg = encodeURIComponent(`Olá ${lead.name.split(' ')[0]}, tudo bem? Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e gostaria de apresentar uma solução de TMS que pode otimizar sua operação logística. Posso te mostrar em 15 minutos?`);
+                          window.open(`https://wa.me/${num}?text=${msg}`, '_blank');
+                        }}><Icon d={ICONS.whatsapp} /></button>
                       </div></td>
                     </tr>
                   ))}
