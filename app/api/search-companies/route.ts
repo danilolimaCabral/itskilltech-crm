@@ -57,20 +57,6 @@ async function fetchCnpja(cnpj: string) {
   }
 }
 
-// Validar dígitos verificadores do CNPJ
-function validateCnpj(cnpj: string): boolean {
-  const c = cnpj.replace(/\D/g, '')
-  if (c.length !== 14) return false
-  if (/^(\d)\1+$/.test(c)) return false
-  const calc = (str: string, weights: number[]) =>
-    str.split('').reduce((acc, d, i) => acc + parseInt(d) * weights[i], 0)
-  const w1 = [5,4,3,2,9,8,7,6,5,4,3,2]
-  const w2 = [6,5,4,3,2,9,8,7,6,5,4,3,2]
-  const d1 = 11 - (calc(c.slice(0,12), w1) % 11)
-  const d2 = 11 - (calc(c.slice(0,13), w2) % 11)
-  return parseInt(c[12]) === (d1 >= 10 ? 0 : d1) && parseInt(c[13]) === (d2 >= 10 ? 0 : d2)
-}
-
 // POST /api/search-companies
 // Body: { query: string, mode: 'name' | 'segment', state?: string, limit?: number }
 export async function POST(req: NextRequest) {
@@ -85,30 +71,36 @@ export async function POST(req: NextRequest) {
     const stateHint = state ? ` no estado ${state}` : ' no Brasil'
     const limitNum = Math.min(parseInt(String(limit)) || 10, 15)
 
-    // Prompt melhorado para o LLM gerar CNPJs reais e verificáveis
-    const systemPrompt = `Você é um especialista em empresas brasileiras.
-Você conhece CNPJs reais de empresas brasileiras cadastradas na Receita Federal.
-Retorne APENAS JSON válido, sem markdown, sem explicações, sem código.
-Os CNPJs devem ser REAIS e VÁLIDOS (passar no algoritmo de verificação da Receita Federal).
-Forneça apenas empresas que você tem certeza que existem com esses CNPJs.`
+    // Pedir ao Gemini para sugerir CNPJs reais
+    // Para segmento: pedir mais CNPJs pois muitos podem ser inválidos
+    const askCount = mode === 'segment' ? Math.min(limitNum * 3, 30) : Math.min(limitNum * 2, 20)
 
-    let userPrompt = ''
+    let systemPrompt: string
+    let userPrompt: string
+
     if (mode === 'name') {
-      userPrompt = `Forneça ${limitNum} CNPJs reais de empresas brasileiras cujo nome ou razão social contenha "${query}"${stateHint}.
-Inclua a matriz e filiais se conhecer.
+      systemPrompt = `Você é um especialista em empresas brasileiras.
+Você conhece os CNPJs REAIS de empresas brasileiras registradas na Receita Federal.
+Retorne SOMENTE JSON válido, sem markdown, sem texto adicional.`
+
+      userPrompt = `Forneça ${askCount} CNPJs reais de empresas brasileiras cujo nome ou razão social contenha "${query}"${stateHint}.
+Inclua a matriz e filiais principais se conhecer.
+IMPORTANTE: Os CNPJs devem ser REAIS e EXATOS como registrados na Receita Federal.
 Retorne SOMENTE este JSON (sem texto adicional, sem markdown):
-[{"cnpj":"00000000000000","razao_social":"NOME COMPLETO","nome_fantasia":"NOME FANTASIA"}]`
+[{"cnpj":"XX.XXX.XXX/XXXX-XX","razao_social":"NOME COMPLETO","nome_fantasia":"NOME FANTASIA"}]`
     } else {
-      userPrompt = `Forneça ${limitNum} CNPJs reais de empresas brasileiras do segmento/setor de "${query}"${stateHint}.
-IMPORTANTE: Os CNPJs devem ser de empresas que atuam ESPECIFICAMENTE no segmento "${query}".
-Inclua empresas de diferentes portes (pequenas, médias e grandes).
-Exemplos de formato: se o segmento for "transporte", inclua transportadoras, logística, fretes.
-Se for "tecnologia", inclua empresas de software, TI, sistemas.
+      systemPrompt = `Você é um especialista em empresas brasileiras.
+Você conhece empresas de todos os setores da economia brasileira.
+Retorne SOMENTE JSON válido, sem markdown, sem texto adicional.`
+
+      userPrompt = `Liste ${askCount} empresas brasileiras do segmento/setor de "${query}"${stateHint}.
+Inclua empresas conhecidas de diferentes portes (grandes, médias e pequenas).
+Para cada empresa, forneça o CNPJ mais provável no formato XX.XXX.XXX/0001-XX.
+Prefira empresas com presença nacional conhecida no setor de "${query}".
 Retorne SOMENTE este JSON (sem texto adicional, sem markdown):
-[{"cnpj":"00000000000000","razao_social":"NOME COMPLETO","nome_fantasia":"NOME FANTASIA"}]`
+[{"cnpj":"XX.XXX.XXX/0001-XX","razao_social":"NOME COMPLETO","nome_fantasia":"NOME FANTASIA"}]`
     }
 
-    // Usar Gemini que tem mais conhecimento factual
     const completion = await openai.chat.completions.create({
       model: 'gemini-2.5-flash',
       messages: [
@@ -116,7 +108,7 @@ Retorne SOMENTE este JSON (sem texto adicional, sem markdown):
         { role: 'user', content: userPrompt }
       ],
       temperature: 0.1,
-      max_tokens: 2000
+      max_tokens: 3000
     })
 
     const rawText = completion.choices[0]?.message?.content || '[]'
@@ -124,13 +116,11 @@ Retorne SOMENTE este JSON (sem texto adicional, sem markdown):
     // Extrair JSON da resposta (lidar com markdown do Gemini)
     let suggestions: Array<{ cnpj: string; razao_social?: string; nome_fantasia?: string }> = []
     try {
-      // Remover markdown code blocks (```json ... ``` ou ``` ... ```)
+      // Remover markdown code blocks
       const cleaned = rawText.replace(/```(?:json)?\s*/g, '').replace(/```\s*/g, '').trim()
-      // Tentar parsear diretamente após limpeza
       try {
         suggestions = JSON.parse(cleaned)
       } catch {
-        // Fallback: extrair array JSON com regex
         const jsonMatch = cleaned.match(/\[[\s\S]*\]/)
         if (jsonMatch) {
           suggestions = JSON.parse(jsonMatch[0])
@@ -154,48 +144,45 @@ Retorne SOMENTE este JSON (sem texto adicional, sem markdown):
       })
     }
 
-    // Filtrar CNPJs válidos
-    const validSuggestions = suggestions
-      .filter(s => s.cnpj && validateCnpj(s.cnpj.replace(/\D/g, '')))
-      .slice(0, limitNum)
+    // Deduplicate CNPJs
+    const seen = new Set<string>()
+    const uniqueSuggestions = suggestions.filter(s => {
+      const clean = s.cnpj?.replace(/\D/g, '') || ''
+      if (!clean || seen.has(clean)) return false
+      seen.add(clean)
+      return true
+    })
 
-    if (!validSuggestions.length) {
-      // Se nenhum CNPJ válido, tentar buscar sem validação (o CNPJ.já vai rejeitar os inválidos)
-      const allSuggestions = suggestions.slice(0, limitNum)
-      const results = await Promise.allSettled(
-        allSuggestions.map(s => fetchCnpja(s.cnpj))
-      )
-      const validResults = results
-        .map(r => r.status === 'fulfilled' ? r.value : null)
-        .filter(Boolean)
-
-      if (validResults.length === 0) {
-        return NextResponse.json({
-          results: [],
-          total: 0,
-          message: `Não encontrei empresas verificadas para "${query}"${stateHint}. Tente buscar por CNPJ diretamente ou use termos mais específicos.`
-        })
-      }
-
-      return NextResponse.json({
-        results: validResults,
-        total: validResults.length,
-        query,
-        mode,
-        verified: validResults.length
-      })
-    }
-
-    // Buscar dados reais no CNPJ.já para cada sugestão válida
+    // Buscar dados reais no CNPJ.já para cada sugestão (sem validar dígitos verificadores)
+    // O CNPJ.já vai rejeitar os inválidos
     const results = await Promise.allSettled(
-      validSuggestions.map(s => fetchCnpja(s.cnpj))
+      uniqueSuggestions.slice(0, askCount).map(s => fetchCnpja(s.cnpj))
     )
 
     const validResults = results
       .map(r => r.status === 'fulfilled' ? r.value : null)
       .filter(Boolean)
+      .slice(0, limitNum)
 
     if (validResults.length === 0) {
+      // Para segmento, retornar resultados "não verificados" como fallback
+      if (mode === 'segment') {
+        const fallback = uniqueSuggestions.slice(0, limitNum).map(s => ({
+          cnpj: s.cnpj?.replace(/\D/g, '') || '',
+          name: s.razao_social || '',
+          alias: s.nome_fantasia || s.razao_social || '',
+          phone: '', email: '', city: '', state: state || '',
+          cnae: query, status: '', founded: '', size: '',
+          members: [], source: 'IA (não verificado)'
+        }))
+        return NextResponse.json({
+          results: fallback,
+          total: fallback.length,
+          query, mode,
+          verified: 0,
+          message: `Resultados sugeridos por IA para "${query}" — não verificados na Receita Federal. Para dados precisos, busque pelo CNPJ.`
+        })
+      }
       return NextResponse.json({
         results: [],
         total: 0,
