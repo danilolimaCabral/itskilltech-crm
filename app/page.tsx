@@ -722,26 +722,30 @@ function SearchView({ workspace, onImport, showToast }: any) {
     if (!query.trim()) return;
     setLoading(true); setSearchResults([]); setSearchDetail(null); setSearchError('');
     try {
-      let url = '';
       if (queryMode === 'cnpj') {
-        url = `/api/cnpja?cnpj=${encodeURIComponent(query.replace(/\D/g,''))}`;
-      } else if (queryMode === 'name') {
-        url = `/api/cnpja?name=${encodeURIComponent(query)}${stateFilter ? `&state=${stateFilter}` : ''}`;
+        // Busca direta por CNPJ no CNPJ.já
+        const url = `/api/cnpja?cnpj=${encodeURIComponent(query.replace(/\D/g,''))}`;
+        const r = await fetch(url);
+        const j = await r.json();
+        if (!r.ok) { setSearchError(j.error || 'CNPJ não encontrado'); }
+        else { setSearchDetail(j); showToast('Empresa encontrada!'); }
       } else {
-        url = `/api/cnpja?segment=${encodeURIComponent(query)}${stateFilter ? `&state=${stateFilter}` : ''}&limit=15`;
-      }
-      const r = await fetch(url);
-      const j = await r.json();
-      if (!r.ok) { setSearchError(j.error || 'Erro na consulta'); }
-      else if (j.results) {
-        setSearchResults(j.results);
-        setSearchTotal(j.total || j.results.length);
-        if (j.results.length === 0) setSearchError(j.message || 'Nenhuma empresa encontrada.');
-        else showToast(`${j.results.length} empresa(s) encontrada(s)`);
-      } else {
-        // Resultado único (CNPJ direto)
-        setSearchDetail(j);
-        showToast('Empresa encontrada!');
+        // Busca por nome ou segmento via IA + CNPJ.já
+        const r = await fetch('/api/search-companies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, mode: queryMode, state: stateFilter, limit: 12 })
+        });
+        const j = await r.json();
+        if (!r.ok) { setSearchError(j.error || 'Erro na busca'); }
+        else if (j.results?.length > 0) {
+          setSearchResults(j.results);
+          setSearchTotal(j.total || j.results.length);
+          const verified = j.verified || 0;
+          showToast(`${j.results.length} empresa(s) encontrada(s)${verified < j.results.length ? ` (⚠️ ${j.results.length - verified} não verificadas)` : ''}`);
+        } else {
+          setSearchError(j.message || `Nenhuma empresa encontrada para "${query}".`);
+        }
       }
     } catch { setSearchError('Erro de conexão. Tente novamente.'); }
     setLoading(false);
