@@ -248,11 +248,12 @@ export default function CRM() {
     const emailTpl = templates.find(t => t.type === 'email');
     if (emailTpl) {
       const body = emailTpl.body.replace(/\{\{nome\}\}/g, lead.name.split(' ')[0]).replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa').replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
-      setEmailSubject(emailTpl.subject || `Apresentação ITskillTech — ${lead.company || 'sua empresa'}`);
+      setEmailSubject(emailTpl.subject || `Apresentação ${ws?.name || 'getLOG/Lottustech'} — ${lead.company || 'sua empresa'}`);
       setEmailBody(body);
     } else {
-      setEmailSubject(`Apresentação ITskillTech — Solução TMS para ${lead.company || 'sua empresa'}`);
-      setEmailBody(`Olá ${lead.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo, sou da ITskillTech. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar significativamente a operação logística de vocês.\n\nGostaria de agendar uma conversa rápida de 15 minutos para apresentar os resultados que estamos gerando para empresas do mesmo segmento.\n\nQual seria o melhor horário para você?\n\nAtenciosamente,\nDanilo\nITskillTech`);
+      const wsName = ws?.name || 'getLOG/Lottustech';
+      setEmailSubject(`Apresentação ${wsName} — Solução TMS para ${lead.company || 'sua empresa'}`);
+      setEmailBody(`Olá ${lead.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo, da ${wsName}. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar significativamente a operação logística de vocês.\n\nGostaria de agendar uma conversa rápida de 15 minutos para apresentar os resultados que estamos gerando para empresas do mesmo segmento.\n\nQual seria o melhor horário para você?\n\nAtenciosamente,\nDanilo Cabral\n${wsName}\ndanilo@lottustech.com.br\n(41) 99949-9815`);
     }
     setShowEmailTemplates(false);
   };
@@ -264,7 +265,8 @@ export default function CRM() {
       const body = whatsTpl.body.replace(/\{\{nome\}\}/g, lead.name.split(' ')[0]).replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa').replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
       setWhatsBody(body);
     } else {
-      setWhatsBody(`Olá ${lead.name.split(' ')[0]}, tudo bem?\n\nMeu nome é Danilo, da ITskillTech. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar a operação logística de vocês.\n\nPosso te mostrar em 15 minutos como estamos ajudando empresas do mesmo segmento?\n\nQualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
+      const wsNameW = ws?.name || 'getLOG/Lottustech';
+      setWhatsBody(`Olá ${lead.name.split(' ')[0]}, tudo bem?\n\nMeu nome é Danilo, da ${wsNameW}. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar a operação logística de vocês.\n\nPosso te mostrar em 15 minutos como estamos ajudando empresas do mesmo segmento?\n\nQualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
     }
     setShowWhatsTemplates(false);
   };
@@ -431,7 +433,7 @@ export default function CRM() {
                         {/* WhatsApp */}
                         <button className="ch-icon whatsapp-btn" title={lead.whatsapp || lead.phone ? `WhatsApp: ${lead.whatsapp || lead.phone}` : 'Abrir WhatsApp (sem número)'} onClick={() => {
                           const num = cleanPhone(lead.whatsapp || lead.phone || '');
-                          const msg = encodeURIComponent(`Olá ${lead.name.split(' ')[0]}, tudo bem?\n\nMeu nome é Danilo, da ITskillTech. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar a operação logística de vocês.\n\nPosso te mostrar em 15 minutos como estamos ajudando empresas do mesmo segmento?\n\nQualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
+                          const msg = encodeURIComponent(`Olá ${lead.name.split(' ')[0]}, tudo bem?\n\nMeu nome é Danilo, da ${ws?.name || 'getLOG/Lottustech'}. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar a operação logística de vocês.\n\nPosso te mostrar em 15 minutos como estamos ajudando empresas do mesmo segmento?\n\nQualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                           if (num) {
                             window.open(`https://wa.me/${num}?text=${msg}`, '_blank');
                           } else {
@@ -672,9 +674,7 @@ export default function CRM() {
             </div>
             <div className="modal-body">
               <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14 }}>Para: <strong>{emailModal.name}</strong> &lt;{emailModal.email}&gt;</div>
-              {!gmailConfigured && (
-                <div className="alert alert-warn" style={{ marginBottom: 12, fontSize: 12 }}>⚠ E-mail SMTP não configurado. Adicione GMAIL_USER e GMAIL_APP_PASSWORD nas variáveis de ambiente da Vercel.</div>
-              )}
+              
               <div className="field">
                 <label className="field-label">Assunto</label>
                 <input className="field-input" value={emailSubject} onChange={e => setEmailSubject(e.target.value)} />
@@ -686,7 +686,7 @@ export default function CRM() {
             </div>
             <div className="modal-footer">
               <button className="btn" onClick={() => setEmailModal(null)}>Cancelar</button>
-              <button className="btn btn-primary" disabled={!emailModal.email || sendingEmail || !gmailConfigured} onClick={sendEmail}>
+              <button className="btn btn-primary" disabled={!emailModal.email || sendingEmail} onClick={sendEmail}>
                 <Icon d={ICONS.send} />{sendingEmail ? 'Enviando...' : 'Enviar e-mail'}
               </button>
             </div>
