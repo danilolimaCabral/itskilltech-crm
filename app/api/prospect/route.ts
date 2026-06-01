@@ -1,98 +1,159 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
-// URL do proxy Vibe Prospecting (Explorium) — servidor local com MCP
-// Fallback para Apollo.io se o proxy não estiver disponível
-const VIBE_PROXY_URL = process.env.VIBE_PROXY_URL || 'https://3001-iocu0mm3to8rhntcq5bg7-d5828773.us2.manus.computer';
+const APOLLO_API_KEY = process.env.APOLLO_API_KEY || '';
+const APOLLO_BASE_URL = 'https://api.apollo.io/api/v1';
+
+const INDUSTRY_MAP: Record<string, string> = {
+  'tecnologia': 'information technology and services',
+  'ti': 'information technology and services',
+  'software': 'computer software',
+  'saas': 'computer software',
+  'financeiro': 'financial services',
+  'saude': 'hospital & health care',
+  'educacao': 'e-learning',
+  'varejo': 'retail',
+  'logistica': 'logistics and supply chain',
+  'marketing': 'marketing and advertising',
+  'rh': 'staffing and recruiting',
+  'consultoria': 'management consulting',
+  'industria': 'industrial automation',
+  'construcao': 'construction',
+  'alimentacao': 'food & beverages',
+};
 
 export async function GET() {
-  return NextResponse.json({ 
-    configured: true, 
-    provider: 'vibe-prospecting',
-    proxy: VIBE_PROXY_URL 
+  return NextResponse.json({
+    configured: !!APOLLO_API_KEY,
+    provider: 'apollo',
+    message: APOLLO_API_KEY ? 'Apollo.io configurado' : 'APOLLO_API_KEY não configurada',
   });
 }
 
-export async function POST(req: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const body = await req.json();
-    const { country, department, level, industry, qty, keywords, entity_type } = body;
+    const body = await request.json();
 
-    // Mapear parâmetros para o proxy
-    const proxyBody = {
-      country: country || 'brasil',
-      keywords: keywords || industry || department || 'software',
-      company_size: '11-50',
-      qty: Math.min(parseInt(qty) || 10, 50),
-      entity_type: entity_type || 'businesses',
-      department: department || '',
-      level: level || '',
-    };
+    const country = body.country || 'Brazil';
+    const industryRaw = (body.industry || body.department || body.keywords || '').toLowerCase();
+    const numResults = Math.min(parseInt(body.qty || body.num_results || '25'), 100);
+    const employeeRanges = body.employee_ranges || ['1,10', '11,50', '51,200'];
 
-    // Chamar o proxy Vibe Prospecting
-    const proxyRes = await fetch(`${VIBE_PROXY_URL}/search`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(proxyBody),
-      signal: AbortSignal.timeout(120000), // 2 minutos
-    });
+    const industry = INDUSTRY_MAP[industryRaw] || industryRaw || 'information technology and services';
 
-    if (!proxyRes.ok) {
-      const errText = await proxyRes.text();
-      throw new Error(`Proxy error ${proxyRes.status}: ${errText.slice(0, 200)}`);
+    if (!APOLLO_API_KEY) {
+      return NextResponse.json(
+        { ok: false, error: 'APOLLO_API_KEY não configurada' },
+        { status: 503 }
+      );
     }
 
-    const data = await proxyRes.json();
+    const perPage = 25;
+    const pagesNeeded = Math.ceil(numResults / perPage);
+    const allOrgs: any[] = [];
 
-    if (!data.ok) {
-      throw new Error(data.error || 'Erro no Vibe Prospecting');
+    for (let page = 1; page <= pagesNeeded; page++) {
+      const payload = {
+        page,
+        per_page: perPage,
+        organization_locations: [country],
+        organization_num_employees_ranges: employeeRanges,
+        q_organization_keyword_tags: industry ? [industry] : [],
+      };
+
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'X-Api-Key': APOLLO_API_KEY,
+      };
+
+      // Tentar endpoint principal
+      let resp = await fetch(`${APOLLO_BASE_URL}/mixed_companies/search`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      // Fallback para endpoint alternativo
+      if (!resp.ok) {
+        resp = await fetch(`${APOLLO_BASE_URL}/organizations/search`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+        });
+      }
+
+      if (resp.ok) {
+        const result = await resp.json();
+        const orgs = result.organizations || result.accounts || [];
+        allOrgs.push(...orgs);
+
+        const total = result.pagination?.total_entries || 0;
+        if (allOrgs.length >= total || allOrgs.length >= numResults) break;
+      } else {
+        const errText = await resp.text();
+        console.error('Apollo error:', resp.status, errText.slice(0, 200));
+        break;
+      }
     }
+
+    const limited = allOrgs.slice(0, numResults);
+
+    const leads = limited
+      .filter((org: any) => org.name)
+      .map((org: any) => {
+        let domain = org.primary_domain || org.website_url || '';
+        if (domain && !domain.startsWith('http')) domain = `https://${domain}`;
+
+        const city = org.city || '';
+        const countryName = org.country || '';
+        const location = [city, countryName].filter(Boolean).join(', ');
+
+        const employees = org.estimated_num_employees || 0;
+        let empRange = org.num_employees_range || 'N/A';
+        if (employees) {
+          if (employees < 11) empRange = '1-10';
+          else if (employees < 51) empRange = '11-50';
+          else if (employees < 201) empRange = '51-200';
+          else if (employees < 501) empRange = '201-500';
+          else empRange = '500+';
+        }
+
+        const revenue = org.annual_revenue_printed || org.annual_revenue || '';
+
+        return {
+          id: org.id || '',
+          name: org.name,
+          company: org.name,
+          email: org.primary_domain ? `contato@${org.primary_domain}` : '',
+          phone: org.phone || '',
+          website: domain,
+          location,
+          city,
+          country: countryName,
+          industry: org.industry || industry,
+          employees: empRange,
+          revenue: revenue ? String(revenue) : '',
+          logo: org.logo_url || '',
+          description: org.short_description || '',
+          linkedin: org.linkedin_url || '',
+          role: 'Empresa',
+          source: 'Apollo.io',
+        };
+      });
 
     return NextResponse.json({
       ok: true,
-      count: data.count,
-      total: data.total,
-      provider: 'vibe-prospecting',
-      leads: data.leads,
+      count: leads.length,
+      total: leads.length,
+      provider: 'apollo',
+      leads,
     });
 
-  } catch (e: any) {
-    // Fallback: tentar Apollo.io se disponível
-    const apolloKey = process.env.APOLLO_API_KEY;
-    if (apolloKey) {
-      try {
-        const { country, department, qty } = await req.clone().json().catch(() => ({}));
-        const apolloRes = await fetch('https://api.apollo.io/v1/mixed_companies/search', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Api-Key': apolloKey,
-          },
-          body: JSON.stringify({
-            page: 1,
-            per_page: Math.min(parseInt(qty) || 10, 25),
-            organization_locations: [country || 'Brazil'],
-          }),
-        });
-        if (apolloRes.ok) {
-          const apolloData = await apolloRes.json();
-          const leads = (apolloData.organizations || []).map((org: any) => ({
-            name: org.name,
-            company: org.name,
-            email: org.primary_domain ? `contato@${org.primary_domain}` : '',
-            website: org.website_url || '',
-            employees: org.estimated_num_employees || '',
-            industry: org.industry || '',
-            role: 'Empresa',
-          }));
-          return NextResponse.json({ ok: true, count: leads.length, provider: 'apollo', leads });
-        }
-      } catch {}
-    }
-
+  } catch (error: any) {
     return NextResponse.json(
-      { ok: false, error: e.message || 'Erro ao buscar leads' },
+      { ok: false, error: error.message || 'Erro ao buscar leads' },
       { status: 500 }
     );
   }
