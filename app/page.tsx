@@ -21,7 +21,19 @@ const DEFAULT_WORKSPACES: Workspace[] = [
 const STORAGE_KEY = 'itskill_crm_full_v1';
 const uid = () => 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
 const cleanPhone = (p: string) => (p || '').replace(/\D/g, '');
-const statusLabel = (s: string) => (({ novo: 'Novo', contatado: 'Contatado', negociacao: 'Em negociação', fechado: 'Fechado', perdido: 'Perdido' } as any)[s] || s);
+// Funil de vendas — 5 etapas
+const FUNNEL = [
+  { id: 'prospeccao',   label: '1 · Prospecção',   short: 'Prospecção',   color: '#6366f1', bg: '#eef2ff' },
+  { id: 'qualificacao', label: '2 · Qualificação',  short: 'Qualificação', color: '#f59e0b', bg: '#fffbeb' },
+  { id: 'apresentacao', label: '3 · Apresentação',  short: 'Apresentação', color: '#3b82f6', bg: '#eff6ff' },
+  { id: 'fechamento',   label: '4 · Fechamento',   short: 'Fechamento',   color: '#10b981', bg: '#ecfdf5' },
+  { id: 'posvenda',     label: '5 · Pós-venda',    short: 'Pós-venda',    color: '#8b5cf6', bg: '#f5f3ff' },
+];
+const FUNNEL_MAP: any = Object.fromEntries(FUNNEL.map(f => [f.id, f]));
+// Mapeamento de status legado para novo funil
+const LEGACY_MAP: any = { novo: 'prospeccao', contatado: 'qualificacao', negociacao: 'apresentacao', fechado: 'fechamento', perdido: 'prospeccao' };
+const normalizeStatus = (s: string) => FUNNEL_MAP[s] ? s : (LEGACY_MAP[s] || 'prospeccao');
+const statusLabel = (s: string) => FUNNEL_MAP[normalizeStatus(s)]?.short || s;
 
 const Icon = ({ d, fill }: { d: string; fill?: boolean }) => (
   <svg viewBox="0 0 24 24" fill={fill ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: d }} />
@@ -82,6 +94,11 @@ export default function CRM() {
   const [showWhatsTemplates, setShowWhatsTemplates] = useState(false);
   const [whatsModal, setWhatsModal] = useState<Lead | null>(null);
   const [whatsBody, setWhatsBody] = useState('');
+  // Painel lateral de lead
+  const [leadPanel, setLeadPanel] = useState<Lead | null>(null);
+  const [panelAnalysis, setPanelAnalysis] = useState<any>(null);
+  const [analyzingLead, setAnalyzingLead] = useState(false);
+  const [panelTab, setPanelTab] = useState<'info' | 'timeline' | 'analysis'>('info');
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2800); };
 
@@ -161,20 +178,27 @@ export default function CRM() {
     if (!callResult || !callModal) return;
     setSavingCall(true);
     const STATUS_MAP: any = {
-      atendeu_interesse: 'negociacao',
-      atendeu_sem_interesse: 'contatado',
+      atendeu_interesse: 'apresentacao',
+      atendeu_sem_interesse: 'qualificacao',
       nao_atendeu: null,
       caixa_postal: null,
       numero_errado: null,
     };
     const newStatus = STATUS_MAP[callResult];
+    // Atualizar timeline
+    const timeline = JSON.parse(callModal.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+    const resultLabels2: any = { atendeu_interesse: '✅ Atendeu — interesse!', atendeu_sem_interesse: '🟡 Atendeu — sem interesse', nao_atendeu: '❌ Não atendeu', caixa_postal: '📬 Caixa postal', numero_errado: '🚫 Número errado' };
+    timeline.unshift({ type: 'call', label: `Ligação: ${resultLabels2[callResult] || callResult}`, note: callNotes || '', ts: Date.now() });
+    if (newStatus) timeline.unshift({ type: 'status', label: `Etapa → ${FUNNEL_MAP[newStatus]?.label || newStatus}`, ts: Date.now(), from: callModal.status });
+    const notesClean = (callModal.notes || '').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
+    const notesWithCall = callNotes ? `[Ligação ${new Date().toLocaleDateString('pt-BR')}] ${callNotes}\n${notesClean}` : notesClean;
     const updatedLead: Lead = {
       ...callModal,
       status: newStatus || callModal.status,
       call_count: (callModal.call_count || 0) + 1,
       last_contact: Date.now(),
       updated_at: Date.now(),
-      notes: callNotes ? `[Ligação ${new Date().toLocaleDateString('pt-BR')}] ${callNotes}\n${callModal.notes || ''}` : callModal.notes,
+      notes: notesWithCall + `\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]`,
     };
     try {
       // Salvar log de ligação no banco
@@ -245,6 +269,33 @@ export default function CRM() {
     setShowWhatsTemplates(false);
   };
 
+  // Analisar empresa
+  const analyzeCompany = async (lead: Lead) => {
+    if (!lead.company && !lead.notes?.includes('CNPJ:')) { showToast('Lead sem empresa para analisar'); return; }
+    setAnalyzingLead(true); setPanelAnalysis(null); setPanelTab('analysis');
+    try {
+      const cnpjMatch = lead.notes?.match(/CNPJ[:\s]+([\d.\-\/]+)/);
+      const cnpj = cnpjMatch ? cnpjMatch[1].replace(/\D/g,'') : '';
+      const r = await fetch('/api/analyze-company', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company: lead.company || lead.name, cnpj, leadName: lead.name, leadRole: lead.role }) });
+      const j = await r.json();
+      if (j.ok) { setPanelAnalysis(j); showToast('Análise concluída!'); }
+      else showToast('Erro na análise: ' + (j.error || 'tente novamente'));
+    } catch { showToast('Erro ao analisar empresa'); }
+    setAnalyzingLead(false);
+  };
+
+  // Mudar status rápido do lead (funil de 5 etapas)
+  const quickStatus = async (lead: Lead, newStatus: string) => {
+    const timeline = JSON.parse(lead.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+    const funnelLabel = FUNNEL_MAP[newStatus]?.label || newStatus;
+    timeline.unshift({ type: 'status', label: `Etapa → ${funnelLabel}`, ts: Date.now(), from: lead.status });
+    const notesClean = (lead.notes || '').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
+    const updated: Lead = { ...lead, status: newStatus, updated_at: Date.now(), notes: notesClean + `\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]` };
+    await saveLead(updated);
+    setLeadPanel(updated);
+    showToast(`Etapa: ${FUNNEL_MAP[newStatus]?.short || newStatus}`);
+  };
+
   const loadTemplates = async (ws: string) => {
     try { const r = await fetch(`/api/templates?workspace=${ws}`); const j = await r.json(); if (Array.isArray(j)) setTemplates(j); } catch {}
   };
@@ -253,13 +304,15 @@ export default function CRM() {
   const filtered = leads.filter(l => {
     const t = search.toLowerCase();
     const ms = !t || l.name.toLowerCase().includes(t) || (l.email || '').toLowerCase().includes(t) || (l.company || '').toLowerCase().includes(t);
-    return ms && (statusFilter === 'all' || l.status === statusFilter);
+    return ms && (statusFilter === 'all' || normalizeStatus(l.status) === statusFilter);
   });
   const stats = {
     total: leads.length,
-    novos: leads.filter(l => l.status === 'novo').length,
-    negociacao: leads.filter(l => l.status === 'negociacao').length,
-    fechados: leads.filter(l => l.status === 'fechado').length,
+    prospeccao: leads.filter(l => normalizeStatus(l.status) === 'prospeccao').length,
+    qualificacao: leads.filter(l => normalizeStatus(l.status) === 'qualificacao').length,
+    apresentacao: leads.filter(l => normalizeStatus(l.status) === 'apresentacao').length,
+    fechamento: leads.filter(l => normalizeStatus(l.status) === 'fechamento').length,
+    posvenda: leads.filter(l => normalizeStatus(l.status) === 'posvenda').length,
   };
 
   return (
@@ -328,22 +381,27 @@ export default function CRM() {
                   <button className="btn btn-primary" onClick={() => { setEditing(null); setModalOpen(true); }}><Icon d={ICONS.plus} />Novo lead</button>
                 </div>
               </div>
-              <div className="stats">
-                <div className="stat"><div className="stat-label"><span className="stat-dot" style={{ background: '#475467' }} />Total</div><div className="stat-value">{stats.total}</div></div>
-                <div className="stat"><div className="stat-label"><span className="stat-dot" style={{ background: 'var(--primary)' }} />Novos</div><div className="stat-value">{stats.novos}</div></div>
-                <div className="stat"><div className="stat-label"><span className="stat-dot" style={{ background: 'var(--purple)' }} />Negociação</div><div className="stat-value">{stats.negociacao}</div></div>
-                <div className="stat"><div className="stat-label"><span className="stat-dot" style={{ background: 'var(--success)' }} />Fechados</div><div className="stat-value">{stats.fechados}</div></div>
+              {/* Funil de vendas — 5 etapas */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                <div className="stat" style={{ cursor: 'pointer', flex: '1 1 80px', borderBottom: statusFilter === 'all' ? '3px solid #475467' : '3px solid transparent' }} onClick={() => setStatusFilter('all')}>
+                  <div className="stat-label"><span className="stat-dot" style={{ background: '#475467' }} />Total</div><div className="stat-value">{stats.total}</div>
+                </div>
+                {FUNNEL.map(f => (
+                  <div key={f.id} className="stat" style={{ cursor: 'pointer', flex: '1 1 80px', borderBottom: statusFilter === f.id ? `3px solid ${f.color}` : '3px solid transparent' }} onClick={() => setStatusFilter(f.id)}>
+                    <div className="stat-label"><span className="stat-dot" style={{ background: f.color }} />{f.short}</div>
+                    <div className="stat-value" style={{ color: f.color }}>{(stats as any)[f.id] || 0}</div>
+                  </div>
+                ))}
               </div>
               <div className="toolbar">
                 <div className="search"><Icon d='<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>' /><input placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} /></div>
-                <div className="filter-group">{['all', 'novo', 'contatado', 'negociacao', 'fechado'].map(s => <button key={s} className={`filter-tab${statusFilter === s ? ' active' : ''}`} onClick={() => setStatusFilter(s)}>{s === 'all' ? 'Todos' : statusLabel(s)}</button>)}</div>
               </div>
               {filtered.length === 0 ? (
                 <div className="empty-state"><div className="empty-title">Nenhum lead</div><div className="empty-text">Adicione seu primeiro contato</div><button className="btn btn-primary" onClick={() => { setEditing(null); setModalOpen(true); }}><Icon d={ICONS.plus} />Adicionar lead</button></div>
               ) : (
                 <div className="table-wrap"><table className="data"><thead><tr><th>Lead</th><th>Contato</th><th>Status</th><th style={{ textAlign: 'right' }}>Ações</th></tr></thead><tbody>
                   {filtered.map(lead => (
-                    <tr key={lead.id} onClick={() => { setEditing(lead); setModalOpen(true); }}>
+                    <tr key={lead.id} onClick={() => { setLeadPanel(lead); setPanelAnalysis(null); setPanelTab('info'); }}>
                       <td>
                         <div className="cell-primary">{lead.name}</div>
                         <div className="cell-secondary">{lead.company || '—'}{lead.role ? ` · ${lead.role}` : ''}</div>
@@ -354,11 +412,13 @@ export default function CRM() {
                         {(lead.whatsapp || lead.phone) && <div className="cell-secondary">{lead.whatsapp || lead.phone}</div>}
                         {!lead.email && !lead.whatsapp && !lead.phone && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>}
                       </td>
-                      <td><span className={`badge badge-${lead.status}`}>{statusLabel(lead.status)}</span></td>
+                      <td>{
+                        (() => { const f = FUNNEL_MAP[normalizeStatus(lead.status)]; return f ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: f.bg, color: f.color, border: `1px solid ${f.color}33`, whiteSpace: 'nowrap' }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: f.color, flexShrink: 0 }} />{f.short}</span> : <span className={`badge badge-${lead.status}`}>{statusLabel(lead.status)}</span>; })()
+                      }</td>
                       <td onClick={e => e.stopPropagation()}><div className="channel-icons">
-                        {/* Enriquecer */}
-                        <button className="ch-icon enrich-btn" title={`Enriquecer: buscar telefone de ${lead.company || lead.name}`} disabled={enriching === lead.id} onClick={() => enrichLead(lead)}>
-                          {enriching === lead.id ? <span style={{ fontSize: 10 }}>...</span> : <Icon d={ICONS.enrich} />}
+                        {/* Analisar empresa */}
+                        <button className="ch-icon enrich-btn" title={`Analisar empresa: ${lead.company || lead.name}`} onClick={() => { setLeadPanel(lead); setPanelAnalysis(null); setPanelTab('analysis'); analyzeCompany(lead); }}>
+                          <Icon d={ICONS.sparkles} />
                         </button>
                         {/* Ligar */}
                         <button className="ch-icon phone-btn" title={lead.phone || lead.whatsapp ? `Ligar: ${lead.phone || lead.whatsapp}` : 'Registrar ligação'} onClick={() => { setCallModal(lead); setCallResult(''); setCallNotes(''); }}>
@@ -403,8 +463,158 @@ export default function CRM() {
         </div></div>
       </div>
 
+      {/* Painel Lateral de Lead */}
+      {leadPanel && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex' }} onClick={e => { if (e.target === e.currentTarget) setLeadPanel(null); }}>
+          <div style={{ flex: 1 }} onClick={() => setLeadPanel(null)} />
+          <div style={{ width: Math.min(480, window.innerWidth), background: 'var(--surface)', boxShadow: '-4px 0 32px rgba(0,0,0,.18)', display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto' }}>
+            {/* Header do painel */}
+            <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.3 }}>{leadPanel.name}</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{leadPanel.company}{leadPanel.role ? ` · ${leadPanel.role}` : ''}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 10 }}>
+                  <button className="btn btn-sm" title="Editar lead" onClick={() => { setEditing(leadPanel); setModalOpen(true); }}><Icon d={ICONS.edit} /></button>
+                  <button className="modal-close" onClick={() => setLeadPanel(null)} style={{ position: 'static', fontSize: 20, width: 32, height: 32 }}>×</button>
+                </div>
+              </div>
+              {/* Mudança rápida de etapa do funil */}
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>Etapa do funil</div>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {FUNNEL.map(f => {
+                  const cur = normalizeStatus(leadPanel.status) === f.id;
+                  return (
+                    <button key={f.id} onClick={() => quickStatus(leadPanel, f.id)}
+                      style={{ fontSize: 11, fontWeight: cur ? 700 : 500, padding: '4px 10px', borderRadius: 20, border: `1.5px solid ${cur ? f.color : 'var(--border)'}`, background: cur ? f.color : 'var(--surface)', color: cur ? '#fff' : 'var(--text-muted)', cursor: 'pointer', transition: 'all .15s' }}>
+                      {f.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Abas do painel */}
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
+              {([['info','Dados'],['timeline','Histórico'],['analysis','Análise IA']] as const).map(([t, lbl]) => (
+                <button key={t} onClick={() => { setPanelTab(t); if (t === 'analysis' && !panelAnalysis && !analyzingLead) analyzeCompany(leadPanel); }}
+                  style={{ flex: 1, padding: '10px 4px', fontSize: 12, fontWeight: panelTab === t ? 700 : 400, borderBottom: panelTab === t ? '2px solid var(--primary)' : '2px solid transparent', background: 'none', cursor: 'pointer', color: panelTab === t ? 'var(--primary)' : 'var(--text-muted)', transition: 'all .15s' }}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+            {/* Conteúdo das abas */}
+            <div style={{ flex: 1, padding: 18, overflowY: 'auto' }}>
+              {panelTab === 'info' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {[['E-mail', leadPanel.email],['WhatsApp', leadPanel.whatsapp],['Telefone', leadPanel.phone],['LinkedIn', leadPanel.linkedin],['Fonte', leadPanel.source]].filter(([,v]) => v).map(([k,v]) => (
+                    <div key={k as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>
+                      <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>{k}</span>
+                      <span style={{ fontWeight: 600, maxWidth: '60%', textAlign: 'right', wordBreak: 'break-all' }}>{v}</span>
+                    </div>
+                  ))}
+                  {leadPanel.call_count ? <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>📞 {leadPanel.call_count} ligação(ões) · último contato: {leadPanel.last_contact ? new Date(leadPanel.last_contact).toLocaleDateString('pt-BR') : '—'}</div> : null}
+                  {leadPanel.notes && (() => { const clean = leadPanel.notes.replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g,'').trim(); return clean ? <div style={{ marginTop: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Anotações</div><div style={{ fontSize: 13, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', background: 'var(--surface-2)', borderRadius: 8, padding: '10px 12px' }}>{clean}</div></div> : null; })()}
+                  {/* Ações rápidas */}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                    {(leadPanel.phone || leadPanel.whatsapp) && <a href={`tel:${cleanPhone(leadPanel.phone || leadPanel.whatsapp || '')}`} className="btn btn-sm" style={{ textDecoration: 'none' }}><Icon d={ICONS.phone} />Ligar</a>}
+                    {(leadPanel.whatsapp || leadPanel.phone) && <button className="btn btn-sm" style={{ background: '#25d366', color: '#fff', border: 'none' }} onClick={() => { const num = cleanPhone(leadPanel.whatsapp || leadPanel.phone || ''); if (num) window.open(`https://wa.me/${num}`, '_blank'); }}><Icon d={ICONS.whatsapp} />WhatsApp</button>}
+                    {leadPanel.email && <button className="btn btn-sm" onClick={() => openEmailModal(leadPanel)}><Icon d={ICONS.email} />E-mail</button>}
+                    <button className="btn btn-sm" onClick={() => { setCallModal(leadPanel); setCallResult(''); setCallNotes(''); }}><Icon d={ICONS.phone} />Registrar ligação</button>
+                  </div>
+                </div>
+              )}
+              {panelTab === 'timeline' && (() => {
+                const timeline = JSON.parse(leadPanel.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+                const created = { type: 'created', label: 'Lead criado', ts: leadPanel.created_at };
+                const all = [...timeline, created];
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    {all.length === 1 ? <div style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '24px 0' }}>Nenhum evento registrado ainda.<br/>Registre uma ligação ou mude o status para começar.</div> : null}
+                    {all.map((ev: any, i: number) => {
+                      const icons: any = { status: '🔄', call: '📞', email: '✉️', whatsapp: '💬', created: '🌱', note: '📝' };
+                      const colors: any = { status: '#3b82f6', call: '#10b981', email: '#f59e0b', whatsapp: '#25d366', created: '#6366f1', note: '#8b5cf6' };
+                      const c = colors[ev.type] || '#667085';
+                      return (
+                        <div key={i} style={{ display: 'flex', gap: 12, paddingBottom: 16, position: 'relative' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: c + '18', border: `2px solid ${c}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, zIndex: 1 }}>{icons[ev.type] || '•'}</div>
+                            {i < all.length - 1 && <div style={{ width: 2, flex: 1, background: 'var(--border)', marginTop: 4 }} />}
+                          </div>
+                          <div style={{ flex: 1, paddingTop: 4 }}>
+                            <div style={{ fontWeight: 600, fontSize: 13, color: c }}>{ev.label}</div>
+                            {ev.note && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3, background: 'var(--surface-2)', borderRadius: 6, padding: '5px 8px' }}>{ev.note}</div>}
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{ev.ts ? new Date(ev.ts).toLocaleString('pt-BR') : '—'}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+              {panelTab === 'analysis' && (
+                analyzingLead ? (
+                  <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
+                    <div style={{ width: 36, height: 36, border: '3px solid var(--border)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
+                    <div style={{ fontSize: 13 }}>Analisando empresa com IA + CNPJ.já...</div>
+                  </div>
+                ) : panelAnalysis ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    {/* Dados da empresa */}
+                    {panelAnalysis.company?.cnpj && (
+                      <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '12px 14px' }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Dados Oficiais (Receita Federal)</div>
+                        {[['CNPJ', panelAnalysis.company.cnpj?.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')],['CNAE', panelAnalysis.company.cnae],['Porte', panelAnalysis.company.size],['Cidade', panelAnalysis.company.city && `${panelAnalysis.company.city}/${panelAnalysis.company.state}`],['Fundação', panelAnalysis.company.founded],['Status', panelAnalysis.company.status]].filter(([,v]) => v).map(([k,v]) => (
+                          <div key={k as string} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', borderBottom: '1px solid var(--border)' }}>
+                            <span style={{ color: 'var(--text-muted)' }}>{k}</span><span style={{ fontWeight: 600 }}>{v}</span>
+                          </div>
+                        ))}
+                        {panelAnalysis.company.members?.length > 0 && (
+                          <div style={{ marginTop: 8 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 4 }}>Sócios / Diretores</div>
+                            {panelAnalysis.company.members.slice(0,3).map((m: any, i: number) => (
+                              <div key={i} style={{ fontSize: 12, padding: '2px 0' }}><strong>{m.name}</strong> <span style={{ color: 'var(--text-muted)' }}>· {m.role}</span></div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {/* Score */}
+                    {panelAnalysis.analysis?.score_potencial && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--surface-2)', borderRadius: 10, padding: '10px 14px' }}>
+                        <div style={{ fontSize: 28, fontWeight: 800, color: panelAnalysis.analysis.score_potencial >= 7 ? '#10b981' : panelAnalysis.analysis.score_potencial >= 5 ? '#f59e0b' : '#ef4444' }}>{panelAnalysis.analysis.score_potencial}<span style={{ fontSize: 14, fontWeight: 400, color: 'var(--text-muted)' }}>/10</span></div>
+                        <div><div style={{ fontWeight: 600, fontSize: 13 }}>Score de Potencial</div><div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Estimativa de conversão</div></div>
+                      </div>
+                    )}
+                    {/* Resumo */}
+                    {panelAnalysis.analysis?.resumo && <div><div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Resumo</div><div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>{panelAnalysis.analysis.resumo}</div></div>}
+                    {/* Dores */}
+                    {panelAnalysis.analysis?.dores_provaveis?.length > 0 && <div><div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>Dores Prováveis</div>{panelAnalysis.analysis.dores_provaveis.map((d: string, i: number) => <div key={i} style={{ fontSize: 12, padding: '4px 0 4px 10px', borderLeft: '3px solid #ef4444', marginBottom: 4, color: 'var(--text-secondary)' }}>{d}</div>)}</div>}
+                    {/* Abordagem */}
+                    {panelAnalysis.analysis?.abordagem_sugerida && <div><div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Como Abordar</div><div style={{ fontSize: 13, color: 'var(--text-secondary)', background: '#eff6ff', borderRadius: 8, padding: '10px 12px', lineHeight: 1.6, borderLeft: '3px solid #3b82f6' }}>{panelAnalysis.analysis.abordagem_sugerida}</div></div>}
+                    {/* Perguntas */}
+                    {panelAnalysis.analysis?.perguntas_abertura?.length > 0 && <div><div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>Perguntas de Abertura</div>{panelAnalysis.analysis.perguntas_abertura.map((q: string, i: number) => <div key={i} style={{ fontSize: 12, padding: '5px 10px', borderRadius: 6, background: 'var(--surface-2)', marginBottom: 4, color: 'var(--text-secondary)' }}>💬 {q}</div>)}</div>}
+                    {/* Oportunidades */}
+                    {panelAnalysis.analysis?.oportunidades?.length > 0 && <div><div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>Oportunidades</div>{panelAnalysis.analysis.oportunidades.map((o: string, i: number) => <div key={i} style={{ fontSize: 12, padding: '4px 0 4px 10px', borderLeft: '3px solid #10b981', marginBottom: 4, color: 'var(--text-secondary)' }}>{o}</div>)}</div>}
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'right' }}>Fonte: {panelAnalysis.source}</div>
+                    <button className="btn btn-sm" style={{ width: '100%', justifyContent: 'center' }} onClick={() => analyzeCompany(leadPanel)}><Icon d={ICONS.refresh} />Atualizar análise</button>
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                    <div style={{ fontSize: 32, marginBottom: 12 }}>✨</div>
+                    <div style={{ fontWeight: 600, marginBottom: 8 }}>Análise Inteligente</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>Pesquisa a empresa no CNPJ.já + IA e gera um briefing completo para sua negociação.</div>
+                    <button className="btn btn-primary" onClick={() => analyzeCompany(leadPanel)}>✨ Analisar empresa</button>
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal de Lead */}
-      {modalOpen && <LeadModal lead={editing} workspace={workspace} onClose={() => setModalOpen(false)} onSave={async (l: Lead) => { await saveLead(l); setModalOpen(false); showToast(editing ? 'Lead atualizado' : 'Lead criado'); }} onDelete={editing ? async () => { await removeLead(editing.id); setModalOpen(false); } : undefined} />}
+      {modalOpen && <LeadModal lead={editing} workspace={workspace} onClose={() => setModalOpen(false)} onSave={async (l: Lead) => { await saveLead(l); setModalOpen(false); if (leadPanel && editing?.id === leadPanel.id) setLeadPanel(l); showToast(editing ? 'Lead atualizado' : 'Lead criado'); }} onDelete={editing ? async () => { await removeLead(editing.id); setModalOpen(false); setLeadPanel(null); } : undefined} />}
 
       {/* Modal de Ligação */}
       {callModal && (
@@ -711,10 +921,13 @@ function SearchView({ workspace, onImport, showToast }: any) {
     source: 'CNPJ.já'
   });
 
-  const addToCart = (data: any) => {
+  const addToCart = async (data: any) => {
     const lead = buildFromCnpja(data);
-    onImport([lead]);
-    setAddedIds(prev => new Set([...prev, data.cnpj || data.name]));
+    await onImport([lead]);
+    const key = data.cnpj || data.name;
+    setAddedIds(prev => new Set([...prev, key]));
+    // Remove o card da lista após 600ms para feedback visual
+    setTimeout(() => setSearchResults(prev => prev.filter(r => (r.cnpj || r.name) !== key)), 600);
     showToast('Lead adicionado à carteira!');
   };
 
@@ -912,7 +1125,7 @@ function SearchView({ workspace, onImport, showToast }: any) {
                 <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
                   <strong style={{ color: 'var(--text)' }}>{searchResults.length}</strong> resultado(s){searchTotal > searchResults.length ? ` de ${searchTotal.toLocaleString()} encontrados` : ''}
                 </div>
-                <button className="btn btn-primary btn-sm" onClick={() => { searchResults.forEach(r => onImport([buildFromCnpja(r)])); setAddedIds(new Set(searchResults.map(r => r.cnpj || r.name))); showToast(`${searchResults.length} leads adicionados!`); }}>
+                <button className="btn btn-primary btn-sm" onClick={async () => { const all = [...searchResults]; for (const r of all) { await onImport([buildFromCnpja(r)]); } setAddedIds(new Set(all.map(r => r.cnpj || r.name))); setTimeout(() => setSearchResults([]), 600); showToast(`${all.length} leads adicionados à carteira!`); }}>
                   <Icon d={ICONS.download} />Adicionar todos
                 </button>
               </div>
@@ -1060,7 +1273,7 @@ function LeadModal({ lead, workspace, onClose, onSave, onDelete }: any) {
           </div>
           <div className="field-row">
             <div className="field"><label className="field-label">Cargo</label><input className="field-input" value={f.role || ''} onChange={e => set('role', e.target.value)} /></div>
-            <div className="field"><label className="field-label">Status</label><select className="field-select" value={f.status || 'novo'} onChange={e => set('status', e.target.value)}><option value="novo">Novo</option><option value="contatado">Contatado</option><option value="negociacao">Em negociação</option><option value="fechado">Fechado</option><option value="perdido">Perdido</option></select></div>
+            <div className="field"><label className="field-label">Etapa do Funil</label><select className="field-select" value={normalizeStatus(f.status || 'prospeccao')} onChange={e => set('status', e.target.value)}>{FUNNEL.map(fu => <option key={fu.id} value={fu.id}>{fu.label}</option>)}</select></div>
           </div>
           <div className="field-row">
             <div className="field"><label className="field-label">E-mail</label><input className="field-input" type="email" value={f.email || ''} onChange={e => set('email', e.target.value)} /></div>
