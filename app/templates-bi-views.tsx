@@ -31,16 +31,36 @@ export function TemplatesView({ workspace, workspaceName, templates, onReload, s
       const r = await fetch('/api/generate-template', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: tab, tone: aiTone, context: aiContext, workspace, workspaceName }),
+        body: JSON.stringify({ type: tab, tone: aiTone, context: aiContext, workspace, workspaceName, count: 3 }),
       });
       const j = await r.json();
-      if (j.template) {
+      if (j.error) {
+        showToast('Erro ao gerar: ' + j.error);
+      } else if (j.templates && Array.isArray(j.templates) && j.templates.length > 0) {
+        // Salvar todos os templates gerados automaticamente
+        let saved = 0;
+        for (const tpl of j.templates) {
+          try {
+            await fetch('/api/templates', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ...tpl, id: `tpl_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, workspace, type: tab }),
+            });
+            saved++;
+          } catch {}
+        }
+        showToast(`✓ ${saved} template(s) gerado(s) e salvo(s)!`);
+        onReload();
+      } else if (j.template) {
+        // Compatibilidade com resposta singular
         setEditing({ ...j.template, id: '', workspace, type: tab });
         showToast('Template gerado pela IA!');
       } else {
-        showToast('Erro ao gerar: ' + (j.error || 'falha'));
+        showToast('Erro: resposta inválida da IA. Tente novamente.');
       }
-    } catch { showToast('Erro ao gerar template'); }
+    } catch (e: any) {
+      showToast('Erro ao gerar template: ' + (e?.message || 'falha na conexão'));
+    }
     setGenerating(false);
   };
 
@@ -53,9 +73,8 @@ export function TemplatesView({ workspace, workspaceName, templates, onReload, s
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...editing, workspace, type: tab }),
       });
-      const j = await r.json();
-      if (j.ok) { showToast('Template salvo!'); setEditing(null); onReload(); }
-      else showToast('Erro ao salvar: ' + (j.error || 'falha'));
+      if (r.ok) { showToast('Template salvo!'); setEditing(null); onReload(); }
+      else { const j = await r.json(); showToast('Erro ao salvar: ' + (j.error || 'falha')); }
     } catch { showToast('Erro ao salvar template'); }
     setSaving(false);
   };
