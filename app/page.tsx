@@ -230,10 +230,14 @@ export default function CRM() {
       const j = await r.json();
       if (j.success) {
         showToast('✓ E-mail enviado para ' + emailModal.email);
-        // Atualizar status para contatado se ainda for novo
-        if (emailModal.status === 'novo') {
-          await saveLead({ ...emailModal, status: 'contatado', updated_at: Date.now() });
-        }
+        // Avançar para próxima etapa do funil e registrar na timeline
+        const STATUS_ADVANCE: any = { prospeccao: 'qualificacao', novo: 'qualificacao', contatado: 'qualificacao', qualificacao: 'apresentacao', apresentacao: 'fechamento', fechamento: 'posvenda' };
+        const nextStatus = STATUS_ADVANCE[normalizeStatus(emailModal.status)] || normalizeStatus(emailModal.status);
+        const timeline = JSON.parse(emailModal.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+        timeline.unshift({ type: 'email', label: `E-mail enviado: ${emailSubject}`, ts: Date.now() });
+        if (nextStatus !== normalizeStatus(emailModal.status)) timeline.unshift({ type: 'status', label: `Etapa → ${FUNNEL_MAP[nextStatus]?.label || nextStatus}`, ts: Date.now() });
+        const notesClean = (emailModal.notes || '').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
+        await saveLead({ ...emailModal, status: nextStatus, updated_at: Date.now(), notes: notesClean + `\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]` });
         setEmailModal(null); setEmailSubject(''); setEmailBody('');
       } else {
         showToast('Erro: ' + (j.error || 'falha no envio'));
@@ -380,6 +384,19 @@ export default function CRM() {
                   }}>
                     {enrichingAll ? `⚙ Enriquecendo... ${enrichProgress.done}/${enrichProgress.total}` : '⚙ Enriquecer todos'}
                   </button>
+                  <button className="btn" style={{background:'#ef4444',color:'#fff',border:'none',marginRight:8,fontSize:12,padding:'6px 12px',borderRadius:6,cursor:'pointer'}} onClick={async () => {
+                    const seen = new Map<string, string>();
+                    const toDelete: string[] = [];
+                    for (const l of [...leads].sort((a,b) => (a.updated_at||0)-(b.updated_at||0))) {
+                      const key = (l.email || l.name || '').toLowerCase().trim();
+                      if (!key) continue;
+                      if (seen.has(key)) { toDelete.push(l.id); } else { seen.set(key, l.id); }
+                    }
+                    if (!toDelete.length) { showToast('Nenhum duplicado encontrado!'); return; }
+                    if (!confirm(`Encontrados ${toDelete.length} lead(s) duplicado(s). Excluir os mais antigos?`)) return;
+                    for (const id of toDelete) await removeLead(id, true);
+                    showToast(`✓ ${toDelete.length} duplicado(s) removido(s)`);
+                  }}>🗑 Deduplicar</button>
                   <button className="btn btn-primary" onClick={() => { setEditing(null); setModalOpen(true); }}><Icon d={ICONS.plus} />Novo lead</button>
                 </div>
               </div>
