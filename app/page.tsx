@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { TemplatesView, BIView } from './templates-bi-views';
 
 interface Lead {
   id: string; workspace: string; name: string; company?: string; role?: string;
@@ -43,6 +44,10 @@ const ICONS: any = {
   workspace: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
   trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
   edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
+  template: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+  bi: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+  sparkles: '<path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M19 3l.75 2.25L22 6l-2.25.75L19 9l-.75-2.25L16 6l2.25-.75z"/>',
+  copy: '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
 };
 
 export default function CRM() {
@@ -71,6 +76,12 @@ export default function CRM() {
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
+  // Templates
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [showEmailTemplates, setShowEmailTemplates] = useState(false);
+  const [showWhatsTemplates, setShowWhatsTemplates] = useState(false);
+  const [whatsModal, setWhatsModal] = useState<Lead | null>(null);
+  const [whatsBody, setWhatsBody] = useState('');
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2800); };
 
@@ -93,6 +104,12 @@ export default function CRM() {
         const r = await fetch('/api/workspaces');
         const j = await r.json();
         if (j.workspaces?.length) setWorkspaces(j.workspaces);
+      } catch {}
+      // load templates
+      try {
+        const r = await fetch(`/api/templates?workspace=${workspace}`);
+        const j = await r.json();
+        if (Array.isArray(j)) setTemplates(j);
       } catch {}
     })();
     const params = new URLSearchParams(window.location.search);
@@ -203,8 +220,33 @@ export default function CRM() {
 
   const openEmailModal = (lead: Lead) => {
     setEmailModal(lead);
-    setEmailSubject(`Apresentação ITskillTech — Solução TMS para ${lead.company || 'sua empresa'}`);
-    setEmailBody(`Olá ${lead.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo, sou da ITskillTech. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar significativamente a operação logística de vocês.\n\nGostaria de agendar uma conversa rápida de 15 minutos para apresentar os resultados que estamos gerando para empresas do mesmo segmento.\n\nQual seria o melhor horário para você?\n\nAtenciosamente,\nDanilo\nITskillTech`);
+    // Usar primeiro template de email do workspace, se existir
+    const emailTpl = templates.find(t => t.type === 'email');
+    if (emailTpl) {
+      const body = emailTpl.body.replace(/\{\{nome\}\}/g, lead.name.split(' ')[0]).replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa').replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
+      setEmailSubject(emailTpl.subject || `Apresentação ITskillTech — ${lead.company || 'sua empresa'}`);
+      setEmailBody(body);
+    } else {
+      setEmailSubject(`Apresentação ITskillTech — Solução TMS para ${lead.company || 'sua empresa'}`);
+      setEmailBody(`Olá ${lead.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo, sou da ITskillTech. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar significativamente a operação logística de vocês.\n\nGostaria de agendar uma conversa rápida de 15 minutos para apresentar os resultados que estamos gerando para empresas do mesmo segmento.\n\nQual seria o melhor horário para você?\n\nAtenciosamente,\nDanilo\nITskillTech`);
+    }
+    setShowEmailTemplates(false);
+  };
+
+  const openWhatsModal = (lead: Lead) => {
+    setWhatsModal(lead);
+    const whatsTpl = templates.find(t => t.type === 'whatsapp');
+    if (whatsTpl) {
+      const body = whatsTpl.body.replace(/\{\{nome\}\}/g, lead.name.split(' ')[0]).replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa').replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
+      setWhatsBody(body);
+    } else {
+      setWhatsBody(`Olá ${lead.name.split(' ')[0]}, tudo bem?\n\nMeu nome é Danilo, da ITskillTech. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar a operação logística de vocês.\n\nPosso te mostrar em 15 minutos como estamos ajudando empresas do mesmo segmento?\n\nQualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
+    }
+    setShowWhatsTemplates(false);
+  };
+
+  const loadTemplates = async (ws: string) => {
+    try { const r = await fetch(`/api/templates?workspace=${ws}`); const j = await r.json(); if (Array.isArray(j)) setTemplates(j); } catch {}
   };
 
   const ws = workspaces.find(w => w.id === workspace) || workspaces[0];
@@ -227,7 +269,7 @@ export default function CRM() {
         <div className="sidebar-section">
           <div className="section-label">Workspaces</div>
           {workspaces.map(w => (
-            <button key={w.id} className={`ws-item${w.id === workspace ? ' active' : ''}`} onClick={() => { setWorkspace(w.id); setSidebarOpen(false); }}>
+            <button key={w.id} className={`ws-item${w.id === workspace ? ' active' : ''}`} onClick={() => { setWorkspace(w.id); loadTemplates(w.id); setSidebarOpen(false); }}>
               <span className="ws-dot" style={{ background: w.color }} />
               <span>{w.name}</span>
             </button>
@@ -238,7 +280,7 @@ export default function CRM() {
         </div>
         <div className="sidebar-section">
           <div className="section-label">Navegação</div>
-          {[['leads', 'Leads', ICONS.leads], ['search', 'Buscar Leads', ICONS.search2], ['inbox', 'Caixa de Entrada', ICONS.inbox], ['settings', 'Configurações', ICONS.settings]].map(([v, label, ic]) => (
+          {[['leads', 'Leads', ICONS.leads], ['search', 'Buscar Leads', ICONS.search2], ['templates', 'Templates', ICONS.template], ['bi', 'BI / Prospecção', ICONS.bi], ['inbox', 'Caixa de Entrada', ICONS.inbox], ['settings', 'Configurações', ICONS.settings]].map(([v, label, ic]) => (
             <button key={v} className={`nav-item${view === v ? ' active' : ''}`} onClick={() => { setView(v as string); setSidebarOpen(false); }}>
               <Icon d={ic as string} /><span>{label}</span>
             </button>
@@ -250,7 +292,7 @@ export default function CRM() {
       <div className="main">
         <header className="topbar">
           <button className="btn menu-toggle" onClick={() => setSidebarOpen(true)}><Icon d='<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>' /></button>
-          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{ws?.name} <span style={{ color: 'var(--text-muted)' }}>/</span> <strong style={{ color: 'var(--text)' }}>{view === 'leads' ? 'Leads' : view === 'inbox' ? 'Caixa de Entrada' : view === 'workspaces' ? 'Workspaces' : 'Configurações'}</strong></span>
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{ws?.name} <span style={{ color: 'var(--text-muted)' }}>/</span> <strong style={{ color: 'var(--text)' }}>{{ leads: 'Leads', search: 'Buscar Leads', templates: 'Templates', bi: 'BI / Prospecção', inbox: 'Caixa de Entrada', workspaces: 'Workspaces', settings: 'Configurações' }[view] || view}</strong></span>
           <span className={`db-badge ${gmailConfigured ? 'on' : 'off'}`}>{gmailConfigured ? '✉ E-mail ativo' : 'E-mail não configurado'}</span>
         </header>
 
@@ -355,6 +397,8 @@ export default function CRM() {
           {view === 'workspaces' && <WorkspacesView workspaces={workspaces} onReload={async () => {
             try { const r = await fetch('/api/workspaces'); const j = await r.json(); if (j.workspaces?.length) setWorkspaces(j.workspaces); } catch {}
           }} showToast={showToast} />}
+          {view === 'templates' && <TemplatesView workspace={workspace} templates={templates} onReload={() => loadTemplates(workspace)} showToast={showToast} />}
+          {view === 'bi' && <BIView workspace={workspace} leads={leads} />}
           {view === 'settings' && <SettingsView gmailConfigured={gmailConfigured} hasDb={hasDb} showToast={showToast} />}
         </div></div>
       </div>

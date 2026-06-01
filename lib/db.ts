@@ -98,6 +98,21 @@ export async function initDatabase() {
     );
   `;
 
+  // Tabela de templates de mensagem
+  await sql`
+    CREATE TABLE IF NOT EXISTS templates (
+      id TEXT PRIMARY KEY,
+      workspace TEXT NOT NULL,
+      name TEXT NOT NULL,
+      type TEXT NOT NULL,
+      subject TEXT,
+      body TEXT NOT NULL,
+      tags TEXT,
+      created_at BIGINT,
+      updated_at BIGINT
+    );
+  `;
+
   return { ok: true };
 }
 
@@ -204,5 +219,32 @@ export async function upsertQuote(quote: any) {
 export async function deleteQuote(id: string) {
   if (!hasDatabase) return null;
   await sql`DELETE FROM quotes WHERE id = ${id};`;
+  return { id };
+}
+
+// ---- Templates ----
+export async function getTemplates(workspace: string) {
+  if (!hasDatabase) return [];
+  const { rows } = await sql`
+    SELECT * FROM templates WHERE workspace = ${workspace} ORDER BY created_at DESC;
+  `;
+  return rows;
+}
+
+export async function upsertTemplate(t: any) {
+  if (!hasDatabase) return null;
+  await sql`
+    INSERT INTO templates (id, workspace, name, type, subject, body, tags, created_at, updated_at)
+    VALUES (${t.id}, ${t.workspace}, ${t.name}, ${t.type}, ${t.subject || ''}, ${t.body}, ${t.tags || ''}, ${t.created_at || Date.now()}, ${t.updated_at || Date.now()})
+    ON CONFLICT (id) DO UPDATE SET
+      name = EXCLUDED.name, type = EXCLUDED.type, subject = EXCLUDED.subject,
+      body = EXCLUDED.body, tags = EXCLUDED.tags, updated_at = EXCLUDED.updated_at;
+  `;
+  return t;
+}
+
+export async function deleteTemplate(id: string) {
+  if (!hasDatabase) return null;
+  await sql`DELETE FROM templates WHERE id = ${id};`;
   return { id };
 }
