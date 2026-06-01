@@ -48,6 +48,7 @@ export function AgentView({ workspace, workspaceName, showToast }: { workspace: 
   const [tab, setTab] = useState<'config' | 'history' | 'log'>('config');
   const [saving, setSaving] = useState(false);
   const [lastRun, setLastRun] = useState<any>(null);
+  const [cronStatus, setCronStatus] = useState<'active' | 'inactive'>('inactive');
   const logRef = useRef<HTMLDivElement>(null);
 
   const load = async () => {
@@ -57,6 +58,8 @@ export function AgentView({ workspace, workspaceName, showToast }: { workspace: 
       if (j.config) setConfig({ ...j.config, workspace });
       if (j.runs) { setRuns(j.runs); if (j.runs[0]) setLastRun(j.runs[0]); }
       if (j.sources) setSources(j.sources);
+    if (j.config?.enabled) setCronStatus('active');
+    else setCronStatus('inactive');
     } catch {}
   };
 
@@ -112,6 +115,18 @@ export function AgentView({ workspace, workspaceName, showToast }: { workspace: 
 
   const segLabel = SEGMENTS.find(s => s.value === config.industry)?.label || config.industry;
 
+  // Próxima execução automática (próximo dia útil às 9h BRT)
+  const nextRun = (() => {
+    const now = new Date();
+    const next = new Date(now);
+    next.setHours(9, 0, 0, 0);
+    if (next <= now || now.getDay() === 0 || now.getDay() === 6) {
+      next.setDate(next.getDate() + 1);
+      while (next.getDay() === 0 || next.getDay() === 6) next.setDate(next.getDate() + 1);
+    }
+    return next.toLocaleString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  })();
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {/* Header do Agente */}
@@ -143,6 +158,13 @@ export function AgentView({ workspace, workspaceName, showToast }: { workspace: 
             </div>
           </div>
         </div>
+        {/* Badge cron status */}
+        {config.enabled && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(34,197,94,0.2)', borderRadius: 20, padding: '4px 12px', marginBottom: 12, width: 'fit-content' }}>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 6px #4ade80' }} />
+            <span style={{ fontSize: 12, color: '#bbf7d0', fontWeight: 600 }}>Cron ativo — próxima execução: {nextRun}</span>
+          </div>
+        )}
         {/* Resumo rápido */}
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
           {[
@@ -312,13 +334,18 @@ export function AgentView({ workspace, workspaceName, showToast }: { workspace: 
           )}
 
           {/* Info sobre agendamento */}
-          <div style={{ padding: '14px 16px', background: '#eff6ff', borderRadius: 10, border: '1px solid #bfdbfe' }}>
+          <div style={{ padding: '14px 16px', background: config.enabled ? '#f0fdf4' : '#eff6ff', borderRadius: 10, border: `1px solid ${config.enabled ? '#bbf7d0' : '#bfdbfe'}` }}>
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth={2} width={18} height={18} style={{ flexShrink: 0, marginTop: 1 }} dangerouslySetInnerHTML={{ __html: ICONS.clock }} />
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13, color: '#1e40af' }}>Agendamento automático</div>
-                <div style={{ fontSize: 12, color: '#1d4ed8', marginTop: 3 }}>
-                  Quando o agente está <strong>Ativo</strong>, ele executa automaticamente todo dia útil às 9h (horário de Brasília). Você também pode executar manualmente a qualquer momento clicando em "Executar Agora".
+              <svg viewBox="0 0 24 24" fill="none" stroke={config.enabled ? '#16a34a' : '#3b82f6'} strokeWidth={2} width={18} height={18} style={{ flexShrink: 0, marginTop: 1 }} dangerouslySetInnerHTML={{ __html: ICONS.clock }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 13, color: config.enabled ? '#15803d' : '#1e40af' }}>
+                  {config.enabled ? '✅ Cron Job ativo — rodando dentro do CRM' : '⏰ Agendamento automático (inativo)'}
+                </div>
+                <div style={{ fontSize: 12, color: config.enabled ? '#166534' : '#1d4ed8', marginTop: 3 }}>
+                  {config.enabled
+                    ? <>A IA executa automaticamente <strong>todo dia útil às 9h (BRT)</strong>: busca empresas no CNPJ.já, analisa cada uma, gera e-mail personalizado e envia. Próxima execução: <strong>{nextRun}</strong>.</>
+                    : <>Ative o agente acima para habilitar o cron job. Ele rodará automaticamente <strong>todo dia útil às 9h</strong> diretamente dentro do CRM, sem precisar de nada externo.</>
+                  }
                 </div>
               </div>
             </div>
