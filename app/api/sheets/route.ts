@@ -8,8 +8,8 @@ const SHEET_ID = process.env.GOOGLE_SHEET_ID || '1iKPPIP3q6lgh4CQuHBH0frIMLOnd3M
 // Abas disponíveis com seus GIDs
 const SHEET_TABS = [
   { name: '2026',       gid: '0' },
-  { name: 'SMB',        gid: '1297805226' },
-  { name: 'Novos 2026', gid: '1876543210' },
+  { name: 'SMB',        gid: '1897665938' },
+  { name: 'Novos 2026', gid: '1346962403' },
 ];
 
 // Mapear status da planilha para status do CRM
