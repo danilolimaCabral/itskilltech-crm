@@ -57,6 +57,20 @@ async function fetchCnpja(cnpj: string) {
   }
 }
 
+// Validar dígitos verificadores do CNPJ
+function validateCnpj(cnpj: string): boolean {
+  const c = cnpj.replace(/\D/g, '')
+  if (c.length !== 14) return false
+  if (/^(\d)\1+$/.test(c)) return false
+  const calc = (str: string, weights: number[]) =>
+    str.split('').reduce((acc, d, i) => acc + parseInt(d) * weights[i], 0)
+  const w1 = [5,4,3,2,9,8,7,6,5,4,3,2]
+  const w2 = [6,5,4,3,2,9,8,7,6,5,4,3,2]
+  const d1 = 11 - (calc(c.slice(0,12), w1) % 11)
+  const d2 = 11 - (calc(c.slice(0,13), w2) % 11)
+  return parseInt(c[12]) === (d1 >= 10 ? 0 : d1) && parseInt(c[13]) === (d2 >= 10 ? 0 : d2)
+}
+
 // POST /api/search-companies
 // Body: { query: string, mode: 'name' | 'segment', state?: string, limit?: number }
 export async function POST(req: NextRequest) {
@@ -71,32 +85,35 @@ export async function POST(req: NextRequest) {
     const stateHint = state ? ` no estado ${state}` : ' no Brasil'
     const limitNum = Math.min(parseInt(String(limit)) || 10, 15)
 
-    // Prompt para o LLM gerar CNPJs reais
-    const systemPrompt = `Você é um especialista em empresas brasileiras com acesso a dados da Receita Federal.
-Sua tarefa é retornar uma lista de CNPJs reais e válidos de empresas brasileiras.
-Retorne APENAS um JSON válido com o array de objetos, sem markdown, sem explicações.`
+    // Prompt melhorado para o LLM gerar CNPJs reais e verificáveis
+    const systemPrompt = `Você é um especialista em empresas brasileiras.
+Você conhece CNPJs reais de empresas brasileiras cadastradas na Receita Federal.
+Retorne APENAS JSON válido, sem markdown, sem explicações, sem código.
+Os CNPJs devem ser REAIS e VÁLIDOS (passar no algoritmo de verificação da Receita Federal).
+Forneça apenas empresas que você tem certeza que existem com esses CNPJs.`
 
     let userPrompt = ''
     if (mode === 'name') {
-      userPrompt = `Liste ${limitNum} empresas brasileiras reais cujo nome ou razão social contenha "${query}"${stateHint}.
-Para cada empresa, forneça o CNPJ real (14 dígitos, apenas números), razão social e nome fantasia.
-Retorne JSON: [{"cnpj": "12345678000100", "razao_social": "...", "nome_fantasia": "..."}]`
+      userPrompt = `Forneça ${limitNum} CNPJs reais de empresas brasileiras cujo nome contenha "${query}"${stateHint}.
+Inclua a matriz e filiais se conhecer.
+Retorne SOMENTE este JSON (sem texto adicional):
+[{"cnpj":"00000000000000","razao_social":"NOME COMPLETO","nome_fantasia":"NOME FANTASIA"}]`
     } else {
-      userPrompt = `Liste ${limitNum} empresas brasileiras reais do segmento de "${query}"${stateHint}.
-Inclua empresas de diferentes portes (pequenas, médias e grandes).
-Para cada empresa, forneça o CNPJ real (14 dígitos, apenas números), razão social e nome fantasia.
-Retorne JSON: [{"cnpj": "12345678000100", "razao_social": "...", "nome_fantasia": "..."}]`
+      userPrompt = `Forneça ${limitNum} CNPJs reais de empresas brasileiras do segmento "${query}"${stateHint}.
+Inclua empresas de diferentes portes. Prefira empresas conhecidas e médias/grandes.
+Retorne SOMENTE este JSON (sem texto adicional):
+[{"cnpj":"00000000000000","razao_social":"NOME COMPLETO","nome_fantasia":"NOME FANTASIA"}]`
     }
 
-    // Chamar o LLM para obter sugestões de CNPJs
+    // Usar Gemini que tem mais conhecimento factual
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
+      model: 'gemini-2.5-flash',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      temperature: 0.3,
-      max_tokens: 1500
+      temperature: 0.1,
+      max_tokens: 2000
     })
 
     const rawText = completion.choices[0]?.message?.content || '[]'
@@ -104,49 +121,85 @@ Retorne JSON: [{"cnpj": "12345678000100", "razao_social": "...", "nome_fantasia"
     // Extrair JSON da resposta
     let suggestions: Array<{ cnpj: string; razao_social?: string; nome_fantasia?: string }> = []
     try {
-      const jsonMatch = rawText.match(/\[[\s\S]*\]/)
+      // Tentar extrair JSON de diferentes formatos
+      const jsonMatch = rawText.match(/\[[\s\S]*?\]/s) || rawText.match(/\[[\s\S]*\]/)
       if (jsonMatch) {
         suggestions = JSON.parse(jsonMatch[0])
+      } else {
+        // Tentar parsear diretamente
+        suggestions = JSON.parse(rawText)
       }
     } catch {
-      return NextResponse.json({ results: [], total: 0, message: 'Não foi possível processar a busca.' })
+      return NextResponse.json({
+        results: [],
+        total: 0,
+        message: `Não foi possível processar a busca para "${query}". Tente buscar por CNPJ diretamente.`
+      })
     }
 
     if (!suggestions.length) {
-      return NextResponse.json({ results: [], total: 0, message: `Nenhuma empresa encontrada para "${query}".` })
+      return NextResponse.json({
+        results: [],
+        total: 0,
+        message: `Nenhuma empresa encontrada para "${query}". Tente buscar por CNPJ diretamente.`
+      })
     }
 
-    // Buscar dados reais no CNPJ.já para cada sugestão
+    // Filtrar CNPJs válidos
+    const validSuggestions = suggestions
+      .filter(s => s.cnpj && validateCnpj(s.cnpj.replace(/\D/g, '')))
+      .slice(0, limitNum)
+
+    if (!validSuggestions.length) {
+      // Se nenhum CNPJ válido, tentar buscar sem validação (o CNPJ.já vai rejeitar os inválidos)
+      const allSuggestions = suggestions.slice(0, limitNum)
+      const results = await Promise.allSettled(
+        allSuggestions.map(s => fetchCnpja(s.cnpj))
+      )
+      const validResults = results
+        .map(r => r.status === 'fulfilled' ? r.value : null)
+        .filter(Boolean)
+
+      if (validResults.length === 0) {
+        return NextResponse.json({
+          results: [],
+          total: 0,
+          message: `Não encontrei empresas verificadas para "${query}"${stateHint}. Tente buscar por CNPJ diretamente ou use termos mais específicos.`
+        })
+      }
+
+      return NextResponse.json({
+        results: validResults,
+        total: validResults.length,
+        query,
+        mode,
+        verified: validResults.length
+      })
+    }
+
+    // Buscar dados reais no CNPJ.já para cada sugestão válida
     const results = await Promise.allSettled(
-      suggestions.slice(0, limitNum).map(s => fetchCnpja(s.cnpj))
+      validSuggestions.map(s => fetchCnpja(s.cnpj))
     )
 
     const validResults = results
-      .map((r, i) => {
-        if (r.status === 'fulfilled' && r.value) return r.value
-        // Fallback: usar dados do LLM se CNPJ.já falhar
-        const s = suggestions[i]
-        return {
-          cnpj: s.cnpj,
-          name: s.razao_social || '',
-          alias: s.nome_fantasia || s.razao_social || '',
-          phone: '',
-          email: '',
-          city: state || '',
-          state: state || '',
-          cnae: mode === 'segment' ? query : '',
-          status: 'Ativa',
-          source: 'IA (não verificado)'
-        }
+      .map(r => r.status === 'fulfilled' ? r.value : null)
+      .filter(Boolean)
+
+    if (validResults.length === 0) {
+      return NextResponse.json({
+        results: [],
+        total: 0,
+        message: `Não encontrei empresas verificadas para "${query}"${stateHint}. Tente buscar por CNPJ diretamente ou use termos mais específicos.`
       })
-      .filter(r => r && r.name)
+    }
 
     return NextResponse.json({
       results: validResults,
       total: validResults.length,
       query,
       mode,
-      verified: validResults.filter(r => r.source === 'CNPJ.já').length
+      verified: validResults.length
     })
 
   } catch (err) {
