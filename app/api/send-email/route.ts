@@ -20,8 +20,8 @@ const WORKSPACE_SENDERS: Record<string, WorkspaceSender> = {
     displayName: 'Danilo Cabral',
     contactEmail: 'danilo@lottustech.com.br',
     phone: '(41) 99949-9815',
-    color: '#1a56db',
-    colorLight: '#1e40af',
+    color: '#16a34a',
+    colorLight: '#15803d',
   },
   iota: {
     email: 'crm@grandy.ia.br',
@@ -29,8 +29,8 @@ const WORKSPACE_SENDERS: Record<string, WorkspaceSender> = {
     displayName: 'Danilo Cabral',
     contactEmail: 'danilo@iota.com.br',
     phone: '(41) 99949-9815',
-    color: '#0e7490',
-    colorLight: '#0891b2',
+    color: '#1a56db',
+    colorLight: '#1e40af',
   },
   splice: {
     email: 'crm@grandy.ia.br',
@@ -38,17 +38,17 @@ const WORKSPACE_SENDERS: Record<string, WorkspaceSender> = {
     displayName: 'Danilo Cabral',
     contactEmail: 'danilo@lottustech.com.br',
     phone: '(41) 99949-9815',
-    color: '#7c3aed',
-    colorLight: '#6d28d9',
+    color: '#ea580c',
+    colorLight: '#c2410c',
   },
   connect: {
     email: 'crm@grandy.ia.br',
-    name: 'Connect',
+    name: 'Connectfy',
     displayName: 'Danilo Cabral',
     contactEmail: 'danilo@lottustech.com.br',
     phone: '(41) 99949-9815',
-    color: '#059669',
-    colorLight: '#047857',
+    color: '#7c3aed',
+    colorLight: '#6d28d9',
   },
 }
 
@@ -58,8 +58,8 @@ const DEFAULT_SENDER: WorkspaceSender = {
   displayName: 'Danilo Cabral',
   contactEmail: 'danilo@lottustech.com.br',
   phone: '(41) 99949-9815',
-  color: '#1a56db',
-  colorLight: '#1e40af',
+  color: '#16a34a',
+  colorLight: '#15803d',
 }
 
 export async function POST(req: NextRequest) {
