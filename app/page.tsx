@@ -101,8 +101,55 @@ export default function CRM() {
   const [panelAnalysis, setPanelAnalysis] = useState<any>(null);
   const [analyzingLead, setAnalyzingLead] = useState(false);
   const [panelTab, setPanelTab] = useState<'info' | 'timeline' | 'analysis'>('info');
+  // Seleção em massa
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkSending, setBulkSending] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2800); };
+
+  // Envio em massa para leads selecionados
+  const sendBulkEmails = async (leadsToSend: Lead[]) => {
+    const withEmail = leadsToSend.filter(l => l.email);
+    if (!withEmail.length) { showToast('Nenhum lead selecionado tem e-mail'); return; }
+    if (!confirm(`Enviar e-mail para ${withEmail.length} lead(s) selecionado(s)?`)) return;
+    setBulkSending(true);
+    setBulkProgress({ done: 0, total: withEmail.length });
+    let sent = 0, failed = 0;
+    for (const lead of withEmail) {
+      try {
+        const wsName = ws?.name || 'getLOG/Lottustech';
+        const emailTpl = templates.find(t => t.type === 'email');
+        let subject = `Apresentação ${wsName} — Solução TMS para ${lead.company || 'sua empresa'}`;
+        let body = `Olá ${lead.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo, da ${wsName}. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar significativamente a operação logística de vocês.\n\nGostaria de agendar uma conversa rápida de 15 minutos para apresentar os resultados que estamos gerando para empresas do mesmo segmento.\n\nQual seria o melhor horário para você?\n\nAtenciosamente,\nDanilo Cabral\n${wsName}\ndanilo@lottustech.com.br\n(41) 99949-9815`;
+        if (emailTpl) {
+          subject = (emailTpl.subject || subject).replace(/\{\{nome\}\}/g, lead.name.split(' ')[0]).replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa').replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
+          body = emailTpl.body.replace(/\{\{nome\}\}/g, lead.name.split(' ')[0]).replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa').replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
+        }
+        const r = await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ to: lead.email, toName: lead.name, subject, body, workspaceSlug: workspace, fromName: ws?.name, leadId: lead.id }),
+        });
+        const j = await r.json();
+        if (j.success) {
+          sent++;
+          const STATUS_ADVANCE: any = { prospeccao: 'qualificacao', novo: 'qualificacao', contatado: 'qualificacao' };
+          const nextStatus = STATUS_ADVANCE[normalizeStatus(lead.status)] || normalizeStatus(lead.status);
+          const timeline = JSON.parse(lead.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+          timeline.unshift({ type: 'email', label: `E-mail enviado: ${subject}`, ts: Date.now() });
+          if (nextStatus !== normalizeStatus(lead.status)) timeline.unshift({ type: 'status', label: `Etapa → ${FUNNEL_MAP[nextStatus]?.label || nextStatus}`, ts: Date.now() });
+          const notesClean = (lead.notes || '').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
+          await saveLead({ ...lead, status: nextStatus, updated_at: Date.now(), notes: notesClean + `\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]` });
+        } else { failed++; }
+      } catch { failed++; }
+      setBulkProgress(p => ({ ...p, done: p.done + 1 }));
+      await new Promise(r => setTimeout(r, 600)); // delay anti-spam
+    }
+    setBulkSending(false);
+    setSelectedIds(new Set());
+    showToast(`✓ ${sent} e-mail(s) enviado(s)${failed ? ` · ${failed} falha(s)` : ''}`);
+  };
 
   // init
   useEffect(() => {
@@ -129,7 +176,8 @@ export default function CRM() {
         const r = await fetch(`/api/templates?workspace=${workspace}`);
         const j = await r.json();
         if (Array.isArray(j)) setTemplates(j);
-      } catch {}
+        else setTemplates([]);
+      } catch { setTemplates([]); }
     })();
     const params = new URLSearchParams(window.location.search);
     if (params.get('auth') === 'ok') { showToast('Conta conectada'); window.history.replaceState({}, '', '/'); }
@@ -415,8 +463,38 @@ export default function CRM() {
                   </div>
                 ))}
               </div>
-              <div className="toolbar">
+              {/* Label da etapa ativa */}
+              {statusFilter !== 'all' && (() => { const f = FUNNEL_MAP[statusFilter]; return f ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '6px 12px', background: f.bg, borderRadius: 8, border: `1px solid ${f.color}33` }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: f.color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: f.color }}>Filtrando: {f.label}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 4 }}>{filtered.length} lead(s)</span>
+                  <button onClick={() => { setStatusFilter('all'); setSelectedIds(new Set()); }} style={{ marginLeft: 'auto', fontSize: 11, color: f.color, background: 'none', border: `1px solid ${f.color}55`, borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>✕ Limpar filtro</button>
+                </div>
+              ) : null; })()}
+              <div className="toolbar" style={{ gap: 8 }}>
                 <div className="search"><Icon d='<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>' /><input placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} /></div>
+                {/* Botões de seleção em massa */}
+                {filtered.length > 0 && (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+                    <button className="btn btn-sm" style={{ fontSize: 11, padding: '5px 10px' }}
+                      onClick={() => {
+                        if (selectedIds.size === filtered.length) setSelectedIds(new Set());
+                        else setSelectedIds(new Set(filtered.map(l => l.id)));
+                      }}>
+                      {selectedIds.size === filtered.length ? '☑ Desmarcar todos' : '☐ Selecionar todos'}
+                    </button>
+                    {selectedIds.size > 0 && (
+                      <button className="btn btn-primary" style={{ fontSize: 11, padding: '5px 12px', background: '#0066ff' }}
+                        disabled={bulkSending}
+                        onClick={() => sendBulkEmails(filtered.filter(l => selectedIds.has(l.id)))}>
+                        {bulkSending
+                          ? `Enviando... ${bulkProgress.done}/${bulkProgress.total}`
+                          : `✉ Enviar e-mail (${selectedIds.size})`}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
               {filtered.length === 0 ? (
                 <div className="empty-state"><div className="empty-title">Nenhum lead</div><div className="empty-text">Adicione seu primeiro contato</div><button className="btn btn-primary" onClick={() => { setEditing(null); setModalOpen(true); }}><Icon d={ICONS.plus} />Adicionar lead</button></div>
@@ -685,17 +763,63 @@ export default function CRM() {
         </div>
       )}
 
-      {/* Modal de E-mail */}
+            {/* Modal de E-mail */}
       {emailModal && (
         <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) setEmailModal(null); }}>
-          <div className="modal" style={{ maxWidth: 560 }}>
+          <div className="modal" style={{ maxWidth: 580 }}>
             <div className="modal-header">
               <div className="modal-title">✉ Enviar E-mail</div>
               <button className="modal-close" onClick={() => setEmailModal(null)}>×</button>
             </div>
             <div className="modal-body">
               <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14 }}>Para: <strong>{emailModal.name}</strong> &lt;{emailModal.email}&gt;</div>
-              
+              {/* Seletor de templates */}
+              {templates.filter(t => t.type === 'email').length > 0 && (
+                <div className="field">
+                  <label className="field-label">Template</label>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button
+                      className="btn btn-sm"
+                      style={{ fontSize: 11, background: 'var(--surface-2)', border: '1px solid var(--border)' }}
+                      onClick={() => {
+                        const wsName = ws?.name || 'getLOG/Lottustech';
+                        setEmailSubject(`Apresentação ${wsName} — Solução TMS para ${emailModal.company || 'sua empresa'}`);
+                        setEmailBody(`Olá ${emailModal.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo, da ${wsName}. Vi que você é ${emailModal.role || 'decisor'} na ${emailModal.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar significativamente a operação logística de vocês.\n\nGostaria de agendar uma conversa rápida de 15 minutos para apresentar os resultados que estamos gerando para empresas do mesmo segmento.\n\nQual seria o melhor horário para você?\n\nAtenciosamente,\nDanilo Cabral\n${wsName}\ndanilo@lottustech.com.br\n(41) 99949-9815`);
+                      }}
+                    >
+                      📝 Padrão
+                    </button>
+                    {templates.filter(t => t.type === 'email').map(tpl => (
+                      <button
+                        key={tpl.id}
+                        className="btn btn-sm"
+                        style={{ fontSize: 11, background: emailSubject === (tpl.subject || '') ? 'var(--primary)' : 'var(--surface-2)', color: emailSubject === (tpl.subject || '') ? '#fff' : 'var(--text)', border: '1px solid var(--border)' }}
+                        onClick={() => {
+                          const body = tpl.body
+                            .replace(/\{\{nome\}\}/g, emailModal.name.split(' ')[0])
+                            .replace(/\{\{empresa\}\}/g, emailModal.company || 'sua empresa')
+                            .replace(/\{\{cargo\}\}/g, emailModal.role || 'decisor')
+                            .replace(/\{\{workspace\}\}/g, ws?.name || 'getLOG/Lottustech');
+                          const subject = (tpl.subject || '')
+                            .replace(/\{\{nome\}\}/g, emailModal.name.split(' ')[0])
+                            .replace(/\{\{empresa\}\}/g, emailModal.company || 'sua empresa')
+                            .replace(/\{\{cargo\}\}/g, emailModal.role || 'decisor')
+                            .replace(/\{\{workspace\}\}/g, ws?.name || 'getLOG/Lottustech');
+                          setEmailSubject(subject || `Apresentação ${ws?.name} — ${emailModal.company || 'sua empresa'}`);
+                          setEmailBody(body);
+                        }}
+                      >
+                        {tpl.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {templates.filter(t => t.type === 'email').length === 0 && (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 12px', marginBottom: 12 }}>
+                  ⚠️ Nenhum template de e-mail criado. Vá em <strong>Templates</strong> no menu lateral para criar templates personalizados.
+                </div>
+              )}
               <div className="field">
                 <label className="field-label">Assunto</label>
                 <input className="field-input" value={emailSubject} onChange={e => setEmailSubject(e.target.value)} />
