@@ -94,14 +94,17 @@ Forneça apenas empresas que você tem certeza que existem com esses CNPJs.`
 
     let userPrompt = ''
     if (mode === 'name') {
-      userPrompt = `Forneça ${limitNum} CNPJs reais de empresas brasileiras cujo nome contenha "${query}"${stateHint}.
+      userPrompt = `Forneça ${limitNum} CNPJs reais de empresas brasileiras cujo nome ou razão social contenha "${query}"${stateHint}.
 Inclua a matriz e filiais se conhecer.
-Retorne SOMENTE este JSON (sem texto adicional):
+Retorne SOMENTE este JSON (sem texto adicional, sem markdown):
 [{"cnpj":"00000000000000","razao_social":"NOME COMPLETO","nome_fantasia":"NOME FANTASIA"}]`
     } else {
-      userPrompt = `Forneça ${limitNum} CNPJs reais de empresas brasileiras do segmento "${query}"${stateHint}.
-Inclua empresas de diferentes portes. Prefira empresas conhecidas e médias/grandes.
-Retorne SOMENTE este JSON (sem texto adicional):
+      userPrompt = `Forneça ${limitNum} CNPJs reais de empresas brasileiras do segmento/setor de "${query}"${stateHint}.
+IMPORTANTE: Os CNPJs devem ser de empresas que atuam ESPECIFICAMENTE no segmento "${query}".
+Inclua empresas de diferentes portes (pequenas, médias e grandes).
+Exemplos de formato: se o segmento for "transporte", inclua transportadoras, logística, fretes.
+Se for "tecnologia", inclua empresas de software, TI, sistemas.
+Retorne SOMENTE este JSON (sem texto adicional, sem markdown):
 [{"cnpj":"00000000000000","razao_social":"NOME COMPLETO","nome_fantasia":"NOME FANTASIA"}]`
     }
 
