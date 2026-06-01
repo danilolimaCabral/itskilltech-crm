@@ -64,7 +64,7 @@ const DEFAULT_SENDER: WorkspaceSender = {
 
 export async function POST(req: NextRequest) {
   try {
-    const { to, toName, subject, body, workspaceSlug } = await req.json()
+    const { to, toName, subject, body, workspaceSlug, leadId } = await req.json()
 
     if (!to || !subject || !body) {
       return NextResponse.json({ error: 'Campos obrigatórios: to, subject, body' }, { status: 400 })
@@ -116,7 +116,8 @@ export async function POST(req: NextRequest) {
           <div class="sig-title">${sender.name}</div>
           <div class="sig-contact">
             <a href="mailto:${sender.contactEmail}">${sender.contactEmail}</a><br>
-            <a href="tel:${sender.phone.replace(/\D/g, '')}">${sender.phone}</a>
+            <a href="tel:${sender.phone.replace(/\D/g, '')}">${sender.phone}</a><br>
+            <a href="https://www.gettms.com.br" style="color:${sender.color};">www.gettms.com.br</a>
           </div>
         </div>
       </div>
@@ -128,12 +129,19 @@ export async function POST(req: NextRequest) {
 </body>
 </html>`
 
+    // Pixel de rastreamento de abertura
+    const baseUrl = process.env.NEXT_PUBLIC_URL || 'https://itskilltech-crm.vercel.app'
+    const trackPixel = leadId
+      ? `<img src="${baseUrl}/api/track-email?lid=${leadId}&ws=${workspaceSlug || 'lottus'}" width="1" height="1" style="display:none;" alt="" />`
+      : ''
+    const htmlWithPixel = htmlBody.replace('</body>', `${trackPixel}</body>`)
+
     const { data, error } = await resend.emails.send({
       from: fromEmail,
       to: toName ? `${toName} <${to}>` : to,
       subject,
       text: body,
-      html: htmlBody,
+      html: htmlWithPixel,
     })
 
     if (error) {

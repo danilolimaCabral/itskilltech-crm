@@ -25,6 +25,7 @@ const cleanPhone = (p: string) => (p || '').replace(/\D/g, '');
 const FUNNEL = [
   { id: 'prospeccao',   label: '1 · Prospecção',   short: 'Prospecção',   color: '#6366f1', bg: '#eef2ff' },
   { id: 'qualificacao', label: '2 · Qualificação',  short: 'Qualificação', color: '#f59e0b', bg: '#fffbeb' },
+  { id: 'email_aberto', label: '📬 E-mail Aberto',  short: 'E-mail Aberto', color: '#0891b2', bg: '#ecfeff' },
   { id: 'apresentacao', label: '3 · Apresentação',  short: 'Apresentação', color: '#3b82f6', bg: '#eff6ff' },
   { id: 'fechamento',   label: '4 · Fechamento',   short: 'Fechamento',   color: '#10b981', bg: '#ecfdf5' },
   { id: 'posvenda',     label: '5 · Pós-venda',    short: 'Pós-venda',    color: '#8b5cf6', bg: '#f5f3ff' },
@@ -225,7 +226,7 @@ export default function CRM() {
       const r = await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: emailModal.email, toName: emailModal.name, subject: emailSubject, body: emailBody, workspaceSlug: workspace, fromName: ws?.name }),
+        body: JSON.stringify({ to: emailModal.email, toName: emailModal.name, subject: emailSubject, body: emailBody, workspaceSlug: workspace, fromName: ws?.name, leadId: emailModal.id }),
       });
       const j = await r.json();
       if (j.success) {
@@ -316,6 +317,7 @@ export default function CRM() {
     total: leads.length,
     prospeccao: leads.filter(l => normalizeStatus(l.status) === 'prospeccao').length,
     qualificacao: leads.filter(l => normalizeStatus(l.status) === 'qualificacao').length,
+    email_aberto: leads.filter(l => normalizeStatus(l.status) === 'email_aberto').length,
     apresentacao: leads.filter(l => normalizeStatus(l.status) === 'apresentacao').length,
     fechamento: leads.filter(l => normalizeStatus(l.status) === 'fechamento').length,
     posvenda: leads.filter(l => normalizeStatus(l.status) === 'posvenda').length,
