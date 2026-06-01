@@ -320,6 +320,122 @@ export function BIView({ workspace, leads }: any) {
           )}
         </div>
       ) : null}
+
+      {/* Mapa do Brasil por estado */}
+      <MapaBrasil leads={leads} />
     </>
+  );
+}
+
+function MapaBrasil({ leads }: { leads: any[] }) {
+  const estadoCount: Record<string, number> = {};
+  leads.forEach((l: any) => {
+    // Tenta extrair UF do campo notes ("Cidade: X/UF") ou do campo state
+    const notesMatch = l.notes?.match(/Cidade:\s*[^/\n]+\/([A-Z]{2})/i);
+    const uf = (notesMatch?.[1] || l.state || '').toUpperCase().trim();
+    if (uf && uf.length === 2) estadoCount[uf] = (estadoCount[uf] || 0) + 1;
+  });
+  const maxCount = Math.max(...Object.values(estadoCount), 1);
+  const [hoveredUF, setHoveredUF] = useState<string | null>(null);
+
+  // Posicoes aproximadas dos estados no SVG 500x560
+  const statePos: Record<string, [number, number, string]> = {
+    AC: [62, 308, 'Acre'], AM: [132, 238, 'Amazonas'], RR: [178, 128, 'Roraima'],
+    PA: [272, 198, 'Pará'], AP: [312, 128, 'Amapá'], TO: [312, 288, 'Tocantins'],
+    MA: [352, 198, 'Maranhão'], PI: [392, 228, 'Piauí'], CE: [422, 192, 'Ceará'],
+    RN: [452, 192, 'R.G.Norte'], PB: [452, 212, 'Paraíba'], PE: [438, 232, 'Pernambuco'],
+    AL: [452, 252, 'Alagoas'], SE: [452, 268, 'Sergipe'], BA: [402, 292, 'Bahia'],
+    MG: [362, 352, 'Minas Gerais'], ES: [412, 352, 'Espírito Santo'],
+    RJ: [392, 382, 'Rio de Janeiro'], SP: [342, 388, 'São Paulo'],
+    PR: [312, 428, 'Paraná'], SC: [312, 458, 'Santa Catarina'],
+    RS: [292, 492, 'Rio Grande do Sul'], MS: [282, 378, 'Mato Grosso do Sul'],
+    MT: [232, 308, 'Mato Grosso'], GO: [302, 328, 'Goiás'],
+    DF: [322, 338, 'Distrito Federal'], RO: [158, 318, 'Rondônia'],
+  };
+
+  const getColor = (uf: string) => {
+    const count = estadoCount[uf] || 0;
+    if (count === 0) return '#e5e7eb';
+    const t = count / maxCount;
+    return `rgb(${Math.round(99 - t * 50)},${Math.round(102 - t * 60)},${Math.round(241 - t * 40)})`;
+  };
+
+  const topStates = Object.entries(estadoCount).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const totalMapped = Object.values(estadoCount).reduce((a, b) => a + b, 0);
+
+  return (
+    <div className="table-wrap" style={{ padding: 16, marginTop: 20 }}>
+      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14 }}>Distribuição Geográfica de Leads</div>
+      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        {/* Mapa SVG */}
+        <div style={{ flex: '1 1 260px', position: 'relative' }}>
+          <svg viewBox="0 0 500 560" style={{ width: '100%', maxWidth: 320 }}>
+            {Object.entries(statePos).map(([uf, [cx, cy, nome]]) => {
+              const count = estadoCount[uf] || 0;
+              const r = count > 0 ? Math.max(14, Math.min(26, 14 + (count / maxCount) * 12)) : 13;
+              const isHov = hoveredUF === uf;
+              return (
+                <g key={uf} style={{ cursor: 'pointer' }}
+                  onMouseEnter={() => setHoveredUF(uf)}
+                  onMouseLeave={() => setHoveredUF(null)}>
+                  <circle cx={cx} cy={cy} r={r}
+                    fill={getColor(uf)}
+                    stroke={isHov ? '#6366f1' : '#fff'}
+                    strokeWidth={isHov ? 2.5 : 1.5}
+                    style={{ transition: 'all .15s' }}
+                  />
+                  <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle"
+                    style={{ fontSize: 9, fontWeight: 700, fill: count > 0 ? '#fff' : '#9ca3af', pointerEvents: 'none', userSelect: 'none' }}>
+                    {uf}
+                  </text>
+                  {count > 0 && (
+                    <text x={cx} y={cy + 11} textAnchor="middle" dominantBaseline="middle"
+                      style={{ fontSize: 8, fill: '#fff', opacity: 0.9, pointerEvents: 'none', userSelect: 'none' }}>
+                      {count}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+          </svg>
+          {hoveredUF && (
+            <div style={{ position: 'absolute', top: 8, right: 8, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 12px', fontSize: 12, boxShadow: '0 2px 8px rgba(0,0,0,.12)', pointerEvents: 'none', zIndex: 10 }}>
+              <div style={{ fontWeight: 700 }}>{statePos[hoveredUF]?.[2] || hoveredUF}</div>
+              <div style={{ color: '#6366f1', fontWeight: 600 }}>{estadoCount[hoveredUF] || 0} lead(s)</div>
+            </div>
+          )}
+        </div>
+
+        {/* Ranking */}
+        <div style={{ flex: '1 1 180px' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 10, letterSpacing: 1 }}>Top Estados</div>
+          {topStates.length === 0 ? (
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', lineHeight: 1.6 }}>
+              Nenhum estado identificado.<br/>O agente preenche automaticamente ao importar leads.
+            </div>
+          ) : (
+            topStates.map(([uf, count], i) => (
+              <div key={uf} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#6366f1', color: '#fff', fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i + 1}</span>
+                <span style={{ fontSize: 12, flex: 1 }}>{statePos[uf]?.[2] || uf}</span>
+                <span style={{ fontWeight: 700, fontSize: 13, color: '#6366f1', minWidth: 24, textAlign: 'right' }}>{count}</span>
+                <div style={{ width: 50, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden', flexShrink: 0 }}>
+                  <div style={{ height: '100%', width: `${Math.round((count / maxCount) * 100)}%`, background: '#6366f1', borderRadius: 3 }} />
+                </div>
+              </div>
+            ))
+          )}
+          {totalMapped > 0 && (
+            <div style={{ marginTop: 16, padding: '8px 10px', background: 'var(--surface-2, #f9fafb)', borderRadius: 8, fontSize: 12 }}>
+              <span style={{ color: 'var(--text-muted)' }}>{totalMapped} de {leads.length} leads mapeados</span>
+            </div>
+          )}
+          <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 60, height: 8, borderRadius: 4, background: 'linear-gradient(to right, #e5e7eb, #6366f1)' }} />
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>0 → {maxCount}</span>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

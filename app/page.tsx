@@ -77,6 +77,7 @@ export default function CRM() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [wsListOpen, setWsListOpen] = useState(false);
   const [enriching, setEnriching] = useState<string | null>(null);
   const [enrichingAll, setEnrichingAll] = useState(false);
   const [enrichProgress, setEnrichProgress] = useState({ done: 0, total: 0 });
@@ -377,16 +378,29 @@ export default function CRM() {
       <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
         <div className="sidebar-header"><div className="logo">IT</div><div className="logo-text">ITskill<span>CRM</span></div></div>
         <div className="sidebar-section">
-          <div className="section-label">Workspaces</div>
-          {workspaces.map(w => (
-            <button key={w.id} className={`ws-item${w.id === workspace ? ' active' : ''}`} onClick={() => { setWorkspace(w.id); loadTemplates(w.id); setSidebarOpen(false); }}>
+          {/* Workspace ativo sempre visível */}
+          {workspaces.filter(w => w.id === workspace).map(w => (
+            <button key={w.id} className="ws-item active" onClick={() => setWsListOpen(o => !o)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start' }}>
               <span className="ws-dot" style={{ background: w.color }} />
-              <span>{w.name}</span>
+              <span style={{ flex: 1, textAlign: 'left' }}>{w.name}</span>
+              <span style={{ fontSize: 10, opacity: 0.6, flexShrink: 0 }}>{wsListOpen ? '▲' : '▼'}</span>
             </button>
           ))}
-          <button className="ws-item" style={{ opacity: 0.6, fontSize: 12 }} onClick={() => { setView('workspaces'); setSidebarOpen(false); }}>
-            <Icon d={ICONS.plus} /><span>Novo workspace</span>
-          </button>
+          {/* Lista recolhível dos outros workspaces */}
+          {wsListOpen && (
+            <div style={{ borderLeft: '2px solid var(--border)', marginLeft: 10, paddingLeft: 6 }}>
+              {workspaces.filter(w => w.id !== workspace).map(w => (
+                <button key={w.id} className="ws-item" onClick={() => { setWorkspace(w.id); loadTemplates(w.id); setSidebarOpen(false); setWsListOpen(false); }}>
+                  <span className="ws-dot" style={{ background: w.color }} />
+                  <span>{w.name}</span>
+                </button>
+              ))}
+              <button className="ws-item" style={{ opacity: 0.6, fontSize: 12 }} onClick={() => { setView('workspaces'); setSidebarOpen(false); setWsListOpen(false); }}>
+                <Icon d={ICONS.plus} /><span>Novo workspace</span>
+              </button>
+            </div>
+          )}
         </div>
         <div className="sidebar-section">
           <div className="section-label">Navegação</div>
