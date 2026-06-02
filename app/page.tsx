@@ -450,7 +450,23 @@ export default function CRM() {
     apresentacao: leads.filter(l => normalizeStatus(l.status) === 'apresentacao').length,
     fechamento: leads.filter(l => normalizeStatus(l.status) === 'fechamento').length,
     posvenda: leads.filter(l => normalizeStatus(l.status) === 'posvenda').length,
+    reunioes: leads.filter(l => {
+      try {
+        const tl = JSON.parse(l.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+        return tl.some((t: any) => t.type === 'meeting');
+      } catch { return false; }
+    }).length,
   };
+
+  // Extrai todas as reuniões agendadas de todos os leads
+  const allMeetings = leads.flatMap(l => {
+    try {
+      const tl = JSON.parse(l.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+      return tl
+        .filter((t: any) => t.type === 'meeting')
+        .map((t: any) => ({ ...t, leadName: l.name, leadCompany: l.company, leadId: l.id }));
+    } catch { return []; }
+  }).sort((a: any, b: any) => b.ts - a.ts);
 
   return (
     <div className="app">
@@ -483,7 +499,7 @@ export default function CRM() {
         </div>
         <div className="sidebar-section">
           <div className="section-label">Navegação</div>
-          {[['leads', 'Leads', ICONS.leads], ['search', 'Buscar Leads', ICONS.search2], ['agent', '🤖 Agente IA', ICONS.sparkles], ['templates', 'Templates', ICONS.template], ['bi', 'BI / Prospecção', ICONS.bi], ['sheets', '📊 Google Sheets', ICONS.upload], ['inbox', 'Caixa de Entrada', ICONS.inbox], ['settings', 'Configurações', ICONS.settings]].map(([v, label, ic]) => (
+          {[['leads', 'Leads', ICONS.leads], ['calendar_view', '📅 Calendário', ICONS.calendar], ['search', 'Buscar Leads', ICONS.search2], ['agent', '🤖 Agente IA', ICONS.sparkles], ['templates', 'Templates', ICONS.template], ['bi', 'BI / Prospecção', ICONS.bi], ['sheets', '📊 Google Sheets', ICONS.upload], ['inbox', 'Caixa de Entrada', ICONS.inbox], ['settings', 'Configurações', ICONS.settings]].map(([v, label, ic]) => (
             <button key={v} className={`nav-item${view === v ? ' active' : ''}`} onClick={() => { setView(v as string); setSidebarOpen(false); }}>
               <Icon d={ic as string} /><span>{label}</span>
             </button>
@@ -495,7 +511,7 @@ export default function CRM() {
       <div className="main">
         <header className="topbar">
           <button className="btn menu-toggle" onClick={() => setSidebarOpen(true)}><Icon d='<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>' /></button>
-          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{ws?.name} <span style={{ color: 'var(--text-muted)' }}>/</span> <strong style={{ color: 'var(--text)' }}>{{ leads: 'Leads', search: 'Buscar Leads', agent: 'Agente de Prospecção', templates: 'Templates', bi: 'BI / Prospecção', sheets: 'Google Sheets', inbox: 'Caixa de Entrada', workspaces: 'Workspaces', settings: 'Configurações' }[view] || view}</strong></span>
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{ws?.name} <span style={{ color: 'var(--text-muted)' }}>/</span> <strong style={{ color: 'var(--text)' }}>{{ leads: 'Leads', calendar_view: 'Calendário', search: 'Buscar Leads', agent: 'Agente de Prospecção', templates: 'Templates', bi: 'BI / Prospecção', sheets: 'Google Sheets', inbox: 'Caixa de Entrada', workspaces: 'Workspaces', settings: 'Configurações' }[view] || view}</strong></span>
           <span className={`db-badge ${gmailConfigured ? 'on' : 'off'}`}>{gmailConfigured ? '✉ E-mail ativo' : 'E-mail não configurado'}</span>
         </header>
 
@@ -564,6 +580,10 @@ export default function CRM() {
               <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
                 <div className="stat" style={{ cursor: 'pointer', flex: '1 1 80px', borderBottom: statusFilter === 'all' ? '3px solid #475467' : '3px solid transparent' }} onClick={() => setStatusFilter('all')}>
                   <div className="stat-label"><span className="stat-dot" style={{ background: '#475467' }} />Total</div><div className="stat-value">{stats.total}</div>
+                </div>
+                <div className="stat" style={{ cursor: 'pointer', flex: '1 1 80px', borderBottom: '3px solid #0066ff', background: '#eff6ff' }} onClick={() => setView('calendar_view')}>
+                  <div className="stat-label"><span className="stat-dot" style={{ background: '#0066ff' }} />Reuniões</div>
+                  <div className="stat-value" style={{ color: '#0066ff' }}>{stats.reunioes}</div>
                 </div>
                 {FUNNEL.map(f => (
                   <div key={f.id} className="stat" style={{ cursor: 'pointer', flex: '1 1 80px', borderBottom: statusFilter === f.id ? `3px solid ${f.color}` : '3px solid transparent' }} onClick={() => setStatusFilter(f.id)}>
@@ -673,6 +693,7 @@ export default function CRM() {
           {view === 'bi' && <BIView workspace={workspace} leads={leads} />}
           {view === 'sheets' && <SheetsView workspace={workspace} workspaceName={ws?.name} onImport={(newLeads: any[]) => { setLeads(prev => { const ids = new Set(prev.map((l:any)=>l.id)); const fresh = newLeads.filter((l:any)=>!ids.has(l.id)); return [...fresh,...prev]; }); showToast(newLeads.length + ' lead(s) importado(s) do Sheets'); }} showToast={showToast} />}
           {view === 'settings' && <SettingsView gmailConfigured={gmailConfigured} hasDb={hasDb} showToast={showToast} />}
+          {view === 'calendar_view' && <CalendarView meetings={allMeetings} leads={leads} onOpenLead={(lead: any) => { setLeadPanel(lead); setPanelTab('timeline'); }} />}
         </div></div>
       </div>
 
@@ -1136,6 +1157,97 @@ export default function CRM() {
         </div>
       )}
       <div className={`toast${toast ? ' show' : ''}`}>{toast}</div>
+    </div>
+  );
+}
+// ---------- Calendário de Reuniões ----------
+function CalendarView({ meetings, leads, onOpenLead }: any) {
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+
+  // Agrupa reuniões por data
+  const grouped: Record<string, any[]> = {};
+  for (const m of meetings) {
+    // Tenta extrair a data do label: "Reunião agendada: DD/MM/YYYY HH:MM"
+    const match = m.label?.match(/(\d{2}\/\d{2}\/\d{4})/);
+    const dateKey = match
+      ? match[1].split('/').reverse().join('-') // converte DD/MM/YYYY → YYYY-MM-DD
+      : new Date(m.ts).toISOString().slice(0, 10);
+    if (!grouped[dateKey]) grouped[dateKey] = [];
+    grouped[dateKey].push(m);
+  }
+
+  const sortedDates = Object.keys(grouped).sort();
+  const upcoming = sortedDates.filter(d => d >= todayStr);
+  const past = sortedDates.filter(d => d < todayStr).reverse();
+
+  const renderMeeting = (m: any, dateKey: string) => {
+    const lead = leads.find((l: any) => l.id === m.leadId);
+    const timeMatch = m.label?.match(/(\d{2}:\d{2})/);
+    const timeStr = timeMatch ? timeMatch[1] : '';
+    const meetUrl = m.label?.match(/https:\/\/meet\.google\.com\/[\w-]+/)?.[0];
+    const isPast = dateKey < todayStr;
+    return (
+      <div key={m.ts + m.leadId} style={{ display: 'flex', gap: 12, padding: '12px 14px', background: isPast ? 'var(--surface)' : '#eff6ff', borderRadius: 10, border: `1px solid ${isPast ? 'var(--border)' : '#bfdbfe'}`, marginBottom: 8, opacity: isPast ? 0.7 : 1 }}>
+        <div style={{ width: 48, height: 48, borderRadius: 10, background: isPast ? '#f3f4f6' : '#0066ff', color: isPast ? '#6b7280' : 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 11, fontWeight: 700 }}>
+          <span style={{ fontSize: 18, lineHeight: 1 }}>{new Date(dateKey + 'T12:00:00').getDate()}</span>
+          <span style={{ textTransform: 'uppercase', fontSize: 9 }}>{new Date(dateKey + 'T12:00:00').toLocaleString('pt-BR', { month: 'short' })}</span>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{m.leadName}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{m.leadCompany}</div>
+          {timeStr && <div style={{ fontSize: 12, color: '#0066ff', fontWeight: 600 }}>⏰ {timeStr}</div>}
+          {meetUrl && <a href={meetUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#0066ff', display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, textDecoration: 'none', background: '#dbeafe', padding: '2px 8px', borderRadius: 6 }}>🎥 Entrar no Meet</a>}
+        </div>
+        {lead && <button className="btn btn-sm" style={{ fontSize: 11, alignSelf: 'flex-start', flexShrink: 0 }} onClick={() => onOpenLead(lead)}>Ver lead</button>}
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      <div className="page-header">
+        <div><div className="page-title">📅 Calendário de Reuniões</div><div className="page-description">{meetings.length} reunião(ões) agendada(s) no total</div></div>
+      </div>
+      {meetings.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>📅</div>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Nenhuma reunião agendada ainda</div>
+          <div style={{ fontSize: 13 }}>Clique no ícone de calendário 📅 em qualquer lead para agendar uma reunião.</div>
+        </div>
+      )}
+      {upcoming.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#0066ff', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#0066ff', display: 'inline-block' }} />
+            Próximas reuniões ({upcoming.reduce((s, d) => s + grouped[d].length, 0)})
+          </div>
+          {upcoming.map(d => (
+            <div key={d}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6, marginTop: 4 }}>
+                {d === todayStr ? '📌 Hoje' : new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+              </div>
+              {grouped[d].map(m => renderMeeting(m, d))}
+            </div>
+          ))}
+        </div>
+      )}
+      {past.length > 0 && (
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#9ca3af', display: 'inline-block' }} />
+            Reuniões passadas ({past.reduce((s, d) => s + grouped[d].length, 0)})
+          </div>
+          {past.map(d => (
+            <div key={d}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6, marginTop: 4 }}>
+                {new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+              </div>
+              {grouped[d].map(m => renderMeeting(m, d))}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
