@@ -62,6 +62,7 @@ const ICONS: any = {
   bi: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
   sparkles: '<path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M19 3l.75 2.25L22 6l-2.25.75L19 9l-.75-2.25L16 6l2.25-.75z"/>',
   copy: '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
 };
 
 export default function CRM() {
@@ -108,6 +109,16 @@ export default function CRM() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkSending, setBulkSending] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
+  // Modal de agendamento Google Calendar
+  const [calModal, setCalModal] = useState<Lead | null>(null);
+  const [calDate, setCalDate] = useState('');
+  const [calGuestEmail, setCalGuestEmail] = useState('');
+  const [calTitle, setCalTitle] = useState('');
+  const [calDescription, setCalDescription] = useState('');
+  const [calSlots, setCalSlots] = useState<Array<{time: string; available: boolean}>>([]);
+  const [calSelectedSlot, setCalSelectedSlot] = useState('');
+  const [calLoadingSlots, setCalLoadingSlots] = useState(false);
+  const [calSaving, setCalSaving] = useState(false);
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2800); };
 
@@ -618,6 +629,10 @@ export default function CRM() {
                         <button className="ch-icon" title="Enriquecer com Apollo.io (telefone, e-mail, decisor)" style={{color: enriching === lead.id ? '#f59e0b' : undefined, opacity: enriching === lead.id ? 0.6 : 1}} disabled={!!enriching} onClick={() => enrichLead(lead)}>
                           <Icon d={ICONS.enrich} />
                         </button>
+                        {/* Agendar reunião */}
+                        <button className="ch-icon" title="Agendar reunião no Google Calendar" style={{color:'#0066ff'}} onClick={() => { setCalModal(lead); setCalGuestEmail(lead.email || ''); setCalTitle(`Reunião com ${lead.name} — ${lead.company || ''}`); setCalDescription(''); setCalDate(new Date().toISOString().slice(0,10)); setCalSlots([]); setCalSelectedSlot(''); }}>
+                          <Icon d={ICONS.calendar} />
+                        </button>
                         {/* Analisar empresa */}
                         <button className="ch-icon enrich-btn" title={`Analisar empresa: ${lead.company || lead.name}`} onClick={() => { setLeadPanel(lead); setPanelAnalysis(null); setPanelTab('analysis'); analyzeCompany(lead); }}>
                           <Icon d={ICONS.sparkles} />
@@ -1013,6 +1028,109 @@ export default function CRM() {
               ) : (
                 <button className="btn" disabled style={{ opacity: 0.5 }}>Sem número cadastrado</button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal de Agendamento Google Calendar */}
+      {calModal && (
+        <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) setCalModal(null); }}>
+          <div className="modal" style={{ maxWidth: 700, width: '95vw' }}>
+            <div className="modal-header">
+              <div className="modal-title">📅 Agendar Reunião — Google Calendar</div>
+              <button className="modal-close" onClick={() => setCalModal(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+                {/* Coluna esquerda: dados da reunião */}
+                <div>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>{calModal.name}</div>
+                  <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>{calModal.company} · {calModal.role}</div>
+                  <div className="field">
+                    <label className="field-label">E-mail do convidado *</label>
+                    <input className="field-input" type="email" value={calGuestEmail} onChange={e => setCalGuestEmail(e.target.value)} placeholder="email@empresa.com" />
+                  </div>
+                  <div className="field">
+                    <label className="field-label">Título da reunião</label>
+                    <input className="field-input" type="text" value={calTitle} onChange={e => setCalTitle(e.target.value)} />
+                  </div>
+                  <div className="field">
+                    <label className="field-label">Pauta / Descrição</label>
+                    <textarea className="field-input" rows={4} value={calDescription} onChange={e => setCalDescription(e.target.value)} placeholder="Tópicos a discutir, objetivos da reunião..." style={{ resize: 'vertical' }} />
+                  </div>
+                  <div className="field">
+                    <label className="field-label">Data</label>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input className="field-input" type="date" value={calDate} onChange={e => setCalDate(e.target.value)} style={{ flex: 1 }} />
+                      <button className="btn btn-primary" style={{ whiteSpace: 'nowrap' }} disabled={!calDate || calLoadingSlots} onClick={async () => {
+                        setCalLoadingSlots(true); setCalSlots([]); setCalSelectedSlot('');
+                        try {
+                          const r = await fetch(`/api/calendar?workspace=${workspace}&date=${calDate}`);
+                          const j = await r.json();
+                          if (j.error) { showToast(j.error); }
+                          else { setCalSlots(j.slots || []); }
+                        } catch { showToast('Erro ao buscar agenda'); }
+                        setCalLoadingSlots(false);
+                      }}>{calLoadingSlots ? '⏳' : '🔍 Ver agenda'}</button>
+                    </div>
+                  </div>
+                </div>
+                {/* Coluna direita: slots disponíveis */}
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12, color: 'var(--text-secondary)' }}>⏰ Horários disponíveis</div>
+                  {calSlots.length === 0 && !calLoadingSlots && (
+                    <div style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', padding: '32px 0' }}>Selecione uma data e clique em "Ver agenda"</div>
+                  )}
+                  {calLoadingSlots && (
+                    <div style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', padding: '32px 0' }}>Carregando agenda...</div>
+                  )}
+                  {calSlots.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, maxHeight: 320, overflowY: 'auto' }}>
+                      {calSlots.map(slot => {
+                        const t = new Date(slot.time);
+                        const label = t.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                        const isSelected = calSelectedSlot === slot.time;
+                        return (
+                          <button key={slot.time} disabled={!slot.available} onClick={() => setCalSelectedSlot(slot.time)}
+                            style={{ padding: '8px 4px', borderRadius: 8, border: isSelected ? '2px solid #0066ff' : '1px solid var(--border)', background: isSelected ? '#eff6ff' : slot.available ? 'var(--surface)' : '#f3f4f6', color: slot.available ? (isSelected ? '#0066ff' : 'var(--text)') : '#9ca3af', fontSize: 13, fontWeight: isSelected ? 700 : 400, cursor: slot.available ? 'pointer' : 'not-allowed', textDecoration: slot.available ? 'none' : 'line-through' }}>
+                            {label}
+                            {!slot.available && <span style={{ fontSize: 10, display: 'block', color: '#ef4444' }}>ocupado</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {calSelectedSlot && (
+                    <div style={{ marginTop: 12, padding: '10px 12px', background: '#eff6ff', borderRadius: 8, fontSize: 13, color: '#0066ff', fontWeight: 600 }}>
+                      ✓ Selecionado: {new Date(calSelectedSlot).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} — duração 1h
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn" onClick={() => setCalModal(null)}>Cancelar</button>
+              <button className="btn btn-primary" disabled={!calGuestEmail || !calSelectedSlot || calSaving} onClick={async () => {
+                setCalSaving(true);
+                try {
+                  const endTime = new Date(new Date(calSelectedSlot).getTime() + 60 * 60 * 1000).toISOString();
+                  const r = await fetch('/api/calendar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workspace, guestEmail: calGuestEmail, guestName: calModal.name, startTime: calSelectedSlot, endTime, title: calTitle, description: calDescription }) });
+                  const j = await r.json();
+                  if (j.ok) {
+                    const timeline = JSON.parse(calModal.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+                    const slotLabel = new Date(calSelectedSlot).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    timeline.unshift({ type: 'meeting', label: `Reunião agendada: ${slotLabel}${j.meetUrl ? ' · ' + j.meetUrl : ''}`, ts: Date.now() });
+                    if (calDescription) timeline.unshift({ type: 'note', label: `Pauta: ${calDescription}`, ts: Date.now() });
+                    const notesClean = (calModal.notes || '').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
+                    await saveLead({ ...calModal, status: normalizeStatus(calModal.status) === 'prospeccao' ? 'qualificacao' : normalizeStatus(calModal.status), updated_at: Date.now(), notes: notesClean + `\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]` });
+                    showToast(`✓ Reunião agendada! Invite enviado para ${calGuestEmail}`);
+                    setCalModal(null);
+                  } else {
+                    showToast(j.error || 'Erro ao agendar reunião');
+                  }
+                } catch { showToast('Erro ao agendar reunião'); }
+                setCalSaving(false);
+              }}>{calSaving ? 'Agendando...' : '📅 Agendar e enviar invite'}</button>
             </div>
           </div>
         </div>
