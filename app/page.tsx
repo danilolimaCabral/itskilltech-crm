@@ -63,6 +63,7 @@ const ICONS: any = {
   sparkles: '<path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M19 3l.75 2.25L22 6l-2.25.75L19 9l-.75-2.25L16 6l2.25-.75z"/>',
   copy: '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>',
   calendar: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  note: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/>',
 };
 
 export default function CRM() {
@@ -109,6 +110,10 @@ export default function CRM() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkSending, setBulkSending] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
+  // Modal de observações
+  const [noteModal, setNoteModal] = useState<Lead | null>(null);
+  const [noteText, setNoteText] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
   // Modal de agendamento Google Calendar
   const [calModal, setCalModal] = useState<Lead | null>(null);
   const [calDate, setCalDate] = useState('');
@@ -662,8 +667,12 @@ export default function CRM() {
                           <Icon d={ICONS.phone} />
                         </button>
                         {/* E-mail */}
-                        <button className="ch-icon email-btn" disabled={!lead.email} title={lead.email ? `E-mail: ${lead.email}` : 'Sem e-mail'} onClick={() => openEmailModal(lead)}>
+                        <button className="ch-icon email-btn" title={lead.email ? `E-mail: ${lead.email}` : 'Enviar e-mail (digitar endereço)'} onClick={() => openEmailModal(lead)}>
                           <Icon d={ICONS.email} />
+                        </button>
+                        {/* Observações */}
+                        <button className="ch-icon" title="Ver/editar observações" style={{ color: (lead.notes || '').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g,'').trim() ? '#f59e0b' : 'var(--text-muted)' }} onClick={() => { const cleanNotes = (lead.notes || '').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g,'').trim(); setNoteModal(lead); setNoteText(cleanNotes); }}>
+                          <Icon d={ICONS.note} />
                         </button>
                         {/* WhatsApp */}
                         <button className="ch-icon whatsapp-btn" title={lead.whatsapp || lead.phone ? `WhatsApp: ${lead.whatsapp || lead.phone}` : 'Sem número'} onClick={() => openWhatsModal(lead)}>
@@ -921,7 +930,15 @@ export default function CRM() {
               <button className="modal-close" onClick={() => setEmailModal(null)}>×</button>
             </div>
             <div className="modal-body">
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14 }}>Para: <strong>{emailModal.name}</strong> &lt;{emailModal.email}&gt;</div>
+              {emailModal.email ? (
+                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14 }}>Para: <strong>{emailModal.name}</strong> &lt;{emailModal.email}&gt;</div>
+              ) : (
+                <div className="field" style={{ marginBottom: 14 }}>
+                  <label className="field-label">E-mail do destinatário</label>
+                  <input className="field-input" type="email" placeholder="email@empresa.com" autoFocus
+                    onChange={e => setEmailModal({ ...emailModal, email: e.target.value })} />
+                </div>
+              )}
               {/* Seletor de templates */}
               {templates.filter(t => t.type === 'email').length > 0 && (
                 <div className="field">
@@ -1049,6 +1066,41 @@ export default function CRM() {
               ) : (
                 <button className="btn" disabled style={{ opacity: 0.5 }}>Sem número cadastrado</button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal de Observações */}
+      {noteModal && (
+        <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) setNoteModal(null); }}>
+          <div className="modal" style={{ maxWidth: 520 }}>
+            <div className="modal-header">
+              <div className="modal-title">📝 Observações — {noteModal.name}</div>
+              <button className="modal-close" onClick={() => setNoteModal(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>{noteModal.company} {noteModal.role ? `· ${noteModal.role}` : ''}</div>
+              <textarea
+                className="field-input"
+                style={{ minHeight: 200, resize: 'vertical', fontFamily: 'inherit', fontSize: 14, lineHeight: 1.6 }}
+                placeholder="Anotações sobre este lead: o que foi conversado, próximos passos, observações importantes..."
+                value={noteText}
+                onChange={e => setNoteText(e.target.value)}
+              />
+            </div>
+            <div className="modal-footer">
+              <button className="btn" onClick={() => setNoteModal(null)}>Cancelar</button>
+              <button className="btn btn-primary" disabled={savingNote} onClick={async () => {
+                setSavingNote(true);
+                try {
+                  const timeline = JSON.parse(noteModal.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+                  const newNotes = noteText.trim() + (timeline.length > 0 ? `\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]` : '');
+                  await saveLead({ ...noteModal, notes: newNotes, updated_at: Date.now() });
+                  showToast('✓ Observações salvas');
+                  setNoteModal(null);
+                } catch { showToast('Erro ao salvar'); }
+                setSavingNote(false);
+              }}>{savingNote ? 'Salvando...' : '✓ Salvar observações'}</button>
             </div>
           </div>
         </div>
