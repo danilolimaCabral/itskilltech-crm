@@ -118,9 +118,12 @@ export async function POST(req: NextRequest) {
       // Limpa o e-mail
       const newEmail = emailDirty ? cleanEmail(originalEmail) : originalEmail;
 
+      // Se o nome ficou vazio após limpeza, usa o cargo como fallback ou "Contato sem nome"
+      const finalName = newName || extractedRole || 'Contato sem nome';
+
       // Só atualiza se algo mudou
       if (
-        newName === originalName &&
+        finalName === originalName &&
         newEmail === originalEmail &&
         extractedRole === originalRole &&
         extractedPhone === originalPhone
@@ -131,7 +134,7 @@ export async function POST(req: NextRequest) {
 
       await sql`
         UPDATE leads SET
-          name = ${newName || originalName},
+          name = ${finalName},
           role = ${extractedRole || originalRole || ''},
           phone = ${extractedPhone || originalPhone || ''},
           whatsapp = ${extractedWhatsapp || originalWhatsapp || ''},
