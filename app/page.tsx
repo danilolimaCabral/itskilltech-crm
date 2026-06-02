@@ -222,12 +222,33 @@ export default function CRM() {
     if (!lead.company) { showToast('Lead sem empresa — não é possível enriquecer'); return; }
     setEnriching(lead.id);
     try {
-      const r = await fetch('/api/enrich', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company: lead.company }) });
+      const r = await fetch('/api/enrich', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company: lead.company, website: (lead as any).website || '' }) });
       const d = await r.json();
       if (!d.ok) { showToast(d.error || 'Dados não encontrados'); return; }
-      const updated: Lead = { ...lead, phone: d.telefone || lead.phone || '', updated_at: Date.now() };
+      // Monta resumo do que foi encontrado
+      const found: string[] = [];
+      if (d.telefone) found.push(`📞 ${d.telefone}`);
+      if (d.email && !d.email_is_guess) found.push(`✉ ${d.email}`);
+      if (d.contact_name) found.push(`👤 ${d.contact_name}${d.contact_title ? ` (${d.contact_title})` : ''}`);
+      // Atualiza o lead com todos os dados encontrados
+      const decisorNote = d.contact_name
+        ? `[DECISOR] ${d.contact_name}${d.contact_title ? ` · ${d.contact_title}` : ''}${d.contact_linkedin ? ` · ${d.contact_linkedin}` : ''}\n`
+        : '';
+      const notesClean = (lead.notes || '').replace(/\[DECISOR\][^\n]*\n?/g, '');
+      const timeline = JSON.parse(notesClean.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+      timeline.unshift({ type: 'enrich', label: `Enriquecido via ${d.source}`, ts: Date.now() });
+      const notesBase = notesClean.replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
+      const updated: Lead = {
+        ...lead,
+        phone: d.telefone || lead.phone || '',
+        whatsapp: d.telefone || lead.whatsapp || '',
+        email: (!lead.email && d.email && !d.email_is_guess) ? d.email : lead.email,
+        notes: decisorNote + notesBase + `\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]`,
+        updated_at: Date.now(),
+      };
       await saveLead(updated);
-      showToast(`✓ Enriquecido: ${d.telefone || 'sem telefone'} · ${d.source}`);
+      const summary = found.length ? found.join(' · ') : 'sem dados novos';
+      showToast(`✓ Enriquecido via ${d.source}: ${summary}`);
     } catch { showToast('Erro ao enriquecer'); }
     setEnriching(null);
   };
@@ -478,21 +499,37 @@ export default function CRM() {
                     if (!toEnrich.length) { showToast('Todos os leads já têm telefone!'); return; }
                     setEnrichingAll(true);
                     setEnrichProgress({ done: 0, total: toEnrich.length });
+                    let enriched = 0;
                     for (let i = 0; i < toEnrich.length; i++) {
                       const lead = toEnrich[i];
                       try {
-                        const r = await fetch('/api/enrich', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company: lead.company, leadId: lead.id }) });
+                        const r = await fetch('/api/enrich', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ company: lead.company, website: (lead as any).website || '' }) });
                         const data = await r.json();
-                        if (data.phone) {
-                          await fetch('/api/leads', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: lead.id, phone: data.phone, whatsapp: data.phone }) });
-                          setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, phone: data.phone, whatsapp: data.phone } : l));
+                        if (data.ok && (data.telefone || data.email)) {
+                          enriched++;
+                          const decisorNote = data.contact_name
+                            ? `[DECISOR] ${data.contact_name}${data.contact_title ? ` · ${data.contact_title}` : ''}${data.contact_linkedin ? ` · ${data.contact_linkedin}` : ''}\n`
+                            : '';
+                          const notesClean = (lead.notes || '').replace(/\[DECISOR\][^\n]*\n?/g, '');
+                          const timeline = JSON.parse(notesClean.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+                          timeline.unshift({ type: 'enrich', label: `Enriquecido via ${data.source}`, ts: Date.now() });
+                          const notesBase = notesClean.replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
+                          const updatedLead = {
+                            ...lead,
+                            phone: data.telefone || lead.phone || '',
+                            whatsapp: data.telefone || lead.whatsapp || '',
+                            email: (!lead.email && data.email && !data.email_is_guess) ? data.email : lead.email,
+                            notes: decisorNote + notesBase + `\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]`,
+                            updated_at: Date.now(),
+                          };
+                          await saveLead(updatedLead);
                         }
                       } catch {}
                       setEnrichProgress({ done: i + 1, total: toEnrich.length });
-                      await new Promise(res => setTimeout(res, 400));
+                      await new Promise(res => setTimeout(res, 500));
                     }
                     setEnrichingAll(false);
-                    showToast('Enriquecimento concluído!');
+                    showToast(`✓ Enriquecimento concluído: ${enriched}/${toEnrich.length} leads atualizados`);
                   }}>
                     {enrichingAll ? `⚙ Enriquecendo... ${enrichProgress.done}/${enrichProgress.total}` : '⚙ Enriquecer todos'}
                   </button>
@@ -672,7 +709,23 @@ export default function CRM() {
                     </div>
                   ))}
                   {leadPanel.call_count ? <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>📞 {leadPanel.call_count} ligação(ões) · último contato: {leadPanel.last_contact ? new Date(leadPanel.last_contact).toLocaleDateString('pt-BR') : '—'}</div> : null}
-                  {leadPanel.notes && (() => { const clean = leadPanel.notes.replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g,'').trim(); return clean ? <div style={{ marginTop: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Anotações</div><div style={{ fontSize: 13, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', background: 'var(--surface-2)', borderRadius: 8, padding: '10px 12px' }}>{clean}</div></div> : null; })()}
+                  {leadPanel.notes && (() => {
+                    const clean = leadPanel.notes.replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g,'').trim();
+                    const decisorMatch = clean.match(/\[DECISOR\]([^\n]+)/);
+                    const decisorInfo = decisorMatch ? decisorMatch[1].trim() : null;
+                    const notesOnly = clean.replace(/\[DECISOR\][^\n]*\n?/g,'').trim();
+                    return (
+                      <>
+                        {decisorInfo && (
+                          <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '10px 12px', marginTop: 4 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, color: '#15803d', textTransform: 'uppercase', marginBottom: 4 }}>👤 Decisor (Apollo.io)</div>
+                            <div style={{ fontSize: 13, color: '#166534', fontWeight: 500 }}>{decisorInfo}</div>
+                          </div>
+                        )}
+                        {notesOnly ? <div style={{ marginTop: 8 }}><div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>Anotações</div><div style={{ fontSize: 13, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', background: 'var(--surface-2)', borderRadius: 8, padding: '10px 12px' }}>{notesOnly}</div></div> : null}
+                      </>
+                    );
+                  })()}
                   {/* Ações rápidas */}
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
                     {(leadPanel.phone || leadPanel.whatsapp) && <a href={`tel:${cleanPhone(leadPanel.phone || leadPanel.whatsapp || '')}`} className="btn btn-sm" style={{ textDecoration: 'none' }}><Icon d={ICONS.phone} />Ligar</a>}
