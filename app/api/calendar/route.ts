@@ -36,7 +36,7 @@ export async function GET(req: Request) {
       },
     });
 
-    const busy: Array<{ start: string; end: string }> =
+    const busy: Array<{ start?: string | null; end?: string | null }> =
       freebusyRes.data.calendars?.primary?.busy || [];
 
     // Gera slots de 30 min das 08:00 às 18:00 no dia solicitado
@@ -52,6 +52,7 @@ export async function GET(req: Request) {
     while (cursor < dayEnd) {
       const slotEnd = new Date(cursor.getTime() + 30 * 60 * 1000);
       const isBusy = busy.some((b) => {
+        if (!b.start || !b.end) return false;
         const bs = new Date(b.start);
         const be = new Date(b.end);
         return cursor < be && slotEnd > bs;
