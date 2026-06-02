@@ -86,12 +86,17 @@ export async function POST(req: NextRequest) {
       const originalWhatsapp = lead.whatsapp || '';
       const originalRole = lead.role || '';
 
-      // Detecta se o nome está sujo (contém telefone, "Enviado whatss", cargo misturado)
+      // Detecta se o nome está sujo (contém telefone, "Enviado whatss", cargo misturado, vírgulas, e-mails)
       const nameDirty =
         /55\s*\d{2}\s*\d{4,5}/i.test(originalName) ||
         /Enviado\s*what/i.test(originalName) ||
-        /,\s*(Gerente|Diretor|Coordenador|Controller|CEO|CFO)/i.test(originalName) ||
-        originalName.startsWith(',');
+        /,\s*(Gerente|Diretor|Coordenador|Controller|CEO|CFO|Analista|Comprador|Senior|Logist)/i.test(originalName) ||
+        originalName.startsWith(',') ||
+        originalName.startsWith(' ,') ||
+        /^[,\s]+$/.test(originalName) ||
+        originalName === '0' ||
+        (originalName.includes('@') && originalName.includes(',')) || // e-mail no campo nome
+        (originalName.split(',').length > 2 && originalName.length > 30); // muitas vírgulas
 
       // Detecta e-mail gerado automaticamente (com muitos números)
       const emailDirty = originalEmail && (
