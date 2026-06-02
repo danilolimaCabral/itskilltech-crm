@@ -614,6 +614,10 @@ export default function CRM() {
                         (() => { const f = FUNNEL_MAP[normalizeStatus(lead.status)]; return f ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: f.bg, color: f.color, border: `1px solid ${f.color}33`, whiteSpace: 'nowrap' }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: f.color, flexShrink: 0 }} />{f.short}</span> : <span className={`badge badge-${lead.status}`}>{statusLabel(lead.status)}</span>; })()
                       }</td>
                       <td onClick={e => e.stopPropagation()}><div className="channel-icons">
+                        {/* Enriquecer com Apollo */}
+                        <button className="ch-icon" title="Enriquecer com Apollo.io (telefone, e-mail, decisor)" style={{color: enriching === lead.id ? '#f59e0b' : undefined, opacity: enriching === lead.id ? 0.6 : 1}} disabled={!!enriching} onClick={() => enrichLead(lead)}>
+                          <Icon d={ICONS.enrich} />
+                        </button>
                         {/* Analisar empresa */}
                         <button className="ch-icon enrich-btn" title={`Analisar empresa: ${lead.company || lead.name}`} onClick={() => { setLeadPanel(lead); setPanelAnalysis(null); setPanelTab('analysis'); analyzeCompany(lead); }}>
                           <Icon d={ICONS.sparkles} />
