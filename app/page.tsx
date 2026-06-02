@@ -693,7 +693,7 @@ export default function CRM() {
           {view === 'bi' && <BIView workspace={workspace} leads={leads} />}
           {view === 'sheets' && <SheetsView workspace={workspace} workspaceName={ws?.name} onImport={(newLeads: any[]) => { setLeads(prev => { const ids = new Set(prev.map((l:any)=>l.id)); const fresh = newLeads.filter((l:any)=>!ids.has(l.id)); return [...fresh,...prev]; }); showToast(newLeads.length + ' lead(s) importado(s) do Sheets'); }} showToast={showToast} />}
           {view === 'settings' && <SettingsView gmailConfigured={gmailConfigured} hasDb={hasDb} showToast={showToast} />}
-          {view === 'calendar_view' && <CalendarView meetings={allMeetings} leads={leads} onOpenLead={(lead: any) => { setLeadPanel(lead); setPanelTab('timeline'); }} />}
+          {view === 'calendar_view' && <CalendarView meetings={allMeetings} leads={leads} onOpenLead={(lead: any) => { setLeadPanel(lead); setPanelTab('timeline'); }} onSchedule={(dateStr?: string) => { const firstLead = leads[0]; if (firstLead) { setCalModal(firstLead); setCalGuestEmail(firstLead.email || ''); setCalTitle(`Reunião com ${firstLead.name} — ${firstLead.company || ''}`); setCalDescription(''); setCalDate(dateStr || new Date().toISOString().slice(0,10)); setCalSlots([]); setCalSelectedSlot(''); } else { showToast('Adicione um lead primeiro para agendar uma reunião.'); } }} />}
         </div></div>
       </div>
 
@@ -1161,93 +1161,192 @@ export default function CRM() {
   );
 }
 // ---------- Calendário de Reuniões ----------
-function CalendarView({ meetings, leads, onOpenLead }: any) {
+function CalendarView({ meetings, leads, onOpenLead, onSchedule }: any) {
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
+  const [curYear, setCurYear] = useState(now.getFullYear());
+  const [curMonth, setCurMonth] = useState(now.getMonth()); // 0-indexed
+  const [selectedDay, setSelectedDay] = useState<string | null>(todayStr);
 
-  // Agrupa reuniões por data
+  // Agrupa reuniões por data (YYYY-MM-DD)
   const grouped: Record<string, any[]> = {};
   for (const m of meetings) {
-    // Tenta extrair a data do label: "Reunião agendada: DD/MM/YYYY HH:MM"
     const match = m.label?.match(/(\d{2}\/\d{2}\/\d{4})/);
     const dateKey = match
-      ? match[1].split('/').reverse().join('-') // converte DD/MM/YYYY → YYYY-MM-DD
+      ? match[1].split('/').reverse().join('-')
       : new Date(m.ts).toISOString().slice(0, 10);
     if (!grouped[dateKey]) grouped[dateKey] = [];
     grouped[dateKey].push(m);
   }
 
-  const sortedDates = Object.keys(grouped).sort();
-  const upcoming = sortedDates.filter(d => d >= todayStr);
-  const past = sortedDates.filter(d => d < todayStr).reverse();
+  // Gera os dias do mês atual
+  const firstDay = new Date(curYear, curMonth, 1);
+  const lastDay = new Date(curYear, curMonth + 1, 0);
+  const startDow = firstDay.getDay(); // 0=dom
+  const totalDays = lastDay.getDate();
+  const weeks: (number | null)[][] = [];
+  let week: (number | null)[] = Array(startDow).fill(null);
+  for (let d = 1; d <= totalDays; d++) {
+    week.push(d);
+    if (week.length === 7) { weeks.push(week); week = []; }
+  }
+  if (week.length > 0) { while (week.length < 7) week.push(null); weeks.push(week); }
 
-  const renderMeeting = (m: any, dateKey: string) => {
+  const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const dowLabels = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+
+  const prevMonth = () => { if (curMonth === 0) { setCurMonth(11); setCurYear(y => y - 1); } else setCurMonth(m => m - 1); };
+  const nextMonth = () => { if (curMonth === 11) { setCurMonth(0); setCurYear(y => y + 1); } else setCurMonth(m => m + 1); };
+
+  const dayKey = (d: number) => `${curYear}-${String(curMonth + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+
+  const selectedMeetings = selectedDay ? (grouped[selectedDay] || []) : [];
+
+  const renderMeeting = (m: any) => {
     const lead = leads.find((l: any) => l.id === m.leadId);
     const timeMatch = m.label?.match(/(\d{2}:\d{2})/);
     const timeStr = timeMatch ? timeMatch[1] : '';
     const meetUrl = m.label?.match(/https:\/\/meet\.google\.com\/[\w-]+/)?.[0];
-    const isPast = dateKey < todayStr;
+    const isPast = (selectedDay || '') < todayStr;
     return (
-      <div key={m.ts + m.leadId} style={{ display: 'flex', gap: 12, padding: '12px 14px', background: isPast ? 'var(--surface)' : '#eff6ff', borderRadius: 10, border: `1px solid ${isPast ? 'var(--border)' : '#bfdbfe'}`, marginBottom: 8, opacity: isPast ? 0.7 : 1 }}>
-        <div style={{ width: 48, height: 48, borderRadius: 10, background: isPast ? '#f3f4f6' : '#0066ff', color: isPast ? '#6b7280' : 'white', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 11, fontWeight: 700 }}>
-          <span style={{ fontSize: 18, lineHeight: 1 }}>{new Date(dateKey + 'T12:00:00').getDate()}</span>
-          <span style={{ textTransform: 'uppercase', fontSize: 9 }}>{new Date(dateKey + 'T12:00:00').toLocaleString('pt-BR', { month: 'short' })}</span>
+      <div key={m.ts + m.leadId} style={{ padding: '12px 14px', background: isPast ? 'var(--surface)' : '#eff6ff', borderRadius: 10, border: `1px solid ${isPast ? 'var(--border)' : '#bfdbfe'}`, marginBottom: 10, opacity: isPast ? 0.75 : 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>{m.leadName}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{m.leadCompany}</div>
+          </div>
+          {timeStr && <div style={{ fontSize: 13, color: '#0066ff', fontWeight: 700, background: '#dbeafe', padding: '2px 8px', borderRadius: 6, flexShrink: 0 }}>⏰ {timeStr}</div>}
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{m.leadName}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{m.leadCompany}</div>
-          {timeStr && <div style={{ fontSize: 12, color: '#0066ff', fontWeight: 600 }}>⏰ {timeStr}</div>}
-          {meetUrl && <a href={meetUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#0066ff', display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 4, textDecoration: 'none', background: '#dbeafe', padding: '2px 8px', borderRadius: 6 }}>🎥 Entrar no Meet</a>}
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+          {meetUrl && (
+            <a href={meetUrl} target="_blank" rel="noopener noreferrer"
+              style={{ fontSize: 12, color: 'white', display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'none', background: '#0066ff', padding: '4px 10px', borderRadius: 6, fontWeight: 600 }}>
+              🎥 Entrar no Meet
+            </a>
+          )}
+          {lead && (
+            <button className="btn btn-sm" style={{ fontSize: 12 }} onClick={() => onOpenLead(lead)}>Ver lead</button>
+          )}
         </div>
-        {lead && <button className="btn btn-sm" style={{ fontSize: 11, alignSelf: 'flex-start', flexShrink: 0 }} onClick={() => onOpenLead(lead)}>Ver lead</button>}
       </div>
     );
   };
 
+  // Próximas reuniões (todos os meses)
+  const allUpcoming = Object.keys(grouped).filter(d => d >= todayStr).sort();
+
   return (
     <div>
-      <div className="page-header">
-        <div><div className="page-title">📅 Calendário de Reuniões</div><div className="page-description">{meetings.length} reunião(ões) agendada(s) no total</div></div>
-      </div>
-      {meetings.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>📅</div>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Nenhuma reunião agendada ainda</div>
-          <div style={{ fontSize: 13 }}>Clique no ícone de calendário 📅 em qualquer lead para agendar uma reunião.</div>
-        </div>
-      )}
-      {upcoming.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: '#0066ff', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#0066ff', display: 'inline-block' }} />
-            Próximas reuniões ({upcoming.reduce((s, d) => s + grouped[d].length, 0)})
-          </div>
-          {upcoming.map(d => (
-            <div key={d}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6, marginTop: 4 }}>
-                {d === todayStr ? '📌 Hoje' : new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
-              </div>
-              {grouped[d].map(m => renderMeeting(m, d))}
-            </div>
-          ))}
-        </div>
-      )}
-      {past.length > 0 && (
+      <div className="page-header" style={{ marginBottom: 16 }}>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#9ca3af', display: 'inline-block' }} />
-            Reuniões passadas ({past.reduce((s, d) => s + grouped[d].length, 0)})
-          </div>
-          {past.map(d => (
-            <div key={d}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6, marginTop: 4 }}>
-                {new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
-              </div>
-              {grouped[d].map(m => renderMeeting(m, d))}
-            </div>
-          ))}
+          <div className="page-title">📅 Calendário de Reuniões</div>
+          <div className="page-description">{meetings.length} reunião(ões) agendada(s) no total</div>
         </div>
-      )}
+        <button className="btn btn-primary" style={{ gap: 6 }} onClick={() => onSchedule && onSchedule()}>
+          + Nova Reunião
+        </button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start' }}>
+        {/* Calendário mensal */}
+        <div style={{ background: 'var(--surface)', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden' }}>
+          {/* Cabeçalho do mês */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border)' }}>
+            <button onClick={prevMonth} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>‹</button>
+            <div style={{ fontWeight: 700, fontSize: 16 }}>{monthNames[curMonth]} {curYear}</div>
+            <button onClick={nextMonth} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>›</button>
+          </div>
+          {/* Dias da semana */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', padding: '8px 12px 0' }}>
+            {dowLabels.map(d => (
+              <div key={d} style={{ textAlign: 'center', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', padding: '4px 0', textTransform: 'uppercase' }}>{d}</div>
+            ))}
+          </div>
+          {/* Semanas */}
+          <div style={{ padding: '4px 12px 12px' }}>
+            {weeks.map((wk, wi) => (
+              <div key={wi} style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2 }}>
+                {wk.map((d, di) => {
+                  if (!d) return <div key={di} />;
+                  const dk = dayKey(d);
+                  const hasMeeting = !!grouped[dk];
+                  const isToday = dk === todayStr;
+                  const isSelected = dk === selectedDay;
+                  return (
+                    <button key={di} onClick={() => setSelectedDay(dk)}
+                      style={{
+                        aspectRatio: '1', borderRadius: 10, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: isToday || isSelected ? 700 : 400, position: 'relative',
+                        background: isSelected ? '#0066ff' : isToday ? '#eff6ff' : 'transparent',
+                        color: isSelected ? 'white' : isToday ? '#0066ff' : 'var(--text)',
+                        outline: isToday && !isSelected ? '2px solid #0066ff' : 'none',
+                      }}>
+                      {d}
+                      {hasMeeting && (
+                        <span style={{ position: 'absolute', bottom: 3, left: '50%', transform: 'translateX(-50%)', width: 5, height: 5, borderRadius: '50%', background: isSelected ? 'white' : '#0066ff', display: 'block' }} />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+          {/* Legenda */}
+          <div style={{ padding: '8px 18px 14px', borderTop: '1px solid var(--border)', display: 'flex', gap: 16, fontSize: 11, color: 'var(--text-muted)' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#0066ff', display: 'inline-block' }} /> Reunião agendada</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 14, height: 14, borderRadius: 4, background: '#eff6ff', border: '2px solid #0066ff', display: 'inline-block' }} /> Hoje</span>
+          </div>
+        </div>
+
+        {/* Painel lateral — reuniões do dia selecionado */}
+        <div>
+          {selectedDay && (
+            <div style={{ background: 'var(--surface)', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden', marginBottom: 16 }}>
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>
+                    {selectedDay === todayStr ? '📌 Hoje' : new Date(selectedDay + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{selectedMeetings.length} reunião(ões)</div>
+                </div>
+                <button className="btn btn-sm" style={{ fontSize: 11, background: '#0066ff', color: 'white', border: 'none' }}
+                  onClick={() => onSchedule && onSchedule(selectedDay)}>
+                  + Agendar
+                </button>
+              </div>
+              <div style={{ padding: 12 }}>
+                {selectedMeetings.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+                    Nenhuma reunião neste dia.
+                    <br />
+                    <button className="btn btn-sm" style={{ marginTop: 8, fontSize: 11 }} onClick={() => onSchedule && onSchedule(selectedDay)}>Agendar reunião</button>
+                  </div>
+                ) : selectedMeetings.map(m => renderMeeting(m))}
+              </div>
+            </div>
+          )}
+
+          {/* Próximas reuniões resumo */}
+          {allUpcoming.length > 0 && (
+            <div style={{ background: 'var(--surface)', borderRadius: 14, border: '1px solid var(--border)', overflow: 'hidden' }}>
+              <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', fontWeight: 700, fontSize: 13 }}>📋 Próximas reuniões</div>
+              <div style={{ padding: '8px 12px', maxHeight: 300, overflowY: 'auto' }}>
+                {allUpcoming.slice(0, 10).map(d => (
+                  <button key={d} onClick={() => { setSelectedDay(d); const [y,mo] = d.split('-').map(Number); setCurYear(y); setCurMonth(mo-1); }}
+                    style={{ width: '100%', textAlign: 'left', background: d === selectedDay ? '#eff6ff' : 'transparent', border: 'none', borderRadius: 8, padding: '8px 10px', cursor: 'pointer', marginBottom: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: d === todayStr ? '#0066ff' : 'var(--text)' }}>
+                        {d === todayStr ? '📌 Hoje' : new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', weekday: 'short' })}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{grouped[d].map((m: any) => m.leadName).join(', ')}</div>
+                    </div>
+                    <span style={{ fontSize: 11, background: '#0066ff', color: 'white', borderRadius: 10, padding: '1px 7px', flexShrink: 0 }}>{grouped[d].length}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
