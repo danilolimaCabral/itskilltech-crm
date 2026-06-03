@@ -353,7 +353,7 @@ export default function CRM() {
     } else {
       const wsName = ws?.name || 'getLOG/Lottustech';
       setEmailSubject(`Apresentação ${wsName} — Solução TMS para ${lead.company || 'sua empresa'}`);
-      setEmailBody(`Olá ${lead.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo, da ${wsName}. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar significativamente a operação logística de vocês.\n\nGostaria de agendar uma conversa rápida de 15 minutos para apresentar os resultados que estamos gerando para empresas do mesmo segmento.\n\nQual seria o melhor horário para você?\n\nAtenciosamente,\nDanilo Cabral\n${wsName}\ndanilo@lottustech.com.br\n(41) 99949-9815`);
+      setEmailBody(`Olá ${lead.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo Cabral, da ${wsName}. Percebo que empresas ${lead.sector || 'atacadistas e distribuidoras'} como a ${lead.company || 'sua empresa'} buscam constantemente otimizar a operação logística e reduzir custos com frete.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas. Que tal explorar como podemos gerar resultados semelhantes para a ${lead.company || 'sua empresa'}?\n\nMe diga qual o melhor horário para um bate-papo de 15 minutos.\n\nAtenciosamente,\nDanilo Cabral\nGerente Comercial | ${wsName}\ndanilo@lottustech.com.br | (41) 99949-9815\nwww.lottustech.com.br`);
     }
     setShowEmailTemplates(false);
   };
@@ -366,7 +366,7 @@ export default function CRM() {
       setWhatsBody(body);
     } else {
       const wsNameW = ws?.name || 'getLOG/Lottustech';
-      setWhatsBody(`Olá ${lead.name.split(' ')[0]}, tudo bem?\n\nMeu nome é Danilo, da ${wsNameW}. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar a operação logística de vocês.\n\nPosso te mostrar em 15 minutos como estamos ajudando empresas do mesmo segmento?\n\nQualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
+      setWhatsBody(`Olá ${lead.name.split(' ')[0]}, tudo bem? Sou da ${wsNameW}. Percebo que ${lead.sector ? 'empresas do setor de ' + lead.sector : 'atacadistas'} como a ${lead.company || 'sua empresa'} buscam constantemente otimizar custos logísticos. Nossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas. Que tal explorar como podemos gerar resultados semelhantes para a ${lead.company || 'sua empresa'}? Me diga qual o melhor horário para um bate-papo de 15 minutos. — Danilo Cabral | (41) 99949-9815`);
     }
     setShowWhatsTemplates(false);
   };
@@ -618,28 +618,61 @@ export default function CRM() {
                       }}>
                       {selectedIds.size === filtered.length ? '☑ Desmarcar todos' : '☐ Selecionar todos'}
                     </button>
-                    {selectedIds.size > 0 && (
+                    {selectedIds.size > 0 && (<>
                       <button className="btn btn-primary" style={{ fontSize: 11, padding: '5px 12px', background: '#0066ff' }}
                         disabled={bulkSending}
                         onClick={() => sendBulkEmails(filtered.filter(l => selectedIds.has(l.id)))}>
                         {bulkSending
                           ? `Enviando... ${bulkProgress.done}/${bulkProgress.total}`
-                          : `✉ Enviar e-mail (${selectedIds.size})`}
+                          : `✉ E-mail (${selectedIds.size})`}
                       </button>
-                    )}
+                      <button className="btn" style={{ fontSize: 11, padding: '5px 12px', background: '#25d366', color: '#fff', border: 'none' }}
+                        disabled={bulkSending}
+                        onClick={() => {
+                          const sel = filtered.filter(l => selectedIds.has(l.id));
+                          const withPhone = sel.filter(l => l.whatsapp || l.phone);
+                          if (!withPhone.length) { showToast('Nenhum lead selecionado tem WhatsApp/telefone'); return; }
+                          if (!confirm(`Enviar WhatsApp para ${withPhone.length} lead(s)?`)) return;
+                          withPhone.forEach((lead, i) => {
+                            setTimeout(() => {
+                              const wsNameW = ws?.name || 'getLOG/Lottustech';
+                              const body = encodeURIComponent(`Olá ${lead.name.split(' ')[0]}, tudo bem?
+
+Meu nome é Danilo, da ${wsNameW}. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar a operação logística de vocês.
+
+Posso te mostrar em 15 minutos como estamos ajudando empresas do mesmo segmento?
+
+Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
+                              const num = (lead.whatsapp || lead.phone || '').replace(/\D/g,'');
+                              window.open(`https://wa.me/${num}?text=${body}`, '_blank');
+                            }, i * 800);
+                          });
+                          showToast(`Abrindo WhatsApp para ${withPhone.length} lead(s)...`);
+                        }}>
+                        💬 WhatsApp ({selectedIds.size})
+                      </button>
+                      <button className="btn" style={{ fontSize: 11, padding: '5px 10px', background: 'var(--surface-2)', border: '1px solid var(--border)' }}
+                        onClick={() => setSelectedIds(new Set())}>
+                        ✕ Limpar
+                      </button>
+                    </>)}
                   </div>
                 )}
               </div>
               {filtered.length === 0 ? (
                 <div className="empty-state"><div className="empty-title">Nenhum lead</div><div className="empty-text">Adicione seu primeiro contato</div><button className="btn btn-primary" onClick={() => { setEditing(null); setModalOpen(true); }}><Icon d={ICONS.plus} />Adicionar lead</button></div>
               ) : (
-                <div className="table-wrap"><table className="data"><thead><tr><th>Lead</th><th>Contato</th><th>Status</th><th style={{ textAlign: 'right' }}>Ações</th></tr></thead><tbody>
+                <div className="table-wrap"><table className="data"><thead><tr><th style={{width:32, paddingRight:4}}></th><th>Lead</th><th>Contato</th><th>Status</th><th style={{ textAlign: 'right' }}>Ações</th></tr></thead><tbody>
                   {filtered.map(lead => (
                     <tr key={lead.id} onClick={() => { setLeadPanel(lead); setPanelAnalysis(null); setPanelTab('info'); }}>
+                      <td onClick={e => e.stopPropagation()} style={{paddingRight:4, width:32}}>
+                        <input type="checkbox" checked={selectedIds.has(lead.id)} onChange={e => { e.stopPropagation(); setSelectedIds(prev => { const n = new Set(prev); if (e.target.checked) n.add(lead.id); else n.delete(lead.id); return n; }); }} style={{width:15,height:15,cursor:'pointer',accentColor:'#0066ff'}} />
+                      </td>
                       <td>
                         <div className="cell-primary">{lead.name}</div>
                         <div className="cell-secondary">{lead.company || '—'}{lead.role ? ` · ${lead.role}` : ''}</div>
-                        {(lead.call_count || 0) > 0 && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>📞 {lead.call_count} ligação(ões) · último: {lead.last_contact ? new Date(lead.last_contact).toLocaleDateString('pt-BR') : '—'}</div>}
+                        {lead.last_contact && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>📧 Último contato: {new Date(lead.last_contact).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>}
+                        {(lead.call_count || 0) > 0 && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>📞 {lead.call_count} ligação(ões)</div>}
                       </td>
                       <td>
                         {lead.email && <div className="cell-secondary">{lead.email}</div>}
@@ -950,7 +983,7 @@ export default function CRM() {
                       onClick={() => {
                         const wsName = ws?.name || 'getLOG/Lottustech';
                         setEmailSubject(`Apresentação ${wsName} — Solução TMS para ${emailModal.company || 'sua empresa'}`);
-                        setEmailBody(`Olá ${emailModal.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo, da ${wsName}. Vi que você é ${emailModal.role || 'decisor'} na ${emailModal.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar significativamente a operação logística de vocês.\n\nGostaria de agendar uma conversa rápida de 15 minutos para apresentar os resultados que estamos gerando para empresas do mesmo segmento.\n\nQual seria o melhor horário para você?\n\nAtenciosamente,\nDanilo Cabral\n${wsName}\ndanilo@lottustech.com.br\n(41) 99949-9815`);
+                        setEmailBody(`Olá ${emailModal.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo Cabral, da ${wsName}. Percebo que empresas ${emailModal.sector || 'atacadistas e distribuidoras'} como a ${emailModal.company || 'sua empresa'} buscam constantemente otimizar a operação logística e reduzir custos com frete.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas. Que tal explorar como podemos gerar resultados semelhantes para a ${emailModal.company || 'sua empresa'}?\n\nMe diga qual o melhor horário para um bate-papo de 15 minutos.\n\nAtenciosamente,\nDanilo Cabral\nGerente Comercial | ${wsName}\ndanilo@lottustech.com.br | (41) 99949-9815\nwww.lottustech.com.br`);
                       }}
                     >
                       📝 Padrão
