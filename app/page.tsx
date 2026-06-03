@@ -504,7 +504,7 @@ export default function CRM() {
         </div>
         <div className="sidebar-section">
           <div className="section-label">Navegação</div>
-          {[['leads', 'Leads', ICONS.leads], ['calendar_view', '📅 Calendário', ICONS.calendar], ['search', 'Buscar Leads', ICONS.search2], ['agent', '🤖 Agente IA', ICONS.sparkles], ['templates', 'Templates', ICONS.template], ['bi', 'BI / Prospecção', ICONS.bi], ['sheets', '📊 Google Sheets', ICONS.upload], ['inbox', 'Caixa de Entrada', ICONS.inbox], ['settings', 'Configurações', ICONS.settings]].map(([v, label, ic]) => (
+          {[['leads', 'Leads', ICONS.leads], ['calendar_view', '📅 Calendário', ICONS.calendar], ['search', 'Buscar Leads', ICONS.search2], ['agent', '🤖 Agente IA', ICONS.sparkles], ['templates', 'Templates', ICONS.template], ['bi', 'BI / Prospecção', ICONS.bi], ['sheets', '📊 Google Sheets', ICONS.upload], ['inbox', 'Caixa de Entrada', ICONS.inbox], ['sent', '📤 E-mails Enviados', ICONS.inbox], ['settings', 'Configurações', ICONS.settings]].map(([v, label, ic]) => (
             <button key={v} className={`nav-item${view === v ? ' active' : ''}`} onClick={() => { setView(v as string); setSidebarOpen(false); }}>
               <Icon d={ic as string} /><span>{label}</span>
             </button>
@@ -516,7 +516,7 @@ export default function CRM() {
       <div className="main">
         <header className="topbar">
           <button className="btn menu-toggle" onClick={() => setSidebarOpen(true)}><Icon d='<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>' /></button>
-          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{ws?.name} <span style={{ color: 'var(--text-muted)' }}>/</span> <strong style={{ color: 'var(--text)' }}>{{ leads: 'Leads', calendar_view: 'Calendário', search: 'Buscar Leads', agent: 'Agente de Prospecção', templates: 'Templates', bi: 'BI / Prospecção', sheets: 'Google Sheets', inbox: 'Caixa de Entrada', workspaces: 'Workspaces', settings: 'Configurações' }[view] || view}</strong></span>
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{ws?.name} <span style={{ color: 'var(--text-muted)' }}>/</span> <strong style={{ color: 'var(--text)' }}>{{ leads: 'Leads', calendar_view: 'Calendário', search: 'Buscar Leads', agent: 'Agente de Prospecção', templates: 'Templates', bi: 'BI / Prospecção', sheets: 'Google Sheets', inbox: 'Caixa de Entrada', sent: 'E-mails Enviados', workspaces: 'Workspaces', settings: 'Configurações' }[view] || view}</strong></span>
           <span className={`db-badge ${gmailConfigured ? 'on' : 'off'}`}>{gmailConfigured ? '✉ E-mail ativo' : 'E-mail não configurado'}</span>
         </header>
 
@@ -720,6 +720,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
           )}
 
           {view === 'inbox' && <InboxView workspace={workspace} gmailConfigured={gmailConfigured} leads={leads} showToast={showToast} />}
+          {view === 'sent' && <SentEmailsView workspace={workspace} leads={leads} showToast={showToast} onOpenLead={(lead: Lead) => { setLeadPanel(lead); setPanelAnalysis(null); setPanelTab('timeline'); }} />}
           {view === 'search' && <SearchView workspace={workspace} onImport={async (newLeads: any[]) => {
             const now = Date.now();
             for (const nl of newLeads) {
@@ -1435,6 +1436,183 @@ function CalendarView({ meetings, leads, onOpenLead, onSchedule }: any) {
     </div>
   );
 }
+// ---------- E-mails Enviados ----------
+function SentEmailsView({ workspace, leads, showToast, onOpenLead }: any) {
+  const [emails, setEmails] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [search, setSearch] = React.useState('');
+  const [selected, setSelected] = React.useState<any>(null);
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/sent-emails?workspace=${workspace}&search=${encodeURIComponent(search)}&limit=300`);
+      const d = await r.json();
+      if (d.ok) setEmails(d.emails || []);
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, [workspace, search]);
+
+  React.useEffect(() => { load(); }, [load]);
+
+  const grouped = React.useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    for (const e of emails) {
+      const day = new Date(e.ts).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+      if (!groups[day]) groups[day] = [];
+      groups[day].push(e);
+    }
+    return groups;
+  }, [emails]);
+
+  return (
+    <div style={{ display: 'flex', gap: 0, height: 'calc(100vh - 56px)', overflow: 'hidden' }}>
+      {/* Lista de e-mails */}
+      <div style={{ width: selected ? 380 : '100%', minWidth: 320, borderRight: selected ? '1px solid var(--border)' : 'none', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Header */}
+        <div style={{ padding: '20px 20px 12px', borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div>
+              <div className="page-title" style={{ fontSize: 18 }}>📤 E-mails Enviados</div>
+              <div className="page-description">{loading ? 'Carregando...' : `${emails.length} e-mail(s) disparado(s)`}</div>
+            </div>
+            <button className="btn" style={{ fontSize: 11, padding: '5px 10px' }} onClick={load}>↻ Atualizar</button>
+          </div>
+          <input
+            className="search-input"
+            placeholder="Buscar por nome, empresa, assunto..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ width: '100%', fontSize: 13 }}
+          />
+        </div>
+
+        {/* Lista */}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {loading ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Carregando e-mails...</div>
+          ) : emails.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Nenhum e-mail enviado ainda</div>
+              <div style={{ fontSize: 12 }}>Os e-mails disparados pelo CRM aparecerão aqui</div>
+            </div>
+          ) : (
+            Object.entries(grouped).map(([day, dayEmails]) => (
+              <div key={day}>
+                <div style={{ padding: '8px 16px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  {day}
+                </div>
+                {dayEmails.map((email: any) => (
+                  <div
+                    key={email.id}
+                    onClick={() => setSelected(selected?.id === email.id ? null : email)}
+                    style={{
+                      padding: '12px 16px',
+                      borderBottom: '1px solid var(--border)',
+                      cursor: 'pointer',
+                      background: selected?.id === email.id ? 'var(--primary-light, #eff6ff)' : 'var(--surface)',
+                      borderLeft: selected?.id === email.id ? '3px solid #0066ff' : '3px solid transparent',
+                      transition: 'background 0.15s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text)', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {email.leadName || '(sem nome)'}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {email.leadCompany}{email.leadRole ? ` · ${email.leadRole}` : ''}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {email.subject}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>
+                          ✉ {email.leadEmail || '(sem e-mail)'}
+                        </div>
+                      </div>
+                      <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {new Date(email.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                        {email.opened && (
+                          <div style={{ fontSize: 10, color: '#16a34a', marginTop: 2, fontWeight: 600 }}>✓ Aberto</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Painel de detalhe */}
+      {selected && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface)' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 2 }}>{selected.subject}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                Para: <strong>{selected.leadName}</strong> &lt;{selected.leadEmail}&gt;
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                {new Date(selected.ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                {selected.opened && <span style={{ marginLeft: 8, color: '#16a34a', fontWeight: 600 }}>✓ E-mail aberto</span>}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              <button className="btn btn-primary" style={{ fontSize: 11, padding: '5px 12px' }}
+                onClick={() => {
+                  const lead = leads.find((l: any) => l.id === selected.leadId);
+                  if (lead) onOpenLead(lead);
+                  else showToast('Lead não encontrado');
+                }}>
+                Ver lead
+              </button>
+              <button className="btn" style={{ fontSize: 11, padding: '5px 10px' }} onClick={() => setSelected(null)}>✕</button>
+            </div>
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+            <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: 16, marginBottom: 16, fontSize: 13 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>DESTINATÁRIO</div>
+                  <div style={{ fontWeight: 600 }}>{selected.leadName}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{selected.leadRole}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>EMPRESA</div>
+                  <div style={{ fontWeight: 600 }}>{selected.leadCompany || '—'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>E-MAIL</div>
+                  <div style={{ fontSize: 12 }}>{selected.leadEmail || '—'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>STATUS</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: selected.opened ? '#16a34a' : 'var(--text-muted)' }}>
+                    {selected.opened ? '✓ Aberto' : '📤 Enviado'}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style={{ background: 'var(--surface-2)', borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600 }}>ASSUNTO</div>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>{selected.subject}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8, fontWeight: 600 }}>MENSAGEM REGISTRADA</div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, whiteSpace: 'pre-wrap', fontStyle: 'italic' }}>
+                (O corpo do e-mail não é armazenado por privacidade — apenas o assunto e data/hora ficam registrados na timeline do lead.)
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------- Caixa de Entrada ----------
 function InboxView({ workspace, gmailConfigured, leads, showToast }: any) {
   const [compose, setCompose] = useState({ to: '', subject: '', body: '' });
