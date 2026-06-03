@@ -353,7 +353,7 @@ export default function CRM() {
     } else {
       const wsName = ws?.name || 'getLOG/Lottustech';
       setEmailSubject(`Apresentação ${wsName} — Solução TMS para ${lead.company || 'sua empresa'}`);
-      setEmailBody(`Olá ${lead.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo Cabral, da ${wsName}. Percebo que empresas ${lead.sector || 'atacadistas e distribuidoras'} como a ${lead.company || 'sua empresa'} buscam constantemente otimizar a operação logística e reduzir custos com frete.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas. Que tal explorar como podemos gerar resultados semelhantes para a ${lead.company || 'sua empresa'}?\n\nMe diga qual o melhor horário para um bate-papo de 15 minutos.\n\nAtenciosamente,\nDanilo Cabral\nGerente Comercial | ${wsName}\ndanilo@lottustech.com.br | (41) 99949-9815\nwww.lottustech.com.br`);
+      setEmailBody(`Olá ${lead.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo Cabral, da ${wsName}. Percebo que empresas ${(lead as any).sector || 'atacadistas e distribuidoras'} como a ${lead.company || 'sua empresa'} buscam constantemente otimizar a operação logística e reduzir custos com frete.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas. Que tal explorar como podemos gerar resultados semelhantes para a ${lead.company || 'sua empresa'}?\n\nMe diga qual o melhor horário para um bate-papo de 15 minutos.\n\nAtenciosamente,\nDanilo Cabral\nGerente Comercial | ${wsName}\ndanilo@lottustech.com.br | (41) 99949-9815\nwww.lottustech.com.br`);
     }
     setShowEmailTemplates(false);
   };
@@ -366,7 +366,7 @@ export default function CRM() {
       setWhatsBody(body);
     } else {
       const wsNameW = ws?.name || 'getLOG/Lottustech';
-      setWhatsBody(`Olá ${lead.name.split(' ')[0]}, tudo bem? Sou da ${wsNameW}. Percebo que ${lead.sector ? 'empresas do setor de ' + lead.sector : 'atacadistas'} como a ${lead.company || 'sua empresa'} buscam constantemente otimizar custos logísticos. Nossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas. Que tal explorar como podemos gerar resultados semelhantes para a ${lead.company || 'sua empresa'}? Me diga qual o melhor horário para um bate-papo de 15 minutos. — Danilo Cabral | (41) 99949-9815`);
+      setWhatsBody(`Olá ${lead.name.split(' ')[0]}, tudo bem? Sou da ${wsNameW}. Percebo que ${(lead as any).sector ? 'empresas do setor de ' + (lead as any).sector : 'atacadistas'} como a ${lead.company || 'sua empresa'} buscam constantemente otimizar custos logísticos. Nossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas. Que tal explorar como podemos gerar resultados semelhantes para a ${lead.company || 'sua empresa'}? Me diga qual o melhor horário para um bate-papo de 15 minutos. — Danilo Cabral | (41) 99949-9815`);
     }
     setShowWhatsTemplates(false);
   };
