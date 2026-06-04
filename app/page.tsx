@@ -80,6 +80,9 @@ export default function CRM() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [wsListOpen, setWsListOpen] = useState(false);
+  const [wsPassModal, setWsPassModal] = useState<string | null>(null); // workspace id a trocar
+  const [wsPassInput, setWsPassInput] = useState('');
+  const WS_PASSWORD = 'lottus2025';
   const [enriching, setEnriching] = useState<string | null>(null);
   const [enrichingAll, setEnrichingAll] = useState(false);
   const [enrichProgress, setEnrichProgress] = useState({ done: 0, total: 0 });
@@ -491,7 +494,7 @@ export default function CRM() {
           {wsListOpen && (
             <div style={{ borderLeft: '2px solid var(--border)', marginLeft: 10, paddingLeft: 6 }}>
               {workspaces.filter(w => w.id !== workspace).map(w => (
-                <button key={w.id} className="ws-item" onClick={() => { setWorkspace(w.id); loadTemplates(w.id); setSidebarOpen(false); setWsListOpen(false); }}>
+                <button key={w.id} className="ws-item" onClick={() => { setWsPassModal(w.id); setWsPassInput(''); }}>
                   <span className="ws-dot" style={{ background: w.color }} />
                   <span>{w.name}</span>
                 </button>
@@ -504,7 +507,7 @@ export default function CRM() {
         </div>
         <div className="sidebar-section">
           <div className="section-label">Navegação</div>
-          {[['leads', 'Leads', ICONS.leads], ['calendar_view', '📅 Calendário', ICONS.calendar], ['search', 'Buscar Leads', ICONS.search2], ['agent', '🤖 Agente IA', ICONS.sparkles], ['templates', 'Templates', ICONS.template], ['bi', 'BI / Prospecção', ICONS.bi], ['sheets', '📊 Google Sheets', ICONS.upload], ['inbox', 'Caixa de Entrada', ICONS.inbox], ['sent', '📤 E-mails Enviados', ICONS.inbox], ['settings', 'Configurações', ICONS.settings]].map(([v, label, ic]) => (
+          {[['dashboard', '📊 Dashboard', ICONS.bi], ['leads', 'Leads', ICONS.leads], ['calendar_view', '📅 Calendário', ICONS.calendar], ['search', 'Buscar Leads', ICONS.search2], ['agent', '🤖 Agente IA', ICONS.sparkles], ['templates', 'Templates', ICONS.template], ['bi', 'BI / Prospecção', ICONS.bi], ['sheets', '📊 Google Sheets', ICONS.upload], ['inbox', 'Caixa de Entrada', ICONS.inbox], ['sent', '📤 E-mails Enviados', ICONS.inbox], ['settings', 'Configurações', ICONS.settings]].map(([v, label, ic]) => (
             <button key={v} className={`nav-item${view === v ? ' active' : ''}`} onClick={() => { setView(v as string); setSidebarOpen(false); }}>
               <Icon d={ic as string} /><span>{label}</span>
             </button>
@@ -516,7 +519,7 @@ export default function CRM() {
       <div className="main">
         <header className="topbar">
           <button className="btn menu-toggle" onClick={() => setSidebarOpen(true)}><Icon d='<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>' /></button>
-          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{ws?.name} <span style={{ color: 'var(--text-muted)' }}>/</span> <strong style={{ color: 'var(--text)' }}>{{ leads: 'Leads', calendar_view: 'Calendário', search: 'Buscar Leads', agent: 'Agente de Prospecção', templates: 'Templates', bi: 'BI / Prospecção', sheets: 'Google Sheets', inbox: 'Caixa de Entrada', sent: 'E-mails Enviados', workspaces: 'Workspaces', settings: 'Configurações' }[view] || view}</strong></span>
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{ws?.name} <span style={{ color: 'var(--text-muted)' }}>/</span> <strong style={{ color: 'var(--text)' }}>{{ dashboard: 'Dashboard', leads: 'Leads', calendar_view: 'Calendário', search: 'Buscar Leads', agent: 'Agente de Prospecção', templates: 'Templates', bi: 'BI / Prospecção', sheets: 'Google Sheets', inbox: 'Caixa de Entrada', sent: 'E-mails Enviados', workspaces: 'Workspaces', settings: 'Configurações' }[view] || view}</strong></span>
           <span className={`db-badge ${gmailConfigured ? 'on' : 'off'}`}>{gmailConfigured ? '✉ E-mail ativo' : 'E-mail não configurado'}</span>
         </header>
 
@@ -719,6 +722,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
             </>
           )}
 
+          {view === 'dashboard' && <DashboardView leads={leads} workspace={workspace} wsName={ws?.name || ''} />}
           {view === 'inbox' && <InboxView workspace={workspace} gmailConfigured={gmailConfigured} leads={leads} showToast={showToast} />}
           {view === 'sent' && <SentEmailsView workspace={workspace} leads={leads} showToast={showToast} onOpenLead={(lead: Lead) => { setLeadPanel(lead); setPanelAnalysis(null); setPanelTab('timeline'); }} />}
           {view === 'search' && <SearchView workspace={workspace} onImport={async (newLeads: any[]) => {
@@ -1242,6 +1246,52 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
           </div>
         </div>
       )}
+      {/* MODAL SENHA WORKSPACE */}
+      {wsPassModal && (
+        <div className="modal-bg" onClick={() => setWsPassModal(null)}>
+          <div className="modal" style={{ maxWidth: 360 }} onClick={(e: any) => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-title">🔒 Trocar de Workspace</span>
+              <button className="modal-close" onClick={() => setWsPassModal(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 14 }}>Digite a senha para acessar outro workspace.</p>
+              <div className="field">
+                <label className="field-label">Senha</label>
+                <input
+                  className="field-input"
+                  type="password"
+                  placeholder="••••••••"
+                  value={wsPassInput}
+                  onChange={(e: any) => setWsPassInput(e.target.value)}
+                  onKeyDown={(e: any) => {
+                    if (e.key === 'Enter') {
+                      if (wsPassInput === WS_PASSWORD) {
+                        const targetId = wsPassModal!;
+                        setWorkspace(targetId); loadTemplates(targetId);
+                        setSidebarOpen(false); setWsListOpen(false);
+                        setWsPassModal(null); setWsPassInput('');
+                      } else { alert('Senha incorreta!'); setWsPassInput(''); }
+                    }
+                  }}
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn" onClick={() => setWsPassModal(null)}>Cancelar</button>
+              <button className="btn btn-primary" onClick={() => {
+                if (wsPassInput === WS_PASSWORD) {
+                  const targetId = wsPassModal!;
+                  setWorkspace(targetId); loadTemplates(targetId);
+                  setSidebarOpen(false); setWsListOpen(false);
+                  setWsPassModal(null); setWsPassInput('');
+                } else { alert('Senha incorreta!'); setWsPassInput(''); }
+              }}>Entrar</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className={`toast${toast ? ' show' : ''}`}>{toast}</div>
     </div>
   );
@@ -1436,6 +1486,180 @@ function CalendarView({ meetings, leads, onOpenLead, onSchedule }: any) {
     </div>
   );
 }
+// ---------- Dashboard ----------
+function DashboardView({ leads, workspace, wsName }: { leads: any[], workspace: string, wsName: string }) {
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+
+  // Extrair todos os eventos da timeline de todos os leads
+  const allEvents: any[] = [];
+  for (const lead of leads) {
+    const tl = JSON.parse(lead.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+    for (const ev of tl) {
+      allEvents.push({ ...ev, leadName: lead.name, leadCompany: lead.company, leadId: lead.id });
+    }
+  }
+
+  // Contadores de hoje
+  const todayEvents = allEvents.filter(ev => {
+    if (!ev.ts) return false;
+    return new Date(ev.ts).toISOString().slice(0, 10) === todayStr;
+  });
+  const todayEmails = todayEvents.filter(ev => ev.type === 'email').length;
+  const todayCalls = todayEvents.filter(ev => ev.type === 'call').length;
+  const todayWhats = todayEvents.filter(ev => ev.type === 'whatsapp').length;
+  const todayTotal = todayEmails + todayCalls + todayWhats;
+
+  // Últimos 7 dias
+  const days7: { label: string; date: string; emails: number; calls: number; whats: number; total: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const ds = d.toISOString().slice(0, 10);
+    const dayEvs = allEvents.filter(ev => ev.ts && new Date(ev.ts).toISOString().slice(0, 10) === ds);
+    days7.push({
+      label: i === 0 ? 'Hoje' : d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', ''),
+      date: ds,
+      emails: dayEvs.filter(ev => ev.type === 'email').length,
+      calls: dayEvs.filter(ev => ev.type === 'call').length,
+      whats: dayEvs.filter(ev => ev.type === 'whatsapp').length,
+      total: dayEvs.filter(ev => ['email','call','whatsapp'].includes(ev.type)).length,
+    });
+  }
+  const maxVal = Math.max(...days7.map(d => d.total), 1);
+
+  // Funil
+  const funnel = [
+    { label: 'Prospecção', count: leads.filter(l => ['prospeccao','novo'].includes(l.status)).length, color: '#6b7280' },
+    { label: 'Qualificação', count: leads.filter(l => l.status === 'qualificacao').length, color: '#f59e0b' },
+    { label: 'Apresentação', count: leads.filter(l => l.status === 'apresentacao').length, color: '#3b82f6' },
+    { label: 'Fechamento', count: leads.filter(l => l.status === 'fechamento').length, color: '#8b5cf6' },
+    { label: 'Pós-venda', count: leads.filter(l => l.status === 'posvenda').length, color: '#10b981' },
+  ];
+  const funnelMax = Math.max(...funnel.map(f => f.count), 1);
+
+  // Últimas atividades
+  const recentEvs = allEvents
+    .filter(ev => ['email','call','whatsapp'].includes(ev.type) && ev.ts)
+    .sort((a, b) => b.ts - a.ts)
+    .slice(0, 8);
+
+  const typeIcon: any = { email: '✉', call: '📞', whatsapp: '💬', enrich: '⚙', status: '→', meeting: '📅' };
+  const typeColor: any = { email: '#1a56db', call: '#0066ff', whatsapp: '#25D366' };
+
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <div className="page-title">📊 Dashboard</div>
+          <div className="page-description">{wsName} — Desempenho de prospecção</div>
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+          {today.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+        </div>
+      </div>
+
+      {/* Cards do dia */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+        {[
+          { label: 'Atividades Hoje', value: todayTotal, color: '#0066ff', bg: '#eff6ff', icon: '⚡' },
+          { label: 'E-mails Enviados', value: todayEmails, color: '#1a56db', bg: '#eff6ff', icon: '✉' },
+          { label: 'Ligações Feitas', value: todayCalls, color: '#7c3aed', bg: '#f5f3ff', icon: '📞' },
+          { label: 'WhatsApp Enviados', value: todayWhats, color: '#059669', bg: '#ecfdf5', icon: '💬' },
+        ].map(card => (
+          <div key={card.label} style={{ background: card.bg, border: `1px solid ${card.color}22`, borderRadius: 10, padding: '16px 18px', borderTop: `3px solid ${card.color}` }}>
+            <div style={{ fontSize: 20, marginBottom: 4 }}>{card.icon}</div>
+            <div style={{ fontSize: 28, fontWeight: 700, color: card.color, letterSpacing: '-0.02em' }}>{card.value}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 500, marginTop: 2 }}>{card.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+        {/* Gráfico de barras — últimos 7 dias */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 20 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 16 }}>Atividades — Últimos 7 dias</div>
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 120 }}>
+            {days7.map(d => (
+              <div key={d.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>{d.total > 0 ? d.total : ''}</div>
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 1, borderRadius: 4, overflow: 'hidden' }}>
+                  {d.emails > 0 && <div style={{ height: Math.round((d.emails / maxVal) * 80), background: '#1a56db', minHeight: 3 }} title={`${d.emails} e-mails`} />}
+                  {d.calls > 0 && <div style={{ height: Math.round((d.calls / maxVal) * 80), background: '#7c3aed', minHeight: 3 }} title={`${d.calls} ligações`} />}
+                  {d.whats > 0 && <div style={{ height: Math.round((d.whats / maxVal) * 80), background: '#25D366', minHeight: 3 }} title={`${d.whats} WhatsApp`} />}
+                  {d.total === 0 && <div style={{ height: 4, background: 'var(--border)', borderRadius: 4 }} />}
+                </div>
+                <div style={{ fontSize: 10, color: d.date === todayStr ? '#0066ff' : 'var(--text-muted)', fontWeight: d.date === todayStr ? 700 : 400 }}>{d.label}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 12, marginTop: 12, fontSize: 11, color: 'var(--text-secondary)' }}>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#1a56db', borderRadius: 2, marginRight: 4 }} />E-mail</span>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#7c3aed', borderRadius: 2, marginRight: 4 }} />Ligação</span>
+            <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#25D366', borderRadius: 2, marginRight: 4 }} />WhatsApp</span>
+          </div>
+        </div>
+
+        {/* Funil de vendas */}
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 20 }}>
+          <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 16 }}>Funil de Vendas</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {funnel.map((f, i) => (
+              <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 90, fontSize: 12, color: 'var(--text-secondary)', textAlign: 'right', flexShrink: 0 }}>{f.label}</div>
+                <div style={{ flex: 1, background: 'var(--surface-2)', borderRadius: 4, height: 22, overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${Math.max((f.count / funnelMax) * 100, f.count > 0 ? 8 : 0)}%`,
+                    height: '100%', background: f.color, borderRadius: 4,
+                    display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 6,
+                    transition: 'width 0.4s ease'
+                  }}>
+                    {f.count > 0 && <span style={{ fontSize: 11, color: 'white', fontWeight: 600 }}>{f.count}</span>}
+                  </div>
+                </div>
+                {f.count === 0 && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>0</span>}
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 8, fontSize: 12 }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Total de leads: </span>
+            <strong>{leads.length}</strong>
+            {funnel[4].count > 0 && <span style={{ marginLeft: 12, color: '#10b981' }}>✓ {funnel[4].count} convertido(s)</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Últimas atividades */}
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 20 }}>
+        <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 14 }}>Últimas Atividades</div>
+        {recentEvs.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+            Nenhuma atividade registrada ainda. Envie um e-mail ou faça uma ligação para começar.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {recentEvs.map((ev, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < recentEvs.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: `${typeColor[ev.type] || '#6b7280'}18`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>
+                  {typeIcon[ev.type] || '•'}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.leadName} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>— {ev.leadCompany}</span></div>
+                  <div style={{ fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ev.label}</div>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>
+                  {ev.ts ? new Date(ev.ts).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 // ---------- E-mails Enviados ----------
 function SentEmailsView({ workspace, leads, showToast, onOpenLead }: any) {
   const [emails, setEmails] = React.useState<any[]>([]);
