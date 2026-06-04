@@ -514,7 +514,7 @@ export default function CRM() {
             <>
               <div className="page-header">
                 <div><div className="page-title">Leads</div><div className="page-description">{ws?.name} · {leads.length} contato(s)</div></div>
-                <div className="page-actions">
+                <div className="page-actions mobile-actions">
                   <button className="btn" style={{background:'#f59e0b',color:'#fff',border:'none',marginRight:8,fontSize:12,padding:'6px 12px',borderRadius:6,cursor:'pointer',opacity:enrichingAll?0.6:1}} disabled={enrichingAll} onClick={async () => {
                     const toEnrich = leads.filter(l => !l.phone && l.company);
                     if (!toEnrich.length) { showToast('Todos os leads já têm telefone!'); return; }
@@ -571,16 +571,16 @@ export default function CRM() {
                 </div>
               </div>
               {/* Funil de vendas — 5 etapas */}
-              <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                <div className="stat" style={{ cursor: 'pointer', flex: '1 1 80px', borderBottom: statusFilter === 'all' ? '3px solid #475467' : '3px solid transparent' }} onClick={() => setStatusFilter('all')}>
+              <div className="stats">
+                <div className="stat" style={{ cursor: 'pointer', borderBottom: statusFilter === 'all' ? '3px solid #475467' : '3px solid transparent' }} onClick={() => setStatusFilter('all')}>
                   <div className="stat-label"><span className="stat-dot" style={{ background: '#475467' }} />Total</div><div className="stat-value">{stats.total}</div>
                 </div>
-                <div className="stat" style={{ cursor: 'pointer', flex: '1 1 80px', borderBottom: '3px solid #0066ff', background: '#eff6ff' }} onClick={() => setView('calendar_view')}>
+                <div className="stat" style={{ cursor: 'pointer', borderBottom: '3px solid #0066ff', background: '#eff6ff' }} onClick={() => setView('calendar_view')}>
                   <div className="stat-label"><span className="stat-dot" style={{ background: '#0066ff' }} />Reuniões</div>
                   <div className="stat-value" style={{ color: '#0066ff' }}>{stats.reunioes}</div>
                 </div>
                 {FUNNEL.map(f => (
-                  <div key={f.id} className="stat" style={{ cursor: 'pointer', flex: '1 1 80px', borderBottom: statusFilter === f.id ? `3px solid ${f.color}` : '3px solid transparent' }} onClick={() => setStatusFilter(f.id)}>
+                  <div key={f.id} className="stat" style={{ cursor: 'pointer', borderBottom: statusFilter === f.id ? `3px solid ${f.color}` : '3px solid transparent' }} onClick={() => setStatusFilter(f.id)}>
                     <div className="stat-label"><span className="stat-dot" style={{ background: f.color }} />{f.short}</div>
                     <div className="stat-value" style={{ color: f.color }}>{(stats as any)[f.id] || 0}</div>
                   </div>
