@@ -1303,6 +1303,24 @@ function CalendarView({ meetings, leads, onOpenLead, onSchedule }: any) {
   const [curYear, setCurYear] = useState(now.getFullYear());
   const [curMonth, setCurMonth] = useState(now.getMonth()); // 0-indexed
   const [selectedDay, setSelectedDay] = useState<string | null>(todayStr);
+  const [metaReuniao, setMetaReuniao] = useState(() => {
+    if (typeof window !== 'undefined') return Number(localStorage.getItem('meta_reuniao_semana') || '5');
+    return 5;
+  });
+  const [editingMeta, setEditingMeta] = useState(false);
+  const [metaInput, setMetaInput] = useState('');
+
+  // Calcular reuniões desta semana (seg a dom)
+  const getWeekStart = (d: Date) => { const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); return new Date(d.setDate(diff)); };
+  const weekStart = getWeekStart(new Date());
+  const weekStartStr = weekStart.toISOString().slice(0, 10);
+  const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6);
+  const weekEndStr = weekEnd.toISOString().slice(0, 10);
+  const reunioesSemana = meetings.filter((m: any) => {
+    const match = m.label?.match(/(\d{2}\/(\d{2})\/(\d{4}))/);
+    const dateKey = match ? match[1].split('/').reverse().join('-') : new Date(m.ts).toISOString().slice(0, 10);
+    return dateKey >= weekStartStr && dateKey <= weekEndStr;
+  }).length;
 
   // Agrupa reuniões por data (YYYY-MM-DD)
   const grouped: Record<string, any[]> = {};
@@ -1381,6 +1399,43 @@ function CalendarView({ meetings, leads, onOpenLead, onSchedule }: any) {
         <button className="btn btn-primary" style={{ gap: 6 }} onClick={() => onSchedule && onSchedule()}>
           + Nova Reunião
         </button>
+      </div>
+
+      {/* Meta de reuniões por semana */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 20px', marginBottom: 20 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>🎯 Meta de Reuniões — Esta Semana</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {editingMeta ? (
+                <>
+                  <input type="number" min={1} max={50} value={metaInput}
+                    onChange={(e: any) => setMetaInput(e.target.value)}
+                    style={{ width: 60, padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)', fontSize: 13, textAlign: 'center' }}
+                    onKeyDown={(e: any) => { if (e.key === 'Enter') { const v = Number(metaInput); if (v > 0) { setMetaReuniao(v); localStorage.setItem('meta_reuniao_semana', String(v)); } setEditingMeta(false); } }}
+                    autoFocus
+                  />
+                  <button className="btn btn-sm" style={{ background: '#0066ff', color: 'white', border: 'none', fontSize: 11 }} onClick={() => { const v = Number(metaInput); if (v > 0) { setMetaReuniao(v); localStorage.setItem('meta_reuniao_semana', String(v)); } setEditingMeta(false); }}>✓</button>
+                  <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => setEditingMeta(false)}>✕</button>
+                </>
+              ) : (
+                <button className="btn btn-sm" style={{ fontSize: 11 }} onClick={() => { setMetaInput(String(metaReuniao)); setEditingMeta(true); }}>✏ Editar meta</button>
+              )}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ flex: 1, background: 'var(--surface-2)', borderRadius: 8, height: 16, overflow: 'hidden' }}>
+              <div style={{ width: `${Math.min((reunioesSemana / metaReuniao) * 100, 100)}%`, height: '100%', background: reunioesSemana >= metaReuniao ? '#10b981' : '#0066ff', borderRadius: 8, transition: 'width 0.4s ease', minWidth: reunioesSemana > 0 ? 16 : 0 }} />
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: reunioesSemana >= metaReuniao ? '#10b981' : '#0066ff', flexShrink: 0 }}>
+              {reunioesSemana} / {metaReuniao}
+            </div>
+            {reunioesSemana >= metaReuniao && <span style={{ fontSize: 13, color: '#10b981', fontWeight: 700 }}>🏆 Meta atingida!</span>}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+            Semana de {weekStart.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} a {weekEnd.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+          </div>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start' }}>
