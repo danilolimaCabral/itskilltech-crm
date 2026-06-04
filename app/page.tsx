@@ -483,27 +483,13 @@ export default function CRM() {
         <div className="sidebar-section">
           {/* Workspace ativo sempre visível */}
           {workspaces.filter(w => w.id === workspace).map(w => (
-            <button key={w.id} className="ws-item active" onClick={() => setWsListOpen(o => !o)}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start' }}>
+            <button key={w.id} className="ws-item active"
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start', cursor: 'default' }}>
               <span className="ws-dot" style={{ background: w.color }} />
               <span style={{ flex: 1, textAlign: 'left' }}>{w.name}</span>
-              <span style={{ fontSize: 10, opacity: 0.6, flexShrink: 0 }}>{wsListOpen ? '▲' : '▼'}</span>
             </button>
           ))}
-          {/* Lista recolhível dos outros workspaces */}
-          {wsListOpen && (
-            <div style={{ borderLeft: '2px solid var(--border)', marginLeft: 10, paddingLeft: 6 }}>
-              {workspaces.filter(w => w.id !== workspace).map(w => (
-                <button key={w.id} className="ws-item" onClick={() => { setWsPassModal(w.id); setWsPassInput(''); }}>
-                  <span className="ws-dot" style={{ background: w.color }} />
-                  <span>{w.name}</span>
-                </button>
-              ))}
-              <button className="ws-item" style={{ opacity: 0.6, fontSize: 12 }} onClick={() => { setView('workspaces'); setSidebarOpen(false); setWsListOpen(false); }}>
-                <Icon d={ICONS.plus} /><span>Novo workspace</span>
-              </button>
-            </div>
-          )}
+          {/* Outros workspaces ocultos — acesso via Configurações */}
         </div>
         <div className="sidebar-section">
           <div className="section-label">Navegação</div>
