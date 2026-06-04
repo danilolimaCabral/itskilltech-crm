@@ -1,6 +1,5 @@
 'use client';
-
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { TemplatesView, BIView } from './templates-bi-views';
 import { AgentView } from './agent-view';
 
@@ -707,7 +706,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                 </tbody></table></div>
               {/* CARDS MOBILE — visível apenas no mobile via CSS */}
               <div className="lead-cards">
-                {paged.map((lead: Lead) => {
+                {filtered.map((lead: Lead) => {
                   const f = FUNNEL_MAP[normalizeStatus(lead.status)];
                   return (
                     <div key={lead.id} className="lead-card" onClick={() => { setLeadPanel(lead); setPanelAnalysis(null); setPanelTab('timeline'); }}>
