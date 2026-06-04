@@ -514,7 +514,7 @@ export default function CRM() {
           ))}
         </div>
       </aside>
-      {sidebarOpen && <div onClick={() => setSidebarOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 150 }} />}
+      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
 
       <div className="main">
         <header className="topbar">
@@ -665,6 +665,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
               {filtered.length === 0 ? (
                 <div className="empty-state"><div className="empty-title">Nenhum lead</div><div className="empty-text">Adicione seu primeiro contato</div><button className="btn btn-primary" onClick={() => { setEditing(null); setModalOpen(true); }}><Icon d={ICONS.plus} />Adicionar lead</button></div>
               ) : (
+                <>
                 <div className="table-wrap"><table className="data"><thead><tr><th style={{width:32, paddingRight:4}}></th><th>Lead</th><th>Contato</th><th>Status</th><th style={{ textAlign: 'right' }}>Ações</th></tr></thead><tbody>
                   {filtered.map(lead => (
                     <tr key={lead.id} onClick={() => { setLeadPanel(lead); setPanelAnalysis(null); setPanelTab('info'); }}>
@@ -718,10 +719,43 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                     </tr>
                   ))}
                 </tbody></table></div>
+              {/* CARDS MOBILE — visível apenas no mobile via CSS */}
+              <div className="lead-cards">
+                {paged.map((lead: Lead) => {
+                  const f = FUNNEL_MAP[normalizeStatus(lead.status)];
+                  return (
+                    <div key={lead.id} className="lead-card" onClick={() => { setLeadPanel(lead); setPanelAnalysis(null); setPanelTab('timeline'); }}>
+                      <div className="lead-card-header">
+                        <div className="lead-card-check" onClick={e => e.stopPropagation()}>
+                          <input type="checkbox" checked={selectedIds.has(lead.id)} onChange={e => { const s = new Set(selectedIds); e.target.checked ? s.add(lead.id) : s.delete(lead.id); setSelectedIds(s); }} style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                        </div>
+                        <div className="lead-card-info">
+                          <div className="lead-card-name">{lead.name}</div>
+                          <div className="lead-card-company">{lead.company}{lead.role ? ` · ${lead.role}` : ''}</div>
+                        </div>
+                        {f && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: f.bg, color: f.color, border: `1px solid ${f.color}33`, whiteSpace: 'nowrap', flexShrink: 0 }}><span style={{ width: 5, height: 5, borderRadius: '50%', background: f.color }} />{f.short}</span>}
+                      </div>
+                      <div className="lead-card-contact">
+                        {lead.email && <span>✉ {lead.email}</span>}
+                        {(lead.whatsapp || lead.phone) && <span>📱 {lead.whatsapp || lead.phone}</span>}
+                        {lead.last_contact && <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Último: {new Date(lead.last_contact).toLocaleDateString('pt-BR')}</span>}
+                      </div>
+                      <div className="lead-card-actions" onClick={e => e.stopPropagation()}>
+                        <button className="ch-icon enrich-btn" title="Enriquecer" disabled={!!enriching} onClick={() => enrichLead(lead)}><Icon d={ICONS.enrich} /></button>
+                        <button className="ch-icon" title="Agendar" style={{color:'#0066ff'}} onClick={() => { setCalModal(lead); setCalGuestEmail(lead.email || ''); setCalTitle(`Reunião com ${lead.name}`); setCalDescription(''); setCalDate(new Date().toISOString().slice(0,10)); setCalSlots([]); setCalSelectedSlot(''); }}><Icon d={ICONS.calendar} /></button>
+                        <button className="ch-icon phone-btn" title="Ligar" onClick={() => { setCallModal(lead); setCallResult(''); setCallNotes(''); }}><Icon d={ICONS.phone} /></button>
+                        <button className="ch-icon email-btn" title="E-mail" onClick={() => openEmailModal(lead)}><Icon d={ICONS.email} /></button>
+                        <button className="ch-icon" title="Observações" style={{ color: (lead.notes||'').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g,'').trim() ? '#f59e0b' : 'var(--text-muted)' }} onClick={() => { const cleanNotes = (lead.notes||'').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g,'').trim(); setNoteModal(lead); setNoteText(cleanNotes); }}><Icon d={ICONS.note} /></button>
+                        <button className="ch-icon whatsapp-btn" title="WhatsApp" onClick={() => openWhatsModal(lead)}><Icon d={ICONS.whatsapp} /></button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+                </>
               )}
             </>
           )}
-
           {view === 'dashboard' && <DashboardView leads={leads} workspace={workspace} wsName={ws?.name || ''} />}
           {view === 'inbox' && <InboxView workspace={workspace} gmailConfigured={gmailConfigured} leads={leads} showToast={showToast} />}
           {view === 'sent' && <SentEmailsView workspace={workspace} leads={leads} showToast={showToast} onOpenLead={(lead: Lead) => { setLeadPanel(lead); setPanelAnalysis(null); setPanelTab('timeline'); }} />}
