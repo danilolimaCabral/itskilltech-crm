@@ -102,7 +102,7 @@ export default function CRM() {
   const [whatsModal, setWhatsModal] = useState<Lead | null>(null);
   const [whatsBody, setWhatsBody] = useState('');
   const [sendingWhats, setSendingWhats] = useState(false);
-  const [zapiConfigured, setZapiConfigured] = useState(false);
+  const [zapiConfigured, setZapiConfigured] = useState(false); // Z-API desativada temporariamente
   // Painel lateral de lead
   const [leadPanel, setLeadPanel] = useState<Lead | null>(null);
   const [panelAnalysis, setPanelAnalysis] = useState<any>(null);
@@ -203,7 +203,7 @@ export default function CRM() {
       try {
         const r = await fetch('/api/whatsapp?action=status');
         const j = await r.json();
-        setZapiConfigured(!!j.configured);
+        setZapiConfigured(false); // Z-API desativada temporariamente
       } catch { setZapiConfigured(false); }
     })();
     const params = new URLSearchParams(window.location.search);
@@ -697,7 +697,19 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                           <Icon d={ICONS.note} />
                         </button>
                         {/* WhatsApp */}
-                        <button className="ch-icon whatsapp-btn" title={lead.whatsapp || lead.phone ? `WhatsApp: ${lead.whatsapp || lead.phone}` : 'Sem número'} onClick={() => openWhatsModal(lead)}>
+                        <button className="ch-icon whatsapp-btn" title={lead.whatsapp || lead.phone ? `WhatsApp: ${lead.whatsapp || lead.phone}` : 'Sem número'} onClick={() => {
+                          const num = cleanPhone(lead.whatsapp || lead.phone || '');
+                          if (!num) { showToast('Lead sem número de telefone'); return; }
+                          const whatsTpl = templates.find((t: any) => t.type === 'whatsapp');
+                          let msg = '';
+                          if (whatsTpl) {
+                            msg = whatsTpl.body.replace(/\{\{nome\}\}/g, lead.name.split(' ')[0]).replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa').replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
+                          } else {
+                            const wsNameW = ws?.name || 'getLOG/Lottustech';
+                            msg = `Olá ${lead.name.split(' ')[0]}, tudo bem? Sou da ${wsNameW}. Nossa solução de TMS pode otimizar a operação logística da ${lead.company || 'sua empresa'}. Posso te mostrar em 15 min? — Danilo | (41) 99949-9815`;
+                          }
+                          window.open(`https://wa.me/55${num}?text=${encodeURIComponent(msg)}`, '_blank');
+                        }}>
                           <Icon d={ICONS.whatsapp} />
                         </button>
                       </div></td>
