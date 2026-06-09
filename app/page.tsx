@@ -731,7 +731,19 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                         <button className="ch-icon phone-btn" title="Ligar" onClick={() => { setCallModal(lead); setCallResult(''); setCallNotes(''); }}><Icon d={ICONS.phone} /></button>
                         <button className="ch-icon email-btn" title="E-mail" onClick={() => openEmailModal(lead)}><Icon d={ICONS.email} /></button>
                         <button className="ch-icon" title="Observações" style={{ color: (lead.notes||'').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g,'').trim() ? '#f59e0b' : 'var(--text-muted)' }} onClick={() => { const cleanNotes = (lead.notes||'').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g,'').trim(); setNoteModal(lead); setNoteText(cleanNotes); }}><Icon d={ICONS.note} /></button>
-                        <button className="ch-icon whatsapp-btn" title="WhatsApp" onClick={() => openWhatsModal(lead)}><Icon d={ICONS.whatsapp} /></button>
+                        <button className="ch-icon whatsapp-btn" title="WhatsApp" onClick={() => {
+                          const num = cleanPhone(lead.whatsapp || lead.phone || '');
+                          if (!num) { showToast('Lead sem número de telefone'); return; }
+                          const whatsTpl = templates.find((t: any) => t.type === 'whatsapp');
+                          let msg = '';
+                          if (whatsTpl) {
+                            msg = whatsTpl.body.replace(/\{\{nome\}\}/g, lead.name.split(' ')[0]).replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa').replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
+                          } else {
+                            const wsNameW = ws?.name || 'getLOG/Lottustech';
+                            msg = `Olá ${lead.name.split(' ')[0]}, tudo bem? Sou da ${wsNameW}. Nossa solução de TMS pode otimizar a operação logística da ${lead.company || 'sua empresa'}. Posso te mostrar em 15 min? — Danilo | (41) 99949-9815`;
+                          }
+                          window.open(`https://wa.me/55${num}?text=${encodeURIComponent(msg)}`, '_blank');
+                        }}><Icon d={ICONS.whatsapp} /></button>
                       </div>
                     </div>
                   );
