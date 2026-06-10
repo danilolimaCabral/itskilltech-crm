@@ -176,7 +176,7 @@ export function TemplatesView({ workspace, workspaceName, templates, onReload, s
                 </div>
               )}
               <div className="field">
-                <label className="field-label">Mensagem * (use {{nome}}, {{empresa}}, {{cargo}} como variáveis)</label>
+                <label className="field-label">Mensagem * (use {'{{'+'nome'+'}}'}, {'{{'+'empresa'+'}}'}, {'{{'+'cargo'+'}}'} como variáveis)</label>
                 <textarea className="field-textarea" style={{ minHeight: 220 }} value={editing.body} onChange={e => setEditing({ ...editing, body: e.target.value })} />
               </div>
               {tab === 'email' && (

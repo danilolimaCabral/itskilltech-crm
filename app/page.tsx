@@ -7,7 +7,7 @@ interface Lead {
   id: string; workspace: string; name: string; company?: string; role?: string;
   email?: string; whatsapp?: string; linkedin?: string; phone?: string;
   source?: string; notes?: string; status: string; created_at: number; updated_at: number;
-  call_count?: number; last_contact?: number;
+  call_count?: number; last_contact?: number; next_call_at?: number;
 }
 
 interface Workspace { id: string; name: string; color: string; }
@@ -90,6 +90,8 @@ export default function CRM() {
   const [callResult, setCallResult] = useState('');
   const [callNotes, setCallNotes] = useState('');
   const [savingCall, setSavingCall] = useState(false);
+  const [callMoveToProspeccao, setCallMoveToProspeccao] = useState(false);
+  const [callSetAlert, setCallSetAlert] = useState(true);
   // Email compose modal
   const [emailModal, setEmailModal] = useState<Lead | null>(null);
   const [emailSubject, setEmailSubject] = useState('');
@@ -284,12 +286,17 @@ export default function CRM() {
       caixa_postal: null,
       numero_errado: null,
     };
-    const newStatus = STATUS_MAP[callResult];
+    let newStatus = STATUS_MAP[callResult];
+    // Se marcou "mover para prospecção", sobrescreve o status
+    if (callMoveToProspeccao) newStatus = 'prospeccao';
+    // Calcular alerta de retorno em 2 dias
+    const alertTs = callSetAlert ? Date.now() + 2 * 24 * 60 * 60 * 1000 : undefined;
     // Atualizar timeline
     const timeline = JSON.parse(callModal.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
     const resultLabels2: any = { atendeu_interesse: '✅ Atendeu — interesse!', atendeu_sem_interesse: '🟡 Atendeu — sem interesse', nao_atendeu: '❌ Não atendeu', caixa_postal: '📬 Caixa postal', numero_errado: '🚫 Número errado' };
     timeline.unshift({ type: 'call', label: `Ligação: ${resultLabels2[callResult] || callResult}`, note: callNotes || '', ts: Date.now() });
     if (newStatus) timeline.unshift({ type: 'status', label: `Etapa → ${FUNNEL_MAP[newStatus]?.label || newStatus}`, ts: Date.now(), from: callModal.status });
+    if (alertTs) timeline.unshift({ type: 'alert', label: `🔔 Alerta: ligar em ${new Date(alertTs).toLocaleDateString('pt-BR')}`, ts: Date.now() });
     const notesClean = (callModal.notes || '').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
     const notesWithCall = callNotes ? `[Ligação ${new Date().toLocaleDateString('pt-BR')}] ${callNotes}\n${notesClean}` : notesClean;
     const updatedLead: Lead = {
@@ -298,6 +305,7 @@ export default function CRM() {
       call_count: (callModal.call_count || 0) + 1,
       last_contact: Date.now(),
       updated_at: Date.now(),
+      next_call_at: alertTs,
       notes: notesWithCall + `\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]`,
     };
     try {
@@ -311,9 +319,10 @@ export default function CRM() {
       }
       await saveLead(updatedLead);
       const resultLabels: any = { atendeu_interesse: '✓ Atendeu — interesse!', atendeu_sem_interesse: '✓ Atendeu — sem interesse', nao_atendeu: 'Não atendeu', caixa_postal: 'Caixa postal', numero_errado: 'Número errado' };
-      showToast(resultLabels[callResult] || 'Ligação registrada');
+      const alertMsg = alertTs ? ` · 🔔 Alerta em ${new Date(alertTs).toLocaleDateString('pt-BR')}` : '';
+      showToast((resultLabels[callResult] || 'Ligação registrada') + alertMsg);
     } catch { showToast('Erro ao registrar ligação'); }
-    setCallModal(null); setCallResult(''); setCallNotes('');
+    setCallModal(null); setCallResult(''); setCallNotes(''); setCallMoveToProspeccao(false); setCallSetAlert(true);
     setSavingCall(false);
   };
 
@@ -335,7 +344,7 @@ export default function CRM() {
         const STATUS_ADVANCE: any = { prospeccao: 'qualificacao', novo: 'qualificacao', contatado: 'qualificacao', qualificacao: 'apresentacao', apresentacao: 'fechamento', fechamento: 'posvenda' };
         const nextStatus = STATUS_ADVANCE[normalizeStatus(emailModal.status)] || normalizeStatus(emailModal.status);
         const timeline = JSON.parse(emailModal.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
-        timeline.unshift({ type: 'email', label: `E-mail enviado: ${emailSubject}${emailAttachmentUrl ? ' (com apresentação)' : ''}`, ts: Date.now() });
+        timeline.unshift({ type: 'email', label: `E-mail enviado: ${emailSubject}${emailAttachmentUrl ? ' (com apresentação)' : ''}`, ts: Date.now(), resend_id: j.id || null });
         if (nextStatus !== normalizeStatus(emailModal.status)) timeline.unshift({ type: 'status', label: `Etapa → ${FUNNEL_MAP[nextStatus]?.label || nextStatus}`, ts: Date.now() });
         const notesClean = (emailModal.notes || '').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
         await saveLead({ ...emailModal, status: nextStatus, updated_at: Date.now(), notes: notesClean + `\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]` });
@@ -481,6 +490,13 @@ export default function CRM() {
   const todayCall = todayProspEvents.filter((e: any) => e.type === 'call').length;
   const todayTotal = todayWhats + todayEmail + todayCall;
 
+  // Alertas de retorno pendentes (next_call_at <= agora + 24h)
+  const nowTs = Date.now();
+  const tomorrowTs = nowTs + 24 * 60 * 60 * 1000;
+  const pendingAlerts = leads.filter(l => l.next_call_at && l.next_call_at <= tomorrowTs).sort((a, b) => (a.next_call_at || 0) - (b.next_call_at || 0));
+  const overdueAlerts = pendingAlerts.filter(l => (l.next_call_at || 0) < nowTs);
+  const todayAlerts = pendingAlerts.filter(l => (l.next_call_at || 0) >= nowTs);
+
   // Extrai todas as reuniões agendadas de todos os leads
   const allMeetings = leads.flatMap(l => {
     try {
@@ -617,6 +633,38 @@ export default function CRM() {
                   📞 Telefone: <strong>{todayCall}</strong>
                 </span>
               </div>
+              {/* Painel de alertas de retorno */}
+              {pendingAlerts.length > 0 && (
+                <div style={{ margin: '8px 0', padding: '12px 14px', background: overdueAlerts.length > 0 ? '#fff7ed' : '#fffbeb', borderRadius: 10, border: `1px solid ${overdueAlerts.length > 0 ? '#f97316' : '#f59e0b'}55` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontSize: 14 }}>🔔</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: overdueAlerts.length > 0 ? '#c2410c' : '#b45309' }}>
+                      {overdueAlerts.length > 0 ? `${overdueAlerts.length} alerta(s) em atraso!` : `${pendingAlerts.length} alerta(s) para hoje/amanhã`}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {pendingAlerts.slice(0, 5).map(l => (
+                      <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: '#fff', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer' }}
+                        onClick={() => { setLeadPanel(l); setPanelAnalysis(null); setPanelTab('timeline'); }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: (l.next_call_at || 0) < nowTs ? '#dc2626' : '#f59e0b', minWidth: 70 }}>
+                          {(l.next_call_at || 0) < nowTs ? '⚠ Atrasado' : new Date(l.next_call_at!).toLocaleDateString('pt-BR')}
+                        </span>
+                        <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{l.name}</span>
+                        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l.company}</span>
+                        <button className="btn btn-sm" style={{ fontSize: 11, padding: '3px 8px', background: '#25d366', color: '#fff', border: 'none', flexShrink: 0 }}
+                          onClick={e => { e.stopPropagation(); setCallModal(l); setCallResult(''); setCallNotes(''); setCallMoveToProspeccao(false); setCallSetAlert(true); }}>
+                          📞 Ligar
+                        </button>
+                        <button className="btn btn-sm" style={{ fontSize: 11, padding: '3px 8px', flexShrink: 0 }}
+                          onClick={e => { e.stopPropagation(); saveLead({ ...l, next_call_at: undefined, updated_at: Date.now() }); }}>
+                          ✓ Feito
+                        </button>
+                      </div>
+                    ))}
+                    {pendingAlerts.length > 5 && <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center' }}>+{pendingAlerts.length - 5} mais alertas</div>}
+                  </div>
+                </div>
+              )}
               {/* Label da etapa ativa */}
               {statusFilter !== 'all' && (() => { const f = FUNNEL_MAP[statusFilter]; return f ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '6px 12px', background: f.bg, borderRadius: 8, border: `1px solid ${f.color}33` }}>
@@ -1011,9 +1059,21 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                 <label className="field-label">Anotações (opcional)</label>
                 <textarea className="field-textarea" style={{ minHeight: 70 }} value={callNotes} onChange={e => setCallNotes(e.target.value)} placeholder="Ex: Vai apresentar para o board em 2 semanas..." />
               </div>
+              {/* Opções pós-ligação */}
+              <div style={{ marginTop: 14, padding: '12px 14px', background: 'var(--surface-2, #f9fafb)', borderRadius: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 2 }}>Opções pós-ligação</div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13 }}>
+                  <input type="checkbox" checked={callMoveToProspeccao} onChange={e => setCallMoveToProspeccao(e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#6366f1' }} />
+                  <span>Mover para <strong style={{ color: '#6366f1' }}>Prospecção</strong></span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 13 }}>
+                  <input type="checkbox" checked={callSetAlert} onChange={e => setCallSetAlert(e.target.checked)} style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#f59e0b' }} />
+                  <span>🔔 Criar alerta: <strong style={{ color: '#f59e0b' }}>ligar em 2 dias</strong> ({new Date(Date.now() + 2*24*60*60*1000).toLocaleDateString('pt-BR')})</span>
+                </label>
+              </div>
             </div>
             <div className="modal-footer">
-              <button className="btn" onClick={() => setCallModal(null)}>Cancelar</button>
+              <button className="btn" onClick={() => { setCallModal(null); setCallMoveToProspeccao(false); setCallSetAlert(true); }}>Cancelar</button>
               <button className="btn btn-primary" disabled={!callResult || savingCall} onClick={saveCall}>{savingCall ? 'Salvando...' : 'Salvar ligação'}</button>
             </div>
           </div>
@@ -1812,16 +1872,38 @@ function SentEmailsView({ workspace, leads, showToast, onOpenLead }: any) {
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState('');
   const [selected, setSelected] = React.useState<any>(null);
+  const [resendStatuses, setResendStatuses] = React.useState<Record<string, any>>({});
+  const [loadingStatuses, setLoadingStatuses] = React.useState(false);
+
+  // Buscar status do Resend para os e-mails que têm resend_id
+  const fetchResendStatuses = React.useCallback(async (emailList: any[]) => {
+    const ids = emailList.filter(e => e.resend_id).map(e => e.resend_id);
+    if (ids.length === 0) return;
+    setLoadingStatuses(true);
+    try {
+      const r = await fetch('/api/resend-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: ids.slice(0, 50) }),
+      });
+      const d = await r.json();
+      if (d.ok) setResendStatuses(d.statuses || {});
+    } catch { /* ignore */ }
+    setLoadingStatuses(false);
+  }, []);
 
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
       const r = await fetch(`/api/sent-emails?workspace=${workspace}&search=${encodeURIComponent(search)}&limit=300`);
       const d = await r.json();
-      if (d.ok) setEmails(d.emails || []);
+      if (d.ok) {
+        setEmails(d.emails || []);
+        fetchResendStatuses(d.emails || []);
+      }
     } catch { /* ignore */ }
     setLoading(false);
-  }, [workspace, search]);
+  }, [workspace, search, fetchResendStatuses]);
 
   React.useEffect(() => { load(); }, [load]);
 
@@ -1846,7 +1928,14 @@ function SentEmailsView({ workspace, leads, showToast, onOpenLead }: any) {
               <div className="page-title" style={{ fontSize: 18 }}>📤 E-mails Enviados</div>
               <div className="page-description">{loading ? 'Carregando...' : `${emails.length} e-mail(s) disparado(s)`}</div>
             </div>
-            <button className="btn" style={{ fontSize: 11, padding: '5px 10px' }} onClick={load}>↻ Atualizar</button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button className="btn" style={{ fontSize: 11, padding: '5px 10px' }} onClick={load}>↻ Atualizar</button>
+              <button className="btn" style={{ fontSize: 11, padding: '5px 10px', background: loadingStatuses ? 'var(--surface-2)' : '#eff6ff', color: '#0066ff', border: '1px solid #0066ff33' }}
+                onClick={() => fetchResendStatuses(emails)}
+                disabled={loadingStatuses}>
+                {loadingStatuses ? '⏳ Verificando...' : '📊 Status Resend'}
+              </button>
+            </div>
           </div>
           <input
             className="search-input"
@@ -1905,9 +1994,15 @@ function SentEmailsView({ workspace, leads, showToast, onOpenLead }: any) {
                         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                           {new Date(email.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                         </div>
-                        {email.opened && (
-                          <div style={{ fontSize: 10, color: '#16a34a', marginTop: 2, fontWeight: 600 }}>✓ Aberto</div>
-                        )}
+                        {/* Badge de status Resend */}
+                        {email.resend_id && resendStatuses[email.resend_id] ? (() => {
+                          const st = resendStatuses[email.resend_id];
+                          if (st.clicked) return <div style={{ fontSize: 10, color: '#0066ff', marginTop: 2, fontWeight: 600 }}>🔗 Clicou</div>;
+                          if (st.opened) return <div style={{ fontSize: 10, color: '#16a34a', marginTop: 2, fontWeight: 600 }}>✓ Aberto</div>;
+                          if (st.bounced) return <div style={{ fontSize: 10, color: '#dc2626', marginTop: 2, fontWeight: 600 }}>⚠ Bounce</div>;
+                          if (st.complained) return <div style={{ fontSize: 10, color: '#ea580c', marginTop: 2, fontWeight: 600 }}>🚫 Spam</div>;
+                          return <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>📤 Enviado</div>;
+                        })() : email.opened ? <div style={{ fontSize: 10, color: '#16a34a', marginTop: 2, fontWeight: 600 }}>✓ Aberto</div> : null}
                       </div>
                     </div>
                   </div>
@@ -1961,10 +2056,33 @@ function SentEmailsView({ workspace, leads, showToast, onOpenLead }: any) {
                   <div style={{ fontSize: 12 }}>{selected.leadEmail || '—'}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>STATUS</div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: selected.opened ? '#16a34a' : 'var(--text-muted)' }}>
-                    {selected.opened ? '✓ Aberto' : '📤 Enviado'}
-                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>STATUS RESEND</div>
+                  {selected.resend_id && resendStatuses[selected.resend_id] ? (() => {
+                    const st = resendStatuses[selected.resend_id];
+                    const statusMap: any = {
+                      clicked: { label: '🔗 Clicou no link', color: '#0066ff' },
+                      opened: { label: '✅ E-mail aberto', color: '#16a34a' },
+                      bounced: { label: '⚠️ Bounce (não entregue)', color: '#dc2626' },
+                      complained: { label: '🚫 Marcado como spam', color: '#ea580c' },
+                      delivered: { label: '✔ Entregue', color: '#0891b2' },
+                      sent: { label: '📤 Enviado', color: '#6b7280' },
+                    };
+                    const s = statusMap[st.status] || statusMap['sent'];
+                    return (
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: s.color }}>{s.label}</div>
+                        {st.last_event && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Evento: {st.last_event}</div>}
+                        {st.created_at && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Criado: {new Date(st.created_at).toLocaleString('pt-BR')}</div>}
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, fontFamily: 'monospace' }}>ID: {selected.resend_id}</div>
+                      </div>
+                    );
+                  })() : (
+                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                      {selected.resend_id ? (
+                        <span>📤 Clique em "📊 Status Resend" para verificar<br/><span style={{ fontSize: 10, fontFamily: 'monospace' }}>{selected.resend_id}</span></span>
+                      ) : selected.opened ? '✓ Aberto (pixel)' : '📤 Enviado'}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
