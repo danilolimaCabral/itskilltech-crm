@@ -1241,7 +1241,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
             {/* Modal WhatsApp */}
       {whatsModal && (
         <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) setWhatsModal(null); }}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 680, width: '95vw' }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 800, width: '96vw', maxHeight: '90vh' }}>
             <div className="modal-header">
               <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ width: 28, height: 28, borderRadius: '50%', background: '#25d366', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1273,8 +1273,8 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
               )}
               <div className="field-group">
                 <label className="field-label">Mensagem</label>
-                <textarea className="field-input" rows={12} value={whatsBody} onChange={e => setWhatsBody(e.target.value)}
-                  style={{ resize: 'vertical', fontFamily: 'inherit', fontSize: 14, lineHeight: '1.6' }} />
+                <textarea className="field-input" rows={16} value={whatsBody} onChange={e => setWhatsBody(e.target.value)}
+                  style={{ resize: 'vertical', fontFamily: 'inherit', fontSize: 14, lineHeight: '1.7', minHeight: 260 }} />
               </div>
               {zapiConfigured ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#079455', marginTop: 8 }}>
