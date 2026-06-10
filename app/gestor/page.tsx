@@ -296,7 +296,11 @@ export default function GestorPage() {
                   </select>
                 </div>
                 {stats.days?.length === 0 ? (
-                  <div style={{ textAlign: 'center', color: '#94a3b8', padding: 30, fontSize: 14 }}>Nenhuma atividade registrada no período</div>
+                  <div style={{ textAlign: 'center', color: '#94a3b8', padding: 30, fontSize: 14 }}>
+                    <div style={{ fontSize: 32, marginBottom: 10 }}>📭</div>
+                    <div style={{ fontWeight: 600, color: '#64748b', marginBottom: 6 }}>Nenhuma atividade registrada ainda</div>
+                    <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.6 }}>O histórico será preenchido automaticamente conforme o Danilo registrar atividades no CRM (WhatsApp, e-mail, ligações e LinkedIn).</div>
+                  </div>
                 ) : (
                   <div style={{ overflowY: 'auto', maxHeight: 280 }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
