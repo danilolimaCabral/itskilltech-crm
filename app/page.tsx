@@ -385,7 +385,7 @@ export default function CRM() {
     setWhatsModal(lead);
     // Montar mensagem padrão imediatamente (garante que o botão nunca fica vazio)
     const wsNameW = ws?.name || 'getLOG/Lottustech';
-    const defaultMsg = `Olá ${lead.name.split(' ')[0]}, tudo bem?\n\nSou o Danilo Cabral, da ${wsNameW}.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas.\n\nQue tal explorar como podemos gerar resultados semelhantes para a ${lead.company || 'sua empresa'}? Me diga qual o melhor horário para um bate-papo de 15 minutos.\n\nAtenciosamente,\nDanilo Cabral | (41) 99949-9815\nwww.gettms.com.br | www.lottustech.com.br`;
+    const defaultMsg = `Olá ${lead.name.split(' ')[0]}, tudo bem?\n\nSou o Danilo Cabral, da ${wsNameW}.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas.\n\nQue tal explorar como podemos gerar resultados semelhantes para a ${lead.company || 'sua empresa'}? Me diga qual o melhor horário para um bate-papo de 15 minutos. 😊`;
     // Tentar usar template salvo (do estado ou buscar da API)
     const tplFromState = templates.find((t: any) => t.type === 'whatsapp');
     if (tplFromState) {
