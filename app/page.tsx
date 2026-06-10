@@ -820,9 +820,11 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                         {(lead.call_count || 0) > 0 && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>📞 {lead.call_count} ligação(ões)</div>}
                       </td>
                       <td>
-                        {lead.email && <div className="cell-secondary">{lead.email}</div>}
-                        {(lead.whatsapp || lead.phone) && <div className="cell-secondary">{lead.whatsapp || lead.phone}</div>}
-                        {!lead.email && !lead.whatsapp && !lead.phone && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>}
+                        {lead.email && <div className="cell-secondary">✉ {lead.email}</div>}
+                        {lead.whatsapp && <div className="cell-secondary">📱 {lead.whatsapp}</div>}
+                        {lead.phone && lead.phone !== lead.whatsapp && <div className="cell-secondary">📞 {lead.phone}</div>}
+                        {lead.linkedin && <div className="cell-secondary"><a href={lead.linkedin.startsWith('http') ? lead.linkedin : `https://linkedin.com/in/${lead.linkedin}`} target="_blank" rel="noopener noreferrer" style={{ color: '#0a66c2', textDecoration: 'none', fontSize: 11 }}>💼 LinkedIn</a></div>}
+                        {!lead.email && !lead.whatsapp && !lead.phone && !lead.linkedin && <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>—</span>}
                       </td>
                       <td>{
                         (() => { const f = FUNNEL_MAP[normalizeStatus(lead.status)]; return f ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: f.bg, color: f.color, border: `1px solid ${f.color}33`, whiteSpace: 'nowrap' }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: f.color, flexShrink: 0 }} />{f.short}</span> : <span className={`badge badge-${lead.status}`}>{statusLabel(lead.status)}</span>; })()
@@ -856,6 +858,12 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                         <button className="ch-icon whatsapp-btn" title={lead.whatsapp || lead.phone ? `WhatsApp: ${lead.whatsapp || lead.phone}` : 'Sem número'} onClick={() => openWhatsModal(lead)}>
                           <Icon d={ICONS.whatsapp} />
                         </button>
+                        {/* LinkedIn */}
+                        {lead.linkedin && (
+                          <a href={lead.linkedin.startsWith('http') ? lead.linkedin : `https://linkedin.com/in/${lead.linkedin}`} target="_blank" rel="noopener noreferrer" className="ch-icon" title={`LinkedIn: ${lead.name}`} style={{ color: '#0a66c2', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+                          </a>
+                        )}
                       </div></td>
                     </tr>
                   ))}
@@ -878,7 +886,9 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                       </div>
                       <div className="lead-card-contact">
                         {lead.email && <span>✉ {lead.email}</span>}
-                        {(lead.whatsapp || lead.phone) && <span>📱 {lead.whatsapp || lead.phone}</span>}
+                        {lead.whatsapp && <span>📱 {lead.whatsapp}</span>}
+                        {lead.phone && lead.phone !== lead.whatsapp && <span>📞 {lead.phone}</span>}
+                        {lead.linkedin && <a href={lead.linkedin.startsWith('http') ? lead.linkedin : `https://linkedin.com/in/${lead.linkedin}`} target="_blank" rel="noopener noreferrer" style={{ color: '#0a66c2', textDecoration: 'none', fontSize: 12 }} onClick={e => e.stopPropagation()}>💼 LinkedIn</a>}
                         {lead.last_contact && <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Último: {new Date(lead.last_contact).toLocaleDateString('pt-BR')}</span>}
                       </div>
                       <div className="lead-card-actions" onClick={e => e.stopPropagation()}>
@@ -888,6 +898,11 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                         <button className="ch-icon email-btn" title="E-mail" onClick={() => openEmailModal(lead)}><Icon d={ICONS.email} /></button>
                         <button className="ch-icon" title="Observações" style={{ color: (lead.notes||'').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g,'').trim() ? '#f59e0b' : 'var(--text-muted)' }} onClick={() => { const cleanNotes = (lead.notes||'').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g,'').trim(); setNoteModal(lead); setNoteText(cleanNotes); }}><Icon d={ICONS.note} /></button>
                         <button className="ch-icon whatsapp-btn" title="WhatsApp" onClick={() => openWhatsModal(lead)}><Icon d={ICONS.whatsapp} /></button>
+                        {lead.linkedin && (
+                          <a href={lead.linkedin.startsWith('http') ? lead.linkedin : `https://linkedin.com/in/${lead.linkedin}`} target="_blank" rel="noopener noreferrer" className="ch-icon" title="LinkedIn" style={{ color: '#0a66c2', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+                          </a>
+                        )}
                       </div>
                     </div>
                   );
