@@ -48,8 +48,7 @@ export async function GET(request: NextRequest) {
       // Busca real via CNPJ.já usando endpoint /office com filtro por nome
       const params = new URLSearchParams({
         'company.name.in': nome,
-        limit: '10',
-        'status.id': 'ATIVA'
+        limit: '10'
       })
 
       const searchRes = await fetch(`${BASE_URL}/office?${params}`, {
