@@ -355,6 +355,7 @@ export default function GestorPage() {
                   { label: 'Total WhatsApp', value: stats.totals?.whatsapp || 0, icon: '💬' },
                   { label: 'Total E-mails', value: stats.totals?.email || 0, icon: '✉' },
                   { label: 'Total Ligações', value: stats.totals?.call || 0, icon: '📞' },
+                  { label: 'Total LinkedIn', value: stats.totals?.linkedin || 0, icon: '💼' },
                   { label: 'Total Prospecções', value: stats.totals?.total || 0, icon: '🎯' },
                   { label: 'Média diária', value: stats.days?.length > 0 ? Math.round((stats.totals?.total || 0) / stats.days.length) : 0, icon: '📈' },
                 ].map(c => (
@@ -366,7 +367,49 @@ export default function GestorPage() {
                 ))}
               </div>
             </div>
-          </>
+          {/* Seção: Leads Prioritários */}
+          <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px', marginTop: 20, border: '1px solid #e2e8f0' }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              🎯 Marcar Lead Prioritário
+              <span style={{ fontSize: 12, color: '#64748b', fontWeight: 400 }}>— Vandir pode indicar leads que o Danilo deve contatar hoje</span>
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+              <input
+                id="priority-lead-name"
+                placeholder="Nome do lead ou empresa (ex: Gestamp, Stihl, Marcos Miranda...)"
+                style={{ flex: 1, border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13 }}
+              />
+              <input
+                id="priority-lead-reason"
+                placeholder="Motivo / instrução (ex: Ligar hoje, tem interesse!)"
+                style={{ flex: 1, border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13 }}
+              />
+              <button
+                onClick={async () => {
+                  const nameEl = document.getElementById('priority-lead-name') as HTMLInputElement;
+                  const reasonEl = document.getElementById('priority-lead-reason') as HTMLInputElement;
+                  const name = nameEl?.value?.trim();
+                  const reason = reasonEl?.value?.trim();
+                  if (!name) return;
+                  const msg = `🎯 LEAD PRIORITÁRIO: ${name}${reason ? ` — ${reason}` : ' — Entre em contato hoje!'}`;
+                  await fetch('/api/gestor-suggestions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ workspace: WORKSPACE, message: msg, from_name: 'Vandir', priority: 'high' }),
+                  });
+                  if (nameEl) nameEl.value = '';
+                  if (reasonEl) reasonEl.value = '';
+                  showToast('✅ Lead prioritário marcado! Danilo receberá o alerta.');
+                  load();
+                }}
+                style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontWeight: 600, cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap' }}
+              >
+                🔴 Marcar como Prioritário
+              </button>
+            </div>
+            <div style={{ fontSize: 12, color: '#94a3b8' }}>O Danilo verá um alerta vermelho urgente no CRM com o nome do lead e a instrução.</div>
+          </div>
+        </>
         )}
       </div>
     </div>

@@ -525,13 +525,14 @@ export default function CRM() {
   const todayProspEvents = leads.flatMap(l => {
     try {
       const tl = JSON.parse(l.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
-      return tl.filter((t: any) => t.ts && new Date(t.ts).toISOString().slice(0, 10) === todayStr && ['whatsapp','email','call'].includes(t.type));
+      return tl.filter((t: any) => t.ts && new Date(t.ts).toISOString().slice(0, 10) === todayStr && ['whatsapp','email','call','linkedin'].includes(t.type));
     } catch { return []; }
   });
   const todayWhats = todayProspEvents.filter((e: any) => e.type === 'whatsapp').length;
   const todayEmail = todayProspEvents.filter((e: any) => e.type === 'email').length;
   const todayCall = todayProspEvents.filter((e: any) => e.type === 'call').length;
-  const todayTotal = todayWhats + todayEmail + todayCall;
+  const todayLinkedin = todayProspEvents.filter((e: any) => e.type === 'linkedin').length;
+  const todayTotal = todayWhats + todayEmail + todayCall + todayLinkedin;
 
   // Alertas de retorno pendentes (next_call_at <= agora + 24h)
   const nowTs = Date.now();
@@ -673,11 +674,12 @@ export default function CRM() {
                     <a href="/gestor" target="_blank" style={{ fontSize: 11, color: '#0066ff', textDecoration: 'none', background: '#eff6ff', padding: '2px 10px', borderRadius: 20, border: '1px solid #0066ff33' }}>📊 Painel Gestor</a>
                   </div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
                   {[
                     { label: '💬 WhatsApp', value: todayWhats, goal: dailyGoals.whatsapp_goal, color: '#16a34a' },
                     { label: '✉ E-mail', value: todayEmail, goal: dailyGoals.email_goal, color: '#1a56db' },
                     { label: '📞 Ligações', value: todayCall, goal: dailyGoals.call_goal, color: '#ea580c' },
+                    { label: '💼 LinkedIn', value: todayLinkedin, goal: (dailyGoals as any).linkedin_goal || 5, color: '#0077b5' },
                     { label: '🎯 Total', value: todayTotal, goal: dailyGoals.total_goal, color: '#7c3aed' },
                   ].map(c => {
                     const pct = c.goal > 0 ? Math.min(100, Math.round((c.value / c.goal) * 100)) : 0;
