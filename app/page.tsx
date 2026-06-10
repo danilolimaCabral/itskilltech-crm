@@ -383,13 +383,30 @@ export default function CRM() {
 
   const openWhatsModal = (lead: Lead) => {
     setWhatsModal(lead);
-    const whatsTpl = templates.find(t => t.type === 'whatsapp');
-    if (whatsTpl) {
-      const body = whatsTpl.body.replace(/\{\{nome\}\}/g, lead.name.split(' ')[0]).replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa').replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
+    // Montar mensagem padrão imediatamente (garante que o botão nunca fica vazio)
+    const wsNameW = ws?.name || 'getLOG/Lottustech';
+    const defaultMsg = `Olá ${lead.name.split(' ')[0]}, tudo bem?\n\nSou o Danilo Cabral, da ${wsNameW}. Percebo que ${(lead as any).sector ? 'empresas do setor de ' + (lead as any).sector : 'empresas'} como a ${lead.company || 'sua empresa'} buscam constantemente otimizar custos logísticos.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas.\n\nQue tal explorar como podemos gerar resultados semelhantes para a ${lead.company || 'sua empresa'}? Me diga qual o melhor horário para um bate-papo de 15 minutos.\n\nAtenciosamente,\nDanilo Cabral | (41) 99949-9815\nwww.gettms.com.br | www.lottustech.com.br`;
+    // Tentar usar template salvo (do estado ou buscar da API)
+    const tplFromState = templates.find((t: any) => t.type === 'whatsapp');
+    if (tplFromState) {
+      const body = tplFromState.body.replace(/\{\{nome\}\}/g, lead.name.split(' ')[0]).replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa').replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
       setWhatsBody(body);
     } else {
-      const wsNameW = ws?.name || 'getLOG/Lottustech';
-      setWhatsBody(`Olá ${lead.name.split(' ')[0]}, tudo bem? Sou da ${wsNameW}. Percebo que ${(lead as any).sector ? 'empresas do setor de ' + (lead as any).sector : 'atacadistas'} como a ${lead.company || 'sua empresa'} buscam constantemente otimizar custos logísticos. Nossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas. Que tal explorar como podemos gerar resultados semelhantes para a ${lead.company || 'sua empresa'}? Me diga qual o melhor horário para um bate-papo de 15 minutos. — Danilo Cabral | (41) 99949-9815`);
+      setWhatsBody(defaultMsg);
+      // Tentar buscar templates da API em background e atualizar se encontrar
+      fetch(`/api/templates?workspace=${workspace}`)
+        .then(r => r.json())
+        .then(j => {
+          if (Array.isArray(j)) {
+            setTemplates(j);
+            const tpl = j.find((t: any) => t.type === 'whatsapp');
+            if (tpl) {
+              const body = tpl.body.replace(/\{\{nome\}\}/g, lead.name.split(' ')[0]).replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa').replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
+              setWhatsBody(body);
+            }
+          }
+        })
+        .catch(() => {});
     }
     setShowWhatsTemplates(false);
   };
