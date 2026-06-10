@@ -783,7 +783,7 @@ export default function CRM() {
                         <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{l.name}</span>
                         <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l.company}</span>
                         <button className="btn btn-sm" style={{ fontSize: 11, padding: '3px 8px', background: '#25d366', color: '#fff', border: 'none', flexShrink: 0 }}
-                          onClick={e => { e.stopPropagation(); setCallModal(l); setCallResult(''); setCallNotes(''); setCallMoveToProspeccao(false); setCallSetAlert(true); }}>
+                          onClick={e => { e.stopPropagation(); setCallModal(l); setCallResult(''); setCallNotes(`${getSaudacao()}, ${l.name.split(' ')[0]}! `); setCallMoveToProspeccao(false); setCallSetAlert(true); }}>
                           📞 Ligar
                         </button>
                         <button className="btn btn-sm" style={{ fontSize: 11, padding: '3px 8px', flexShrink: 0 }}
@@ -908,7 +908,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                           <Icon d={ICONS.sparkles} />
                         </button>
                         {/* Ligar */}
-                        <button className="ch-icon phone-btn" title={lead.phone || lead.whatsapp ? `Ligar: ${lead.phone || lead.whatsapp}` : 'Registrar ligação'} onClick={() => { setCallModal(lead); setCallResult(''); setCallNotes(''); }}>
+                        <button className="ch-icon phone-btn" title={lead.phone || lead.whatsapp ? `Ligar: ${lead.phone || lead.whatsapp}` : 'Registrar ligação'} onClick={() => { setCallModal(lead); setCallResult(''); setCallNotes(`${getSaudacao()}, ${lead.name.split(' ')[0]}! `); }}>
                           <Icon d={ICONS.phone} />
                         </button>
                         {/* E-mail */}
@@ -971,7 +971,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                       <div className="lead-card-actions" onClick={e => e.stopPropagation()}>
                         <button className="ch-icon enrich-btn" title="Enriquecer" disabled={!!enriching} onClick={() => enrichLead(lead)}><Icon d={ICONS.enrich} /></button>
                         <button className="ch-icon" title="Agendar" style={{color:'#0066ff'}} onClick={() => { setCalModal(lead); setCalGuestEmail(lead.email || ''); setCalTitle(`Reunião com ${lead.name}`); setCalDescription(''); setCalDate(new Date().toISOString().slice(0,10)); setCalSlots([]); setCalSelectedSlot(''); }}><Icon d={ICONS.calendar} /></button>
-                        <button className="ch-icon phone-btn" title="Ligar" onClick={() => { setCallModal(lead); setCallResult(''); setCallNotes(''); }}><Icon d={ICONS.phone} /></button>
+                        <button className="ch-icon phone-btn" title="Ligar" onClick={() => { setCallModal(lead); setCallResult(''); setCallNotes(`${getSaudacao()}, ${lead.name.split(' ')[0]}! `); }}><Icon d={ICONS.phone} /></button>
                         <button className="ch-icon email-btn" title="E-mail" onClick={() => openEmailModal(lead)}><Icon d={ICONS.email} /></button>
                         <button className="ch-icon" title="Observações" style={{ color: (lead.notes||'').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g,'').trim() ? '#f59e0b' : 'var(--text-muted)' }} onClick={() => { const cleanNotes = (lead.notes||'').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g,'').trim(); setNoteModal(lead); setNoteText(cleanNotes); }}><Icon d={ICONS.note} /></button>
                         <button className="ch-icon whatsapp-btn" title="WhatsApp" onClick={() => openWhatsModal(lead)}><Icon d={ICONS.whatsapp} /></button>
@@ -1089,7 +1089,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                     {(leadPanel.phone || leadPanel.whatsapp) && <a href={`tel:${cleanPhone(leadPanel.phone || leadPanel.whatsapp || '')}`} className="btn btn-sm" style={{ textDecoration: 'none' }}><Icon d={ICONS.phone} />Ligar</a>}
                     {(leadPanel.whatsapp || leadPanel.phone) && <button className="btn btn-sm" style={{ background: '#25d366', color: '#fff', border: 'none' }} onClick={() => { const num = cleanPhone(leadPanel.whatsapp || leadPanel.phone || ''); if (num) window.open(`https://wa.me/${num}`, '_blank'); }}><Icon d={ICONS.whatsapp} />WhatsApp</button>}
                     {leadPanel.email && <button className="btn btn-sm" onClick={() => openEmailModal(leadPanel)}><Icon d={ICONS.email} />E-mail</button>}
-                    <button className="btn btn-sm" onClick={() => { setCallModal(leadPanel); setCallResult(''); setCallNotes(''); }}><Icon d={ICONS.phone} />Registrar ligação</button>
+                    <button className="btn btn-sm" onClick={() => { setCallModal(leadPanel); setCallResult(''); setCallNotes(`${getSaudacao()}, ${leadPanel.name.split(' ')[0]}! `); }}><Icon d={ICONS.phone} />Registrar ligação</button>
                   </div>
                 </div>
               )}
