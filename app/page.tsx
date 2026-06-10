@@ -1484,6 +1484,20 @@ function CalendarView({ meetings, leads, onOpenLead, onSchedule }: any) {
     grouped[dateKey].push(m);
   }
 
+  // Agrupa atividades (whatsapp, email, call) por dia
+  const activityByDay: Record<string, { whatsapp: number; email: number; call: number }> = {};
+  for (const lead of leads) {
+    try {
+      const tl = JSON.parse(lead.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+      for (const ev of tl) {
+        if (!ev.ts || !['whatsapp', 'email', 'call'].includes(ev.type)) continue;
+        const dk = new Date(ev.ts).toISOString().slice(0, 10);
+        if (!activityByDay[dk]) activityByDay[dk] = { whatsapp: 0, email: 0, call: 0 };
+        activityByDay[dk][ev.type as 'whatsapp' | 'email' | 'call']++;
+      }
+    } catch { /* ignore */ }
+  }
+
   // Gera os dias do mês atual
   const firstDay = new Date(curYear, curMonth, 1);
   const lastDay = new Date(curYear, curMonth + 1, 0);
@@ -1614,6 +1628,8 @@ function CalendarView({ meetings, leads, onOpenLead, onSchedule }: any) {
                   const hasMeeting = !!grouped[dk];
                   const isToday = dk === todayStr;
                   const isSelected = dk === selectedDay;
+                  const acts = activityByDay[dk];
+                  const hasActs = acts && (acts.whatsapp + acts.email + acts.call) > 0;
                   return (
                     <button key={di} onClick={() => setSelectedDay(dk)}
                       style={{
@@ -1621,9 +1637,25 @@ function CalendarView({ meetings, leads, onOpenLead, onSchedule }: any) {
                         background: isSelected ? '#0066ff' : isToday ? '#eff6ff' : 'transparent',
                         color: isSelected ? 'white' : isToday ? '#0066ff' : 'var(--text)',
                         outline: isToday && !isSelected ? '2px solid #0066ff' : 'none',
+                        paddingBottom: hasActs || hasMeeting ? 14 : undefined,
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
                       }}>
-                      {d}
-                      {hasMeeting && (
+                      <span>{d}</span>
+                      {/* Mini badges de atividades */}
+                      {hasActs && (
+                        <span style={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center', position: 'absolute', bottom: 3, left: 0, right: 0, padding: '0 2px' }}>
+                          {acts.whatsapp > 0 && (
+                            <span style={{ fontSize: 8, fontWeight: 700, background: isSelected ? 'rgba(255,255,255,0.3)' : '#dcfce7', color: isSelected ? 'white' : '#16a34a', borderRadius: 3, padding: '0 3px', lineHeight: '12px' }}>W{acts.whatsapp}</span>
+                          )}
+                          {acts.email > 0 && (
+                            <span style={{ fontSize: 8, fontWeight: 700, background: isSelected ? 'rgba(255,255,255,0.3)' : '#dbeafe', color: isSelected ? 'white' : '#1d4ed8', borderRadius: 3, padding: '0 3px', lineHeight: '12px' }}>E{acts.email}</span>
+                          )}
+                          {acts.call > 0 && (
+                            <span style={{ fontSize: 8, fontWeight: 700, background: isSelected ? 'rgba(255,255,255,0.3)' : '#ffedd5', color: isSelected ? 'white' : '#ea580c', borderRadius: 3, padding: '0 3px', lineHeight: '12px' }}>L{acts.call}</span>
+                          )}
+                        </span>
+                      )}
+                      {hasMeeting && !hasActs && (
                         <span style={{ position: 'absolute', bottom: 3, left: '50%', transform: 'translateX(-50%)', width: 5, height: 5, borderRadius: '50%', background: isSelected ? 'white' : '#0066ff', display: 'block' }} />
                       )}
                     </button>
@@ -1633,8 +1665,11 @@ function CalendarView({ meetings, leads, onOpenLead, onSchedule }: any) {
             ))}
           </div>
           {/* Legenda */}
-          <div style={{ padding: '8px 18px 14px', borderTop: '1px solid var(--border)', display: 'flex', gap: 16, fontSize: 11, color: 'var(--text-muted)' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#0066ff', display: 'inline-block' }} /> Reunião agendada</span>
+          <div style={{ padding: '8px 18px 14px', borderTop: '1px solid var(--border)', display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 11, color: 'var(--text-muted)', alignItems: 'center' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#0066ff', display: 'inline-block' }} /> Reunião</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 9, fontWeight: 700, background: '#dcfce7', color: '#16a34a', borderRadius: 3, padding: '0 4px' }}>W</span> WhatsApp</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 9, fontWeight: 700, background: '#dbeafe', color: '#1d4ed8', borderRadius: 3, padding: '0 4px' }}>E</span> E-mail</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ fontSize: 9, fontWeight: 700, background: '#ffedd5', color: '#ea580c', borderRadius: 3, padding: '0 4px' }}>L</span> Ligação</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 14, height: 14, borderRadius: 4, background: '#eff6ff', border: '2px solid #0066ff', display: 'inline-block' }} /> Hoje</span>
           </div>
         </div>
