@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     if (cnpj) {
       const cnpjLimpo = cnpj.replace(/\D/g, '')
       if (cnpjLimpo.length !== 14) {
-        return NextResponse.json({ error: 'CNPJ inválido' }, { status: 400 })
+        return NextResponse.json({ error: 'CNPJ inválido — digite os 14 dígitos' }, { status: 400 })
       }
 
       const res = await fetch(`https://api.cnpja.com/office/${cnpjLimpo}?simples=true&registrations=BR`, {
@@ -22,8 +22,15 @@ export async function GET(request: NextRequest) {
       })
 
       if (!res.ok) {
-        const err = await res.text()
-        return NextResponse.json({ error: `CNPJ não encontrado: ${err}` }, { status: 404 })
+        // Fallback para BrasilAPI
+        const res2 = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`, {
+          headers: { 'Accept': 'application/json' }
+        })
+        if (!res2.ok) {
+          return NextResponse.json({ error: 'CNPJ não encontrado na Receita Federal' }, { status: 404 })
+        }
+        const data2 = await res2.json()
+        return NextResponse.json(formatBrasilAPI(data2))
       }
 
       const data = await res.json()
@@ -32,34 +39,18 @@ export async function GET(request: NextRequest) {
 
     if (nome) {
       if (nome.length < 3) {
-        return NextResponse.json({ error: 'Nome muito curto' }, { status: 400 })
+        return NextResponse.json({ error: 'Digite pelo menos 3 letras' }, { status: 400 })
       }
 
-      const res = await fetch(
-        `https://api.cnpja.com/office/search?query=${encodeURIComponent(nome)}&limit=10`,
-        {
-          headers: {
-            'Authorization': CNPJA_KEY,
-            'Accept': 'application/json'
-          }
-        }
-      )
-
-      if (!res.ok) {
-        // Fallback para BrasilAPI
-        const res2 = await fetch(
-          `https://brasilapi.com.br/api/cnpj/v1/search?query=${encodeURIComponent(nome)}&limit=10`,
-          { headers: { 'Accept': 'application/json' } }
-        )
-        if (!res2.ok) return NextResponse.json({ results: [] })
-        const data2 = await res2.json()
-        const results = Array.isArray(data2) ? data2.map(formatBrasilAPI) : []
-        return NextResponse.json({ results })
-      }
-
-      const data = await res.json()
-      const results = Array.isArray(data?.offices) ? data.offices.map(formatCNPJA) : []
-      return NextResponse.json({ results })
+      // A Receita Federal não disponibiliza busca por nome de forma gratuita
+      // Retornar sugestão para buscar o CNPJ no Google
+      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(`CNPJ ${nome} site:receita.fazenda.gov.br OR site:cnpj.biz`)}`
+      return NextResponse.json({
+        suggestion: true,
+        message: `Busca por nome não disponível. Encontre o CNPJ da empresa e cole no campo acima.`,
+        googleUrl,
+        googleLabel: `🔍 Buscar CNPJ de "${nome}" no Google`
+      })
     }
 
     return NextResponse.json({ error: 'Informe cnpj ou nome' }, { status: 400 })
