@@ -130,6 +130,14 @@ export default function CRM() {
   const [calSelectedSlot, setCalSelectedSlot] = useState('');
   const [calLoadingSlots, setCalLoadingSlots] = useState(false);
   const [calSaving, setCalSaving] = useState(false);
+  // Modal de edição rápida do LinkedIn
+  const [linkedinModal, setLinkedinModal] = useState<Lead | null>(null);
+  const [linkedinInput, setLinkedinInput] = useState('');
+  const [savingLinkedin, setSavingLinkedin] = useState(false);
+  // Modal Instagram
+  const [instagramModal, setInstagramModal] = useState(false);
+  const [instagramCaption, setInstagramCaption] = useState('');
+  const [instagramPosting, setInstagramPosting] = useState(false);
   // Metas do gestor
   const [dailyGoals, setDailyGoals] = useState({ whatsapp_goal: 20, email_goal: 20, call_goal: 10, total_goal: 50 });
   // Sugestões do gestor não lidas
@@ -137,6 +145,44 @@ export default function CRM() {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2800); };
+
+  // Salvar LinkedIn rápido
+  const saveLinkedin = async () => {
+    if (!linkedinModal) return;
+    setSavingLinkedin(true);
+    const url = linkedinInput.trim();
+    const updated = { ...linkedinModal, linkedin: url, updated_at: Date.now() };
+    await saveLead(updated as Lead);
+    setLeads(prev => prev.map(l => l.id === updated.id ? updated as Lead : l));
+    setLinkedinModal(null);
+    setLinkedinInput('');
+    setSavingLinkedin(false);
+    showToast('LinkedIn salvo!');
+  };
+
+  // Publicar no Instagram
+  const postInstagram = async () => {
+    if (!instagramCaption.trim()) return;
+    setInstagramPosting(true);
+    try {
+      const res = await fetch('/api/instagram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ caption: instagramCaption, type: 'post' })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast('✅ Post criado! Confirme a publicação no painel do Instagram.');
+        setInstagramModal(false);
+        setInstagramCaption('');
+      } else {
+        showToast('Erro ao publicar: ' + (data.error || 'Tente novamente'));
+      }
+    } catch (e) {
+      showToast('Erro ao conectar com Instagram');
+    }
+    setInstagramPosting(false);
+  };
 
   // Envio em massa para leads selecionados
   const sendBulkEmails = async (leadsToSend: Lead[]) => {
@@ -393,7 +439,7 @@ export default function CRM() {
     } else {
       const wsName = ws?.name || 'getLOG/Lottustech';
       setEmailSubject(`Apresentação ${wsName} — Solução TMS para ${lead.company || 'sua empresa'}`);
-      setEmailBody(`Olá ${lead.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo Cabral, da ${wsName}. Percebo que empresas ${(lead as any).sector || 'atacadistas e distribuidoras'} como a ${lead.company || 'sua empresa'} buscam constantemente otimizar a operação logística e reduzir custos com frete.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas. Que tal explorar como podemos gerar resultados semelhantes para a ${lead.company || 'sua empresa'}?\n\nMe diga qual o melhor horário para um bate-papo de 15 minutos.\n\nAtenciosamente,\nDanilo Cabral\nGerente Comercial | ${wsName}\ndanilo@lottustech.com.br | (41) 99949-9815\nwww.gettms.com.br | www.lottustech.com.br`);
+      setEmailBody(`Olá ${lead.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo Cabral, da ${wsName}. Percebo que a ${lead.company || 'sua empresa'} busca constantemente otimizar a operação logística e reduzir custos com frete.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas. Que tal explorar como podemos gerar resultados semelhantes para a ${lead.company || 'sua empresa'}?\n\nMe diga qual o melhor horário para um bate-papo de 15 minutos.\n\nAtenciosamente,\nDanilo Cabral\nGerente Comercial | ${wsName}\ndanilo@lottustech.com.br | (41) 99949-9815\nwww.gettms.com.br | www.lottustech.com.br`);
     }
     setShowEmailTemplates(false);
   };
@@ -672,6 +718,7 @@ export default function CRM() {
                       </button>
                     )}
                     <a href="/gestor" target="_blank" style={{ fontSize: 11, color: '#0066ff', textDecoration: 'none', background: '#eff6ff', padding: '2px 10px', borderRadius: 20, border: '1px solid #0066ff33' }}>📊 Painel Gestor</a>
+                    <button onClick={() => { setInstagramModal(true); setInstagramCaption(''); }} style={{ fontSize: 11, color: '#c13584', background: '#fdf2f8', border: '1px solid #c1358433', borderRadius: 20, padding: '2px 10px', cursor: 'pointer', fontWeight: 600 }}>📸 Instagram</button>
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
@@ -859,10 +906,14 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                           <Icon d={ICONS.whatsapp} />
                         </button>
                         {/* LinkedIn */}
-                        {lead.linkedin && (
-                          <a href={lead.linkedin.startsWith('http') ? lead.linkedin : `https://linkedin.com/in/${lead.linkedin}`} target="_blank" rel="noopener noreferrer" className="ch-icon" title={`LinkedIn: ${lead.name}`} style={{ color: '#0a66c2', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+                        {lead.linkedin ? (
+                          <a href={lead.linkedin.startsWith('http') ? lead.linkedin : `https://linkedin.com/in/${lead.linkedin}`} target="_blank" rel="noopener noreferrer" className="ch-icon" title={`Abrir LinkedIn: ${lead.name}`} style={{ color: '#0a66c2', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
                           </a>
+                        ) : (
+                          <button className="ch-icon" title="Adicionar LinkedIn" style={{ color: '#94a3b8' }} onClick={() => { setLinkedinModal(lead); setLinkedinInput(lead.linkedin || ''); }}>
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+                          </button>
                         )}
                       </div></td>
                     </tr>
@@ -898,10 +949,14 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                         <button className="ch-icon email-btn" title="E-mail" onClick={() => openEmailModal(lead)}><Icon d={ICONS.email} /></button>
                         <button className="ch-icon" title="Observações" style={{ color: (lead.notes||'').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g,'').trim() ? '#f59e0b' : 'var(--text-muted)' }} onClick={() => { const cleanNotes = (lead.notes||'').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g,'').trim(); setNoteModal(lead); setNoteText(cleanNotes); }}><Icon d={ICONS.note} /></button>
                         <button className="ch-icon whatsapp-btn" title="WhatsApp" onClick={() => openWhatsModal(lead)}><Icon d={ICONS.whatsapp} /></button>
-                        {lead.linkedin && (
-                          <a href={lead.linkedin.startsWith('http') ? lead.linkedin : `https://linkedin.com/in/${lead.linkedin}`} target="_blank" rel="noopener noreferrer" className="ch-icon" title="LinkedIn" style={{ color: '#0a66c2', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
+                        {lead.linkedin ? (
+                          <a href={lead.linkedin.startsWith('http') ? lead.linkedin : `https://linkedin.com/in/${lead.linkedin}`} target="_blank" rel="noopener noreferrer" className="ch-icon" title="Abrir LinkedIn" style={{ color: '#0a66c2', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
                           </a>
+                        ) : (
+                          <button className="ch-icon" title="Adicionar LinkedIn" style={{ color: '#94a3b8' }} onClick={() => { setLinkedinModal(lead); setLinkedinInput(''); }}>
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+                          </button>
                         )}
                       </div>
                     </div>
@@ -1208,7 +1263,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                       onClick={() => {
                         const wsName = ws?.name || 'getLOG/Lottustech';
                         setEmailSubject(`Apresentação ${wsName} — Solução TMS para ${emailModal.company || 'sua empresa'}`);
-                        setEmailBody(`Olá ${emailModal.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo Cabral, da ${wsName}. Percebo que empresas ${(emailModal as any).sector || 'atacadistas e distribuidoras'} como a ${emailModal.company || 'sua empresa'} buscam constantemente otimizar a operação logística e reduzir custos com frete.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas. Que tal explorar como podemos gerar resultados semelhantes para a ${emailModal.company || 'sua empresa'}?\n\nMe diga qual o melhor horário para um bate-papo de 15 minutos.\n\nAtenciosamente,\nDanilo Cabral\nGerente Comercial | ${wsName}\ndanilo@lottustech.com.br | (41) 99949-9815\nwww.gettms.com.br | www.lottustech.com.br`);
+                        setEmailBody(`Olá ${emailModal.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo Cabral, da ${wsName}. Percebo que a ${emailModal.company || 'sua empresa'} busca constantemente otimizar a operação logística e reduzir custos com frete.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas. Que tal explorar como podemos gerar resultados semelhantes para a ${emailModal.company || 'sua empresa'}?\n\nMe diga qual o melhor horário para um bate-papo de 15 minutos.\n\nAtenciosamente,\nDanilo Cabral\nGerente Comercial | ${wsName}\ndanilo@lottustech.com.br | (41) 99949-9815\nwww.gettms.com.br | www.lottustech.com.br`);
                       }}
                     >
                       📝 Padrão
@@ -1389,6 +1444,102 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                 } catch { showToast('Erro ao salvar'); }
                 setSavingNote(false);
               }}>{savingNote ? 'Salvando...' : '✓ Salvar observações'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal de edição rápida do LinkedIn */}
+      {linkedinModal && (
+        <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) { setLinkedinModal(null); setLinkedinInput(''); } }}>
+          <div className="modal" style={{ maxWidth: 480 }}>
+            <div className="modal-header">
+              <div className="modal-title" style={{ color: '#0a66c2' }}>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="#0a66c2" style={{ marginRight: 8, verticalAlign: 'middle' }}><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+                LinkedIn — {linkedinModal.name}
+              </div>
+              <button className="modal-close" onClick={() => { setLinkedinModal(null); setLinkedinInput(''); }}>×</button>
+            </div>
+            <div className="modal-body">
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>{linkedinModal.company}{linkedinModal.role ? ` · ${linkedinModal.role}` : ''}</div>
+              <div className="field">
+                <label className="field-label">URL do perfil LinkedIn</label>
+                <input
+                  className="field-input"
+                  type="url"
+                  placeholder="https://linkedin.com/in/nome-sobrenome"
+                  value={linkedinInput}
+                  onChange={e => setLinkedinInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveLinkedin(); }}
+                  autoFocus
+                />
+              </div>
+              <div style={{ marginTop: 10, padding: '10px 14px', background: '#f0f9ff', borderRadius: 8, border: '1px solid #bae6fd' }}>
+                <div style={{ fontSize: 12, color: '#0369a1', fontWeight: 600, marginBottom: 6 }}>🔍 Buscar no LinkedIn</div>
+                <a
+                  href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent((linkedinModal.name || '') + ' ' + (linkedinModal.company || ''))}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ fontSize: 12, color: '#0a66c2', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                >
+                  💼 Buscar "{linkedinModal.name}" no LinkedIn →
+                </a>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn" onClick={() => { setLinkedinModal(null); setLinkedinInput(''); }}>Cancelar</button>
+              {linkedinModal.linkedin && (
+                <a
+                  href={linkedinModal.linkedin.startsWith('http') ? linkedinModal.linkedin : `https://linkedin.com/in/${linkedinModal.linkedin}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn"
+                  style={{ color: '#0a66c2', textDecoration: 'none' }}
+                >
+                  Abrir perfil atual
+                </a>
+              )}
+              <button className="btn btn-primary" disabled={savingLinkedin} onClick={saveLinkedin}>
+                {savingLinkedin ? 'Salvando...' : '✓ Salvar LinkedIn'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal Instagram */}
+      {instagramModal && (
+        <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) setInstagramModal(false); }}>
+          <div className="modal" style={{ maxWidth: 520 }}>
+            <div className="modal-header">
+              <div className="modal-title" style={{ color: '#c13584' }}>
+                📸 Publicar no Instagram — @drivoncrm
+              </div>
+              <button className="modal-close" onClick={() => setInstagramModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>Crie um post de prospecção ou conteúdo para o Instagram. O post será enviado para aprovação antes de publicar.</div>
+              <div className="field">
+                <label className="field-label">Legenda do Post</label>
+                <textarea
+                  className="field-input"
+                  rows={6}
+                  placeholder="Ex: Você sabia que empresas que usam TMS reduzem até 30% dos custos logísticos? 🚚✅&#10;&#10;A getLOG/Lottustech oferece soluções completas de gestão de transporte para indústrias e distribuidoras.&#10;&#10;Entre em contato: danilo@lottustech.com.br&#10;&#10;#TMS #Logística #GestaoDeTransporte #Lottustech"
+                  value={instagramCaption}
+                  onChange={e => setInstagramCaption(e.target.value)}
+                  style={{ resize: 'vertical', minHeight: 140 }}
+                />
+              </div>
+              <div style={{ marginTop: 10, padding: '10px 14px', background: '#fdf2f8', borderRadius: 8, border: '1px solid #f9a8d4' }}>
+                <div style={{ fontSize: 12, color: '#9d174d', fontWeight: 600, marginBottom: 4 }}>Sugestões de hashtags</div>
+                <div style={{ fontSize: 11, color: '#c13584', lineHeight: 1.8 }}>#TMS #Logistica #GestaoDeTransporte #Lottustech #getLOG #TransporteRodoviario #SupplyChain #Industria #Distribuidora #SoftwareLogistico</div>
+              </div>
+              <div style={{ marginTop: 8, fontSize: 11, color: '#94a3b8' }}>⚠ O post será criado como rascunho e precisará de confirmação no painel do Manus antes de publicar.</div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn" onClick={() => setInstagramModal(false)}>Cancelar</button>
+              <button className="btn btn-primary" disabled={instagramPosting || !instagramCaption.trim()} onClick={postInstagram}
+                style={{ background: 'linear-gradient(135deg, #c13584, #e1306c)', border: 'none' }}>
+                {instagramPosting ? 'Publicando...' : '📸 Publicar Post'}
+              </button>
             </div>
           </div>
         </div>

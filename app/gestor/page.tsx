@@ -405,6 +405,7 @@ export default function GestorPage() {
                               {lead.email && <a href={`mailto:${lead.email}`} style={{ fontSize: 11, color: '#1d4ed8', textDecoration: 'none' }}>✉ {lead.email}</a>}
                               {lead.phone && <a href={`tel:${lead.phone}`} style={{ fontSize: 11, color: '#0066ff', fontWeight: 600, textDecoration: 'none' }}>📞 {lead.phone}</a>}
                               {lead.whatsapp && lead.whatsapp !== lead.phone && <a href={`https://wa.me/55${lead.whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, textDecoration: 'none' }}>💬 {lead.whatsapp}</a>}
+                              {lead.linkedin && <a href={lead.linkedin.startsWith('http') ? lead.linkedin : `https://linkedin.com/in/${lead.linkedin}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#0a66c2', fontWeight: 600, textDecoration: 'none' }}>💼 LinkedIn</a>}
                             </div>
                           </div>
                           <div style={{ textAlign: 'right', minWidth: 120 }}>
@@ -557,6 +558,13 @@ export default function GestorPage() {
                           {nextCall && <span style={{ fontSize: 11, background: isOverdue ? '#fee2e2' : '#fef9c3', color: isOverdue ? '#dc2626' : '#92400e', borderRadius: 6, padding: '1px 8px' }}>{isOverdue ? '⚠ Retorno atrasado' : `🔔 Retorno: ${nextCall.toLocaleDateString('pt-BR')}`}</span>}
                         </div>
                         <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{l.email} {l.phone ? `· ${l.phone}` : ''}</div>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+                          {l.linkedin ? (
+                            <a href={l.linkedin.startsWith('http') ? l.linkedin : `https://linkedin.com/in/${l.linkedin}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#0a66c2', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3 }}>💼 Ver LinkedIn</a>
+                          ) : (
+                            <a href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent((l.name || '') + ' ' + (l.company || ''))}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#94a3b8', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3 }}>🔍 Buscar no LinkedIn</a>
+                          )}
+                        </div>
                         {lastActivity && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Último contato: {lastActivity.type || lastActivity.action} — {new Date(lastActivity.date || lastActivity.ts).toLocaleDateString('pt-BR')}</div>}
                         {l.gestor_note && <div style={{ fontSize: 12, background: '#fef9c3', color: '#92400e', borderRadius: 6, padding: '4px 8px', marginTop: 4 }}>💡 Nota do gestor: {l.gestor_note}</div>}
                       </div>
