@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📞 Telefone — CRM Lottus Tech</title>
+  <link rel="stylesheet" href="phone.min.css">
+  <link rel="stylesheet" href="phone.dark.css" id="phone-theme">
+  <style>
+    body { margin: 0; background: #0f172a; font-family: 'Inter', sans-serif; }
+    #top-bar {
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    #top-bar a {
+      color: #94a3b8;
+      text-decoration: none;
+      font-size: 13px;
+    }
+    #top-bar a:hover { color: #fff; }
+    #top-bar .title {
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    #status-bar {
+      background: #0f172a;
+      padding: 8px 16px;
+      font-size: 12px;
+      color: #64748b;
+      border-bottom: 1px solid #1e293b;
+    }
+    #status-bar .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ef4444;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    #status-bar .status-dot.connected { background: #22c55e; }
+    #notice-bar {
+      background: #fef3c7;
+      border: 1px solid #fbbf24;
+      color: #92400e;
+      padding: 8px 16px;
+      font-size: 12px;
+      text-align: center;
+    }
+    #notice-bar.hidden { display: none; }
+  </style>
+</head>
+<body>
+
+<div id="top-bar">
+  <a href="/">← Voltar ao CRM</a>
+  <span style="color:#334155">|</span>
+  <span class="title">📞 Softphone WebRTC — BrDid (41) 3798-8945</span>
+</div>
+
+<div id="notice-bar">
+  ⚠️ <strong>Aguardando liberação do WebSocket pelo BrDid</strong> — Ticket #703854 aberto.
+  Quando o BrDid habilitar o WebSocket, o softphone conectará automaticamente com o número <strong>(41) 3798-8945</strong>.
+</div>
+
+<div id="status-bar">
+  <span class="status-dot" id="conn-dot"></span>
+  <span id="conn-status">Desconectado — aguardando WebSocket do servidor SIP</span>
+</div>
+
+<!-- Browser Phone Container -->
+<div id="phone-container"></div>
+
+<!-- SIP.js library (required by Browser-Phone) -->
+<script src="https://cdn.jsdelivr.net/npm/sip.js@0.21.2/lib/platform/web/simple-user/simple-user.min.js"></script>
+<script src="phone.min.js"></script>
+
+<script>
+  // Credenciais SIP do BrDid
+  const SIP_CONFIG = {
+    wssServer: "voz.sobreip.com.br",
+    WebSocketPort: "8089",
+    ServerPath: "/ws",
+    SipDomain: "voz.sobreip.com.br",
+    SipUsername: "4137988945",
+    SipPassword: "11jlr",
+    SipName: "Danilo Cabral",
+    ProfileName: "BrDid (41) 3798-8945",
+    WelcomeScreen: false,
+    AutoGainControl: true,
+    NoiseSuppression: true,
+    EchoCancellation: true,
+    Language: "pt-BR"
+  };
+
+  // Tentar inicializar o Browser-Phone com as credenciais BrDid
+  try {
+    if (typeof StartPhone === 'function') {
+      StartPhone(SIP_CONFIG);
+      document.getElementById('conn-status').textContent = 'Conectando ao servidor SIP do BrDid...';
+    } else {
+      // Fallback: salvar no localStorage para o Browser-Phone usar
+      Object.entries(SIP_CONFIG).forEach(([k, v]) => {
+        localStorage.setItem(k, v);
+      });
+      document.getElementById('conn-status').textContent = 'Configuração salva — recarregando...';
+      setTimeout(() => location.reload(), 500);
+    }
+  } catch(e) {
+    console.error('Erro ao inicializar softphone:', e);
+    document.getElementById('conn-status').textContent = 'Erro ao conectar: ' + e.message;
+  }
+
+  // Monitorar status da conexão
+  window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'sip-connected') {
+      document.getElementById('conn-dot').classList.add('connected');
+      document.getElementById('conn-status').textContent = 'Conectado — ramal ' + SIP_CONFIG.SipUsername;
+      document.getElementById('notice-bar').classList.add('hidden');
+    }
+    if (e.data && e.data.type === 'sip-disconnected') {
+      document.getElementById('conn-dot').classList.remove('connected');
+      document.getElementById('conn-status').textContent = 'Desconectado do servidor SIP';
+    }
+  });
+</script>
+
+</body>
+</html>
