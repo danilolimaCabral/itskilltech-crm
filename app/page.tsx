@@ -730,7 +730,7 @@ export default function CRM() {
                 ))}
               </div>
               {/* Prospecção de hoje com metas */}
-              <div style={{ margin: '8px 0', padding: '12px 14px', background: 'var(--surface-2, #f9fafb)', borderRadius: 10, border: '1px solid var(--border)' }}>
+              <div style={{ margin: '8px 0', padding: '14px 16px', background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>📊 Prospecção de Hoje</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -739,8 +739,8 @@ export default function CRM() {
                         💡 {unreadSuggestions.length} sugestão do gestor
                       </button>
                     )}
-                    <a href="/gestor" target="_blank" style={{ fontSize: 11, color: '#0066ff', textDecoration: 'none', background: '#eff6ff', padding: '2px 10px', borderRadius: 20, border: '1px solid #0066ff33' }}>📊 Painel Gestor</a>
-                    <button onClick={() => { setInstagramModal(true); setInstagramCaption(''); }} style={{ fontSize: 11, color: '#c13584', background: '#fdf2f8', border: '1px solid #c1358433', borderRadius: 20, padding: '2px 10px', cursor: 'pointer', fontWeight: 600 }}>📸 Instagram</button>
+                    <a href="/gestor" target="_blank" style={{ fontSize: 11, color: 'var(--primary)', textDecoration: 'none', background: 'var(--primary-soft)', padding: '3px 10px', borderRadius: 20, border: '1px solid var(--primary-border)', fontWeight: 500 }}>📊 Painel Gestor</a>
+                    <button onClick={() => { setInstagramModal(true); setInstagramCaption(''); }} style={{ fontSize: 11, color: '#9333ea', background: '#faf5ff', border: '1px solid #e9d5ff', borderRadius: 20, padding: '3px 10px', cursor: 'pointer', fontWeight: 500 }}>📸 Instagram</button>
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
@@ -753,13 +753,13 @@ export default function CRM() {
                   ].map(c => {
                     const pct = c.goal > 0 ? Math.min(100, Math.round((c.value / c.goal) * 100)) : 0;
                     return (
-                      <div key={c.label} style={{ background: 'var(--surface)', borderRadius: 8, padding: '8px 10px', border: `1px solid ${c.color}22` }}>
+                      <div key={c.label} style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '10px 12px', border: `1px solid ${c.color}20`, transition: 'all 0.15s' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                           <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{c.label}</span>
                           <span style={{ fontSize: 11, color: '#94a3b8' }}>{c.value}/{c.goal}</span>
                         </div>
                         <div style={{ fontSize: 20, fontWeight: 700, color: c.color, lineHeight: 1 }}>{c.value}</div>
-                        <div style={{ background: '#f1f5f9', borderRadius: 4, height: 5, marginTop: 5, overflow: 'hidden' }}>
+                        <div style={{ background: 'var(--border)', borderRadius: 4, height: 4, marginTop: 6, overflow: 'hidden' }}>
                           <div style={{ width: `${pct}%`, height: '100%', background: c.color, borderRadius: 4, transition: 'width 0.4s' }} />
                         </div>
                         <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>{pct}% da meta{pct >= 100 ? ' ✅' : ''}</div>
@@ -1023,9 +1023,9 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
       {leadPanel && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex' }} onClick={e => { if (e.target === e.currentTarget) setLeadPanel(null); }}>
           <div style={{ flex: 1 }} onClick={() => setLeadPanel(null)} />
-          <div style={{ width: Math.min(480, window.innerWidth), background: 'var(--surface)', boxShadow: '-4px 0 32px rgba(0,0,0,.18)', display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto' }}>
+          <div style={{ width: Math.min(480, window.innerWidth), background: 'var(--surface)', boxShadow: '-8px 0 40px rgba(0,0,0,.14)', display: 'flex', flexDirection: 'column', height: '100%', overflowY: 'auto', borderLeft: '1px solid var(--border)' }}>
             {/* Header do painel */}
-            <div style={{ padding: '18px 20px 14px', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
+            <div style={{ padding: '20px 22px 16px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.3 }}>{leadPanel.name}</div>
@@ -1052,7 +1052,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
               </div>
             </div>
             {/* Abas do painel */}
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--bg)' }}>
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
               {([['info','Dados'],['timeline','Histórico'],['analysis','Análise IA']] as const).map(([t, lbl]) => (
                 <button key={t} onClick={() => { setPanelTab(t); if (t === 'analysis' && !panelAnalysis && !analyzingLead) analyzeCompany(leadPanel); }}
                   style={{ flex: 1, padding: '10px 4px', fontSize: 12, fontWeight: panelTab === t ? 700 : 400, borderBottom: panelTab === t ? '2px solid var(--primary)' : '2px solid transparent', background: 'none', cursor: 'pointer', color: panelTab === t ? 'var(--primary)' : 'var(--text-muted)', transition: 'all .15s' }}>

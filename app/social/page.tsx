@@ -149,7 +149,7 @@ export default function SocialPage() {
   const finalImage = uploadedImage || imageUrl;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f7f8fa', padding: '24px 16px' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px 20px', fontFamily: 'Inter, -apple-system, sans-serif' }}>
       {toast && (
         <div style={{ position: 'fixed', top: 20, right: 20, background: '#1e293b', color: '#fff', borderRadius: 10, padding: '12px 20px', zIndex: 9999, fontSize: 14, boxShadow: '0 4px 20px rgba(0,0,0,0.2)' }}>
           {toast}
@@ -165,10 +165,10 @@ export default function SocialPage() {
         </div>
 
         {/* Tabs */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 20, background: '#fff', borderRadius: 10, padding: 4, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', width: 'fit-content' }}>
+        <div style={{ display: 'flex', gap: 4, marginBottom: 20, background: 'var(--surface)', borderRadius: 10, padding: 4, boxShadow: '0 1px 3px rgba(0,0,0,0.06)', border: '1px solid var(--border)', width: 'fit-content' }}>
           {[{key:'create',label:'✏️ Criar Post'},{key:'schedule',label:'📅 Agendados'}].map(t => (
             <button key={t.key} onClick={() => setTab(t.key as any)}
-              style={{ background: tab === t.key ? '#0066ff' : 'transparent', color: tab === t.key ? '#fff' : '#64748b', border: 'none', borderRadius: 8, padding: '8px 18px', cursor: 'pointer', fontWeight: tab === t.key ? 600 : 400, fontSize: 13, transition: 'all 0.15s' }}>
+              style={{ background: tab === t.key ? 'var(--primary)' : 'transparent', color: tab === t.key ? '#fff' : 'var(--text-muted)', border: 'none', borderRadius: 8, padding: '8px 18px', cursor: 'pointer', fontWeight: tab === t.key ? 600 : 400, fontSize: 13, transition: 'all 0.15s', boxShadow: tab === t.key ? '0 1px 3px rgba(37,99,235,0.3)' : 'none' }}>
               {t.label}
             </button>
           ))}
@@ -180,8 +180,8 @@ export default function SocialPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
               {/* Plataforma */}
-              <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>📲 Plataforma</div>
+              <div style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid var(--border)' }}>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12, color: 'var(--text)' }}>📲 Plataforma</div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {PLATFORMS.map(p => (
                     <button key={p.value} onClick={() => setPlatform(p.value)}
@@ -193,8 +193,8 @@ export default function SocialPage() {
               </div>
 
               {/* Tema */}
-              <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>🎯 Tema do Post</div>
+              <div style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid var(--border)' }}>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12, color: 'var(--text)' }}>🎯 Tema do Post</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {TOPICS.map(t => (
                     <button key={t.value} onClick={() => setTopic(t.value)}
@@ -206,8 +206,8 @@ export default function SocialPage() {
               </div>
 
               {/* Estilo */}
-              <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>🎨 Estilo Visual</div>
+              <div style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid var(--border)' }}>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12, color: 'var(--text)' }}>🎨 Estilo Visual</div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {STYLES.map(s => (
                     <button key={s.value} onClick={() => setStyle(s.value)}
@@ -219,8 +219,8 @@ export default function SocialPage() {
               </div>
 
               {/* Prompt customizado */}
-              <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8 }}>✏️ Descrição da Imagem (opcional)</div>
+              <div style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid var(--border)' }}>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 8, color: 'var(--text)' }}>✏️ Descrição da Imagem (opcional)</div>
                 <textarea
                   value={customPrompt}
                   onChange={e => setCustomPrompt(e.target.value)}
@@ -235,11 +235,11 @@ export default function SocialPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
               {/* Imagem */}
-              <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>🖼️ Imagem do Post</div>
+              <div style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid var(--border)' }}>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12, color: 'var(--text)' }}>🖼️ Imagem do Post</div>
 
                 {/* Preview da imagem */}
-                <div style={{ width: '100%', aspectRatio: platform === 'linkedin' ? '16/9' : '1/1', background: '#f1f5f9', borderRadius: 10, overflow: 'hidden', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px dashed #e2e8f0' }}>
+                <div style={{ width: '100%', aspectRatio: platform === 'linkedin' ? '16/9' : '1/1', background: 'var(--surface-2)', borderRadius: 10, overflow: 'hidden', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px dashed var(--border-strong)' }}>
                   {finalImage ? (
                     <img src={finalImage} alt="Post preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
@@ -276,11 +276,11 @@ export default function SocialPage() {
               </div>
 
               {/* Legenda */}
-              <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+              <div style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>📝 Legenda</div>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>📝 Legenda</div>
                   <button onClick={generateCaption} disabled={generatingCaption}
-                    style={{ background: '#eff6ff', color: '#1d4ed8', border: 'none', borderRadius: 6, padding: '4px 12px', cursor: generatingCaption ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600 }}>
+                    style={{ background: 'var(--primary-soft)', color: 'var(--primary)', border: '1px solid var(--primary-border)', borderRadius: 6, padding: '4px 12px', cursor: generatingCaption ? 'not-allowed' : 'pointer', fontSize: 12, fontWeight: 600 }}>
                     {generatingCaption ? '⏳ Gerando...' : '🤖 Gerar com IA'}
                   </button>
                 </div>
@@ -289,7 +289,7 @@ export default function SocialPage() {
                 <div style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap' }}>
                   {CAPTION_TEMPLATES.map((t, i) => (
                     <button key={i} onClick={() => setCaption(t.text)}
-                      style={{ background: '#f8fafc', color: '#374151', border: '1px solid #e2e8f0', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: 11 }}>
+                      style={{ background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 6, padding: '3px 10px', cursor: 'pointer', fontSize: 11, transition: 'all 0.12s' }}>
                       {t.label}
                     </button>
                   ))}
@@ -300,14 +300,14 @@ export default function SocialPage() {
                   onChange={e => setCaption(e.target.value)}
                   placeholder="Escreva a legenda do post ou gere com IA..."
                   rows={8}
-                  style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', lineHeight: 1.5 }}
+                  style={{ width: '100%', border: '1px solid var(--border-strong)', borderRadius: 8, padding: '8px 12px', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit', lineHeight: 1.5, outline: 'none', color: 'var(--text)', background: 'var(--surface)' }}
                 />
                 <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4, textAlign: 'right' }}>{caption.length} caracteres</div>
               </div>
 
               {/* Botões de publicação */}
-              <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12 }}>🚀 Publicar</div>
+              <div style={{ background: 'var(--surface)', borderRadius: 12, padding: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid var(--border)' }}>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 12, color: 'var(--text)' }}>🚀 Publicar</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <button onClick={openLinkedIn}
                     style={{ width: '100%', background: '#0a66c2', color: '#fff', border: 'none', borderRadius: 10, padding: '12px 0', cursor: 'pointer', fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
@@ -322,7 +322,7 @@ export default function SocialPage() {
                     navigator.clipboard.writeText(text);
                     showToast('✅ Copiado para a área de transferência!');
                   }}
-                    style={{ width: '100%', background: '#f1f5f9', color: '#374151', border: 'none', borderRadius: 10, padding: '10px 0', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
+                    style={{ width: '100%', background: 'var(--surface-2)', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 0', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
                     📋 Copiar Legenda
                   </button>
                 </div>
@@ -332,7 +332,7 @@ export default function SocialPage() {
         )}
 
         {tab === 'schedule' && (
-          <div style={{ background: '#fff', borderRadius: 14, padding: 40, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', textAlign: 'center', color: '#94a3b8' }}>
+          <div style={{ background: 'var(--surface)', borderRadius: 12, padding: 40, boxShadow: '0 1px 3px rgba(0,0,0,0.05)', border: '1px solid var(--border)', textAlign: 'center', color: 'var(--text-muted)' }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>📅</div>
             <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 8, color: '#374151' }}>Agendamento de Posts</div>
             <div style={{ fontSize: 14 }}>Em breve: agende posts para LinkedIn e Instagram com antecedência.</div>
