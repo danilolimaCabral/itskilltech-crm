@@ -176,9 +176,16 @@ export function TemplatesView({ workspace, workspaceName, templates, onReload, s
                 </div>
               )}
               <div className="field">
-                <label className="field-label">Mensagem * (use nome, empresa, cargo como variaveis)</label>
+                <label className="field-label">Mensagem * (use {{nome}}, {{empresa}}, {{cargo}} como variáveis)</label>
                 <textarea className="field-textarea" style={{ minHeight: 220 }} value={editing.body} onChange={e => setEditing({ ...editing, body: e.target.value })} />
               </div>
+              {tab === 'email' && (
+                <div className="field">
+                  <label className="field-label">📎 Anexo / Apresentação (URL pública)</label>
+                  <input className="field-input" value={editing.attachment_url || ''} onChange={e => setEditing({ ...editing, attachment_url: e.target.value })} placeholder="https://drive.google.com/... ou https://..." />
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Cole o link direto do arquivo (PDF, imagem). Use Google Drive com acesso público ou Dropbox.</div>
+                </div>
+              )}
             </div>
             <div className="modal-footer">
               <button className="btn" onClick={() => setEditing(null)}>Cancelar</button>

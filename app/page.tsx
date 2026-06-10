@@ -94,7 +94,9 @@ export default function CRM() {
   const [emailModal, setEmailModal] = useState<Lead | null>(null);
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
+  const [emailAttachmentUrl, setEmailAttachmentUrl] = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailSentInfo, setEmailSentInfo] = useState<{id: string, to: string} | null>(null);
   // Templates
   const [templates, setTemplates] = useState<any[]>([]);
   const [showEmailTemplates, setShowEmailTemplates] = useState(false);
@@ -323,20 +325,21 @@ export default function CRM() {
       const r = await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: emailModal.email, toName: emailModal.name, subject: emailSubject, body: emailBody, workspaceSlug: workspace, fromName: ws?.name, leadId: emailModal.id }),
+        body: JSON.stringify({ to: emailModal.email, toName: emailModal.name, subject: emailSubject, body: emailBody, workspaceSlug: workspace, fromName: ws?.name, leadId: emailModal.id, attachment_url: emailAttachmentUrl || undefined }),
       });
       const j = await r.json();
       if (j.success) {
-        showToast('✓ E-mail enviado para ' + emailModal.email);
+        // Mostrar confirmação com ID Resend
+        setEmailSentInfo({ id: j.id || '—', to: emailModal.email });
         // Avançar para próxima etapa do funil e registrar na timeline
         const STATUS_ADVANCE: any = { prospeccao: 'qualificacao', novo: 'qualificacao', contatado: 'qualificacao', qualificacao: 'apresentacao', apresentacao: 'fechamento', fechamento: 'posvenda' };
         const nextStatus = STATUS_ADVANCE[normalizeStatus(emailModal.status)] || normalizeStatus(emailModal.status);
         const timeline = JSON.parse(emailModal.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
-        timeline.unshift({ type: 'email', label: `E-mail enviado: ${emailSubject}`, ts: Date.now() });
+        timeline.unshift({ type: 'email', label: `E-mail enviado: ${emailSubject}${emailAttachmentUrl ? ' (com apresentação)' : ''}`, ts: Date.now() });
         if (nextStatus !== normalizeStatus(emailModal.status)) timeline.unshift({ type: 'status', label: `Etapa → ${FUNNEL_MAP[nextStatus]?.label || nextStatus}`, ts: Date.now() });
         const notesClean = (emailModal.notes || '').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
         await saveLead({ ...emailModal, status: nextStatus, updated_at: Date.now(), notes: notesClean + `\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]` });
-        setEmailModal(null); setEmailSubject(''); setEmailBody('');
+        setEmailModal(null); setEmailSubject(''); setEmailBody(''); setEmailAttachmentUrl('');
       } else {
         showToast('Erro: ' + (j.error || 'falha no envio'));
       }
@@ -1103,6 +1106,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                             .replace(/\{\{workspace\}\}/g, ws?.name || 'getLOG/Lottustech');
                           setEmailSubject(subject || `Apresentação ${ws?.name} — ${emailModal.company || 'sua empresa'}`);
                           setEmailBody(body);
+                          if (tpl.attachment_url) setEmailAttachmentUrl(tpl.attachment_url);
                         }}
                       >
                         {tpl.name}
@@ -1124,12 +1128,41 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                 <label className="field-label">Mensagem</label>
                 <textarea className="field-textarea" style={{ minHeight: 200 }} value={emailBody} onChange={e => setEmailBody(e.target.value)} />
               </div>
+              {/* Campo de anexo / apresentação */}
+              <div className="field">
+                <label className="field-label">📎 Apresentação / Anexo (URL pública)</label>
+                <input className="field-input" value={emailAttachmentUrl} onChange={e => setEmailAttachmentUrl(e.target.value)} placeholder="https://drive.google.com/... ou link do arquivo" />
+                {emailAttachmentUrl && (
+                  <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#16a34a' }}>
+                    <span>✅ Apresentação será incluída no e-mail como botão</span>
+                    <button style={{ fontSize: 11, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => setEmailAttachmentUrl('')}>Remover</button>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="modal-footer">
               <button className="btn" onClick={() => setEmailModal(null)}>Cancelar</button>
               <button className="btn btn-primary" disabled={!emailModal.email || sendingEmail} onClick={sendEmail}>
                 <Icon d={ICONS.send} />{sendingEmail ? 'Enviando...' : 'Enviar e-mail'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmação de envio de e-mail */}
+      {emailSentInfo && (
+        <div className="modal-bg" onClick={() => setEmailSentInfo(null)}>
+          <div className="modal" style={{ maxWidth: 420, textAlign: 'center' }}>
+            <div className="modal-body" style={{ padding: '32px 24px' }}>
+              <div style={{ fontSize: 48, marginBottom: 12 }}>✅</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>E-mail enviado com sucesso!</div>
+              <div style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>Para: <strong>{emailSentInfo.to}</strong></div>
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '12px 16px', marginBottom: 20 }}>
+                <div style={{ fontSize: 11, color: '#15803d', fontWeight: 600, marginBottom: 4 }}>ID de confirmação Resend</div>
+                <div style={{ fontSize: 12, fontFamily: 'monospace', color: '#166534', wordBreak: 'break-all' }}>{emailSentInfo.id}</div>
+              </div>
+              <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => setEmailSentInfo(null)}>Fechar</button>
             </div>
           </div>
         </div>

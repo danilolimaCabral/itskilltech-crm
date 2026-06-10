@@ -64,7 +64,7 @@ const DEFAULT_SENDER: WorkspaceSender = {
 
 export async function POST(req: NextRequest) {
   try {
-    const { to, toName, subject, body, workspaceSlug, leadId } = await req.json()
+    const { to, toName, subject, body, workspaceSlug, leadId, attachment_url } = await req.json()
 
     if (!to || !subject || !body) {
       return NextResponse.json({ error: 'Campos obrigatórios: to, subject, body' }, { status: 400 })
@@ -111,6 +111,7 @@ export async function POST(req: NextRequest) {
       </div>
       <div class="content">
         ${body.split('\n').map((line: string) => line.trim() ? `<p>${line}</p>` : '<br>').join('')}
+        ${attachment_url ? `<div style="margin-top:20px;padding:16px;background:#f0f9ff;border-radius:8px;border:1px solid #bae6fd;"><div style="font-size:13px;font-weight:600;color:#0369a1;margin-bottom:10px;">&#128206; Apresenta&#231;&#227;o / Material</div><a href="${attachment_url}" style="display:inline-block;padding:10px 20px;background:${sender.color};color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">&#128196; Abrir apresenta&#231;&#227;o</a></div>` : ''}
         <div class="signature">
           <div class="sig-name">${sender.displayName}</div>
           <div class="sig-title">${sender.name}</div>
@@ -140,7 +141,7 @@ export async function POST(req: NextRequest) {
       from: fromEmail,
       to: toName ? `${toName} <${to}>` : to,
       subject,
-      text: body,
+      text: body + (attachment_url ? `\n\nApresentação: ${attachment_url}` : ''),
       html: htmlWithPixel,
     })
 

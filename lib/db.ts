@@ -108,10 +108,13 @@ export async function initDatabase() {
       subject TEXT,
       body TEXT NOT NULL,
       tags TEXT,
+      attachment_url TEXT DEFAULT '',
       created_at BIGINT,
       updated_at BIGINT
     );
   `;
+  // Migração segura: adicionar attachment_url se não existir
+  try { await sql`ALTER TABLE templates ADD COLUMN IF NOT EXISTS attachment_url TEXT DEFAULT '';`; } catch {}
 
   return { ok: true };
 }
@@ -234,11 +237,11 @@ export async function getTemplates(workspace: string) {
 export async function upsertTemplate(t: any) {
   if (!hasDatabase) return null;
   await sql`
-    INSERT INTO templates (id, workspace, name, type, subject, body, tags, created_at, updated_at)
-    VALUES (${t.id}, ${t.workspace}, ${t.name}, ${t.type}, ${t.subject || ''}, ${t.body}, ${t.tags || ''}, ${t.created_at || Date.now()}, ${t.updated_at || Date.now()})
+    INSERT INTO templates (id, workspace, name, type, subject, body, tags, attachment_url, created_at, updated_at)
+    VALUES (${t.id}, ${t.workspace}, ${t.name}, ${t.type}, ${t.subject || ''}, ${t.body}, ${t.tags || ''}, ${t.attachment_url || ''}, ${t.created_at || Date.now()}, ${t.updated_at || Date.now()})
     ON CONFLICT (id) DO UPDATE SET
       name = EXCLUDED.name, type = EXCLUDED.type, subject = EXCLUDED.subject,
-      body = EXCLUDED.body, tags = EXCLUDED.tags, updated_at = EXCLUDED.updated_at;
+      body = EXCLUDED.body, tags = EXCLUDED.tags, attachment_url = EXCLUDED.attachment_url, updated_at = EXCLUDED.updated_at;
   `;
   return t;
 }
