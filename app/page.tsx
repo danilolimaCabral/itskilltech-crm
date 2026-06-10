@@ -465,6 +465,19 @@ export default function CRM() {
     }).length,
   };
 
+  // Contador de prospecção de hoje por canal
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayProspEvents = leads.flatMap(l => {
+    try {
+      const tl = JSON.parse(l.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+      return tl.filter((t: any) => t.ts && new Date(t.ts).toISOString().slice(0, 10) === todayStr && ['whatsapp','email','call'].includes(t.type));
+    } catch { return []; }
+  });
+  const todayWhats = todayProspEvents.filter((e: any) => e.type === 'whatsapp').length;
+  const todayEmail = todayProspEvents.filter((e: any) => e.type === 'email').length;
+  const todayCall = todayProspEvents.filter((e: any) => e.type === 'call').length;
+  const todayTotal = todayWhats + todayEmail + todayCall;
+
   // Extrai todas as reuniões agendadas de todos os leads
   const allMeetings = leads.flatMap(l => {
     try {
@@ -585,6 +598,22 @@ export default function CRM() {
                   </div>
                 ))}
               </div>
+              {/* Prospecção de hoje */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '8px 0', padding: '10px 14px', background: 'var(--surface-2, #f9fafb)', borderRadius: 10, border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginRight: 4 }}>📊 Hoje:</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: todayTotal > 0 ? '#eff6ff' : 'var(--surface)', color: '#0066ff', border: '1px solid #0066ff33' }}>
+                  🎯 {todayTotal} prospectado{todayTotal !== 1 ? 's' : ''}
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '3px 10px', borderRadius: 20, background: todayWhats > 0 ? '#f0fdf4' : 'var(--surface)', color: '#16a34a', border: '1px solid #16a34a33' }}>
+                  💬 WhatsApp: <strong>{todayWhats}</strong>
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '3px 10px', borderRadius: 20, background: todayEmail > 0 ? '#eff6ff' : 'var(--surface)', color: '#1a56db', border: '1px solid #1a56db33' }}>
+                  ✉ E-mail: <strong>{todayEmail}</strong>
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '3px 10px', borderRadius: 20, background: todayCall > 0 ? '#fff7ed' : 'var(--surface)', color: '#ea580c', border: '1px solid #ea580c33' }}>
+                  📞 Telefone: <strong>{todayCall}</strong>
+                </span>
+              </div>
               {/* Label da etapa ativa */}
               {statusFilter !== 'all' && (() => { const f = FUNNEL_MAP[statusFilter]; return f ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '6px 12px', background: f.bg, borderRadius: 8, border: `1px solid ${f.color}33` }}>
@@ -638,6 +667,16 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                           showToast(`Abrindo WhatsApp para ${withPhone.length} lead(s)...`);
                         }}>
                         💬 WhatsApp ({selectedIds.size})
+                      </button>
+                      <button className="btn" style={{ fontSize: 11, padding: '5px 12px', background: '#ef4444', color: '#fff', border: 'none' }}
+                        onClick={async () => {
+                          if (!confirm(`Excluir ${selectedIds.size} lead(s) selecionado(s)? Esta ação não pode ser desfeita.`)) return;
+                          const ids = Array.from(selectedIds);
+                          for (const id of ids) await removeLead(id, true);
+                          setSelectedIds(new Set());
+                          showToast(`${ids.length} lead(s) excluído(s)`);
+                        }}>
+                        🗑 Excluir ({selectedIds.size})
                       </button>
                       <button className="btn" style={{ fontSize: 11, padding: '5px 10px', background: 'var(--surface-2)', border: '1px solid var(--border)' }}
                         onClick={() => setSelectedIds(new Set())}>
@@ -709,6 +748,11 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                             msg = `Olá ${lead.name.split(' ')[0]}, tudo bem? Sou da ${wsNameW}. Nossa solução de TMS pode otimizar a operação logística da ${lead.company || 'sua empresa'}. Posso te mostrar em 15 min? — Danilo | (41) 99949-9815`;
                           }
                           window.open(`https://wa.me/55${num}?text=${encodeURIComponent(msg)}`, '_blank');
+                          // Registrar na timeline
+                          const tl = JSON.parse(lead.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+                          tl.unshift({ type: 'whatsapp', label: `WhatsApp enviado`, ts: Date.now() });
+                          const nc = (lead.notes || '').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
+                          saveLead({ ...lead, updated_at: Date.now(), notes: nc + `\n[TIMELINE]${JSON.stringify(tl)}[/TIMELINE]` });
                         }}>
                           <Icon d={ICONS.whatsapp} />
                         </button>
@@ -755,6 +799,11 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                             msg = `Olá ${lead.name.split(' ')[0]}, tudo bem? Sou da ${wsNameW}. Nossa solução de TMS pode otimizar a operação logística da ${lead.company || 'sua empresa'}. Posso te mostrar em 15 min? — Danilo | (41) 99949-9815`;
                           }
                           window.open(`https://wa.me/55${num}?text=${encodeURIComponent(msg)}`, '_blank');
+                          // Registrar na timeline
+                          const tl2 = JSON.parse(lead.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+                          tl2.unshift({ type: 'whatsapp', label: `WhatsApp enviado`, ts: Date.now() });
+                          const nc2 = (lead.notes || '').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
+                          saveLead({ ...lead, updated_at: Date.now(), notes: nc2 + `\n[TIMELINE]${JSON.stringify(tl2)}[/TIMELINE]` });
                         }}><Icon d={ICONS.whatsapp} /></button>
                       </div>
                     </div>
