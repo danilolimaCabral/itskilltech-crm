@@ -614,7 +614,18 @@ export default function CRM() {
   return (
     <div className="app">
       <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
-        <div className="sidebar-header"><div className="logo">IT</div><div className="logo-text">ITskill<span>CRM</span></div></div>
+        <div className="sidebar-header">
+          <div className="logo" style={{ background: 'linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%)', boxShadow: '0 3px 10px rgba(37,99,235,0.35)' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L4 7v10l8 5 8-5V7L12 2z" fill="white" fillOpacity="0.9"/>
+              <path d="M12 2L4 7l8 5 8-5L12 2z" fill="white" fillOpacity="0.3"/>
+            </svg>
+          </div>
+          <div className="logo-text">
+            <strong>get<em>LOG</em></strong>
+            <span>by Lottustech</span>
+          </div>
+        </div>
         <div className="sidebar-section">
           {/* Workspace ativo sempre visível */}
           {workspaces.filter(w => w.id === workspace).map(w => (
@@ -628,18 +639,33 @@ export default function CRM() {
         </div>
         <div className="sidebar-section">
           <div className="section-label">Navegação</div>
-          {[['dashboard', '📊 Dashboard', ICONS.bi], ['leads', 'Leads', ICONS.leads], ['calendar_view', '📅 Calendário', ICONS.calendar], ['search', 'Buscar Leads', ICONS.search2], ['agent', '🤖 Agente IA', ICONS.sparkles], ['templates', 'Templates', ICONS.template], ['bi', 'BI / Prospecção', ICONS.bi], ['sheets', '📊 Google Sheets', ICONS.upload], ['inbox', 'Caixa de Entrada', ICONS.inbox], ['sent', '📤 E-mails Enviados', ICONS.inbox], ['settings', 'Configurações', ICONS.settings]].map(([v, label, ic]) => (
+          {[
+            ['dashboard', 'Dashboard', ICONS.bi, '📊', '#2563eb'],
+            ['leads', 'Leads', ICONS.leads, '👥', '#059669'],
+            ['calendar_view', 'Calendário', ICONS.calendar, '📅', '#7c3aed'],
+            ['search', 'Buscar Leads', ICONS.search2, '🔍', '#0891b2'],
+            ['agent', 'Agente IA', ICONS.sparkles, '🤖', '#ea580c'],
+            ['templates', 'Templates', ICONS.template, '📋', '#d97706'],
+            ['bi', 'BI / Prospecção', ICONS.bi, '📈', '#2563eb'],
+            ['sheets', 'Google Sheets', ICONS.upload, '📊', '#059669'],
+            ['inbox', 'Caixa de Entrada', ICONS.inbox, '📥', '#4f46e5'],
+            ['sent', 'E-mails Enviados', ICONS.inbox, '📤', '#4f46e5'],
+            ['settings', 'Configurações', ICONS.settings, '⚙️', '#6b7280'],
+          ].map(([v, label, ic, emoji, color]) => (
             <button key={v} className={`nav-item${view === v ? ' active' : ''}`} onClick={() => { setView(v as string); setSidebarOpen(false); }}>
-              <Icon d={ic as string} /><span>{label}</span>
+              <div className="nav-icon" style={{ background: view === v ? `${color}18` : undefined }}>
+                <span style={{ fontSize: 13 }}>{emoji}</span>
+              </div>
+              <span>{label}</span>
             </button>
           ))}
-          <a href="/social" target="_blank" className="nav-item" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, color: 'var(--text-secondary)', fontSize: 13 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-            <span>📣 Social Media</span>
+          <a href="/social" target="_blank" className="nav-item" style={{ textDecoration: 'none' }}>
+            <div className="nav-icon"><span style={{ fontSize: 13 }}>📣</span></div>
+            <span>Social Media</span>
           </a>
-          <a href="/phone" target="_blank" className="nav-item" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, color: 'var(--text-secondary)', fontSize: 13 }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.41 2 2 0 0 1 3.6 1.24h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.82a16 16 0 0 0 6.29 6.29l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-            <span>📞 Softphone</span>
+          <a href="/phone" target="_blank" className="nav-item" style={{ textDecoration: 'none' }}>
+            <div className="nav-icon"><span style={{ fontSize: 13 }}>📞</span></div>
+            <span>Softphone</span>
           </a>
         </div>
       </aside>
@@ -715,22 +741,23 @@ export default function CRM() {
               </div>
               {/* Funil de vendas — 5 etapas */}
               <div className="stats">
-                <div className="stat" style={{ cursor: 'pointer', borderBottom: statusFilter === 'all' ? '3px solid #475467' : '3px solid transparent' }} onClick={() => setStatusFilter('all')}>
-                  <div className="stat-label"><span className="stat-dot" style={{ background: '#475467' }} />Total</div><div className="stat-value">{stats.total}</div>
+                <div className="stat stat-blue" style={{ cursor: 'pointer', '--stat-accent': statusFilter === 'all' ? '#475467' : 'transparent' } as any} onClick={() => setStatusFilter('all')}>
+                  <div className="stat-label"><span className="stat-dot" style={{ background: '#475467' }} />Total</div>
+                  <div className="stat-value">{stats.total}</div>
                 </div>
-                <div className="stat" style={{ cursor: 'pointer', borderBottom: '3px solid #0066ff', background: '#eff6ff' }} onClick={() => setView('calendar_view')}>
+                <div className="stat" style={{ cursor: 'pointer', '--stat-accent': '#0066ff' } as any} onClick={() => setView('calendar_view')}>
                   <div className="stat-label"><span className="stat-dot" style={{ background: '#0066ff' }} />Reuniões</div>
                   <div className="stat-value" style={{ color: '#0066ff' }}>{stats.reunioes}</div>
                 </div>
                 {FUNNEL.map(f => (
-                  <div key={f.id} className="stat" style={{ cursor: 'pointer', borderBottom: statusFilter === f.id ? `3px solid ${f.color}` : '3px solid transparent' }} onClick={() => setStatusFilter(f.id)}>
+                  <div key={f.id} className="stat" style={{ cursor: 'pointer', '--stat-accent': f.color } as any} onClick={() => setStatusFilter(f.id)}>
                     <div className="stat-label"><span className="stat-dot" style={{ background: f.color }} />{f.short}</div>
                     <div className="stat-value" style={{ color: f.color }}>{(stats as any)[f.id] || 0}</div>
                   </div>
                 ))}
               </div>
               {/* Prospecção de hoje com metas */}
-              <div style={{ margin: '8px 0', padding: '14px 16px', background: 'var(--surface)', borderRadius: 12, border: '1px solid var(--border)', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+              <div style={{ margin: '8px 0', padding: '16px 18px', background: 'var(--surface)', borderRadius: 14, border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>📊 Prospecção de Hoje</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -753,16 +780,17 @@ export default function CRM() {
                   ].map(c => {
                     const pct = c.goal > 0 ? Math.min(100, Math.round((c.value / c.goal) * 100)) : 0;
                     return (
-                      <div key={c.label} style={{ background: 'var(--surface-2)', borderRadius: 10, padding: '10px 12px', border: `1px solid ${c.color}20`, transition: 'all 0.15s' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                          <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{c.label}</span>
-                          <span style={{ fontSize: 11, color: '#94a3b8' }}>{c.value}/{c.goal}</span>
+                      <div key={c.label} style={{ background: pct >= 100 ? `${c.color}10` : 'var(--surface-2)', borderRadius: 12, padding: '12px 14px', border: `1px solid ${c.color}25`, transition: 'all 0.18s', position: 'relative', overflow: 'hidden' }}>
+                        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: c.color, borderRadius: '12px 12px 0 0', opacity: 0.7 }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600 }}>{c.label}</span>
+                          <span style={{ fontSize: 10, color: c.color, fontWeight: 700, background: `${c.color}15`, padding: '1px 6px', borderRadius: 8 }}>{c.value}/{c.goal}</span>
                         </div>
-                        <div style={{ fontSize: 20, fontWeight: 700, color: c.color, lineHeight: 1 }}>{c.value}</div>
-                        <div style={{ background: 'var(--border)', borderRadius: 4, height: 4, marginTop: 6, overflow: 'hidden' }}>
-                          <div style={{ width: `${pct}%`, height: '100%', background: c.color, borderRadius: 4, transition: 'width 0.4s' }} />
+                        <div style={{ fontSize: 22, fontWeight: 800, color: c.color, lineHeight: 1, letterSpacing: '-0.03em' }}>{c.value}</div>
+                        <div style={{ background: 'var(--border)', borderRadius: 4, height: 5, marginTop: 8, overflow: 'hidden' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: c.color, borderRadius: 4, transition: 'width 0.5s cubic-bezier(0.34,1.56,0.64,1)' }} />
                         </div>
-                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>{pct}% da meta{pct >= 100 ? ' ✅' : ''}</div>
+                        <div style={{ fontSize: 10, color: pct >= 100 ? c.color : '#94a3b8', marginTop: 4, fontWeight: pct >= 100 ? 700 : 400 }}>{pct}%{pct >= 100 ? ' ✅ Meta!' : ' da meta'}</div>
                       </div>
                     );
                   })}
