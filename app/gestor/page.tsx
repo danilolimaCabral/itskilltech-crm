@@ -215,7 +215,11 @@ export default function GestorPage() {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 600, fontSize: 13 }}>{l.name || '—'}</div>
                           <div style={{ fontSize: 12, color: '#64748b' }}>{l.company} {l.role ? `· ${l.role}` : ''}</div>
-                          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{l.email}</div>
+                          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 2 }}>
+                            {l.email && <span style={{ fontSize: 11, color: '#94a3b8' }}>✉ {l.email}</span>}
+                            {l.phone && <span style={{ fontSize: 11, color: '#0066ff', fontWeight: 500 }}>📞 {l.phone}</span>}
+                            {l.whatsapp && l.whatsapp !== l.phone && <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 500 }}>💬 {l.whatsapp}</span>}
+                          </div>
                           {l.channels && l.channels.length > 0 && (
                             <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
                               {l.channels.map((ch: string) => (
@@ -399,7 +403,8 @@ export default function GestorPage() {
                             )}
                             <div style={{ display: 'flex', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
                               {lead.email && <a href={`mailto:${lead.email}`} style={{ fontSize: 11, color: '#1d4ed8', textDecoration: 'none' }}>✉ {lead.email}</a>}
-                              {lead.phone && <span style={{ fontSize: 11, color: '#374151' }}>📞 {lead.phone}</span>}
+                              {lead.phone && <a href={`tel:${lead.phone}`} style={{ fontSize: 11, color: '#0066ff', fontWeight: 600, textDecoration: 'none' }}>📞 {lead.phone}</a>}
+                              {lead.whatsapp && lead.whatsapp !== lead.phone && <a href={`https://wa.me/55${lead.whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, textDecoration: 'none' }}>💬 {lead.whatsapp}</a>}
                             </div>
                           </div>
                           <div style={{ textAlign: 'right', minWidth: 120 }}>
