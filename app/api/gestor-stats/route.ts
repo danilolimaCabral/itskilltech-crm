@@ -79,21 +79,17 @@ export async function GET(req: NextRequest) {
 
     // Totais gerais
     const totals = daysArr.reduce(
-      (acc, d) => ({
+      (acc: any, d: any) => ({
         whatsapp: acc.whatsapp + d.whatsapp,
         email: acc.email + d.email,
         call: acc.call + d.call,
+        linkedin: acc.linkedin + (d.linkedin || 0),
         total: acc.total + d.total,
       }),
       { whatsapp: 0, email: 0, call: 0, linkedin: 0, total: 0 }
     );
-    // Somar linkedin nos totais
-    const totalsWithLinkedin = daysArr.reduce(
-      (acc: any, d: any) => ({ ...acc, linkedin: acc.linkedin + (d.linkedin || 0) }),
-      totals
-    );
 
-    return NextResponse.json({ days: daysArr, totals: totalsWithLinkedin });
+    return NextResponse.json({ days: daysArr, totals });
   } catch (e) {
     console.error('gestor-stats error:', e);
     return NextResponse.json({ days: [], totals: { whatsapp: 0, email: 0, call: 0, total: 0 } });
