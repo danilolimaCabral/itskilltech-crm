@@ -3113,7 +3113,7 @@ function LeadModal({ lead, workspace, onClose, onSave, onDelete }: any) {
                   placeholder="CNPJ (60.701.190/0001-04) ou nome da empresa..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') buscarEmpresa(); }}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); buscarEmpresa(); } }}
                 />
                 <button className="btn btn-primary" style={{ whiteSpace: 'nowrap', padding: '0 14px' }} onClick={buscarEmpresa} disabled={searching}>
                   {searching ? '⏳' : '🔍 Buscar'}
