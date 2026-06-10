@@ -50,6 +50,10 @@ export default function GestorPage() {
   const [newPendingLead, setNewPendingLead] = useState({ name: '', company: '', phone: '', email: '', note: '' });
   const [addingPending, setAddingPending] = useState(false);
   const [dayModal, setDayModal] = useState<{ date: string; channel: string; channelLabel: string; leads: any[] } | null>(null);
+  const [liFilter, setLiFilter] = useState<'all'|'with_li'|'without_li'>('with_li');
+  const [liSearch, setLiSearch] = useState('');
+  const [liMsgLead, setLiMsgLead] = useState<any>(null);
+  const [liMsg, setLiMsg] = useState('');
 
   // Aplicar classe no body para habilitar scroll
   useEffect(() => {
@@ -662,6 +666,96 @@ export default function GestorPage() {
               style={{ background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 24px', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}
             >{addingPending ? 'Cadastrando...' : '➕ Cadastrar Lead'}</button>
           </div>
+
+          {/* Seção: LinkedIn Prospecting */}
+          <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px', marginTop: 20, border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+                💼 Prospecção LinkedIn
+                <span style={{ fontSize: 12, color: '#64748b', fontWeight: 400 }}>— {leads.filter(l => l.linkedin).length} leads com LinkedIn cadastrado</span>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[{k:'with_li',l:'💼 Com LinkedIn'},{k:'without_li',l:'🔍 Sem LinkedIn'},{k:'all',l:'Todos'}].map(f => (
+                  <button key={f.k} onClick={() => setLiFilter(f.k as any)}
+                    style={{ background: liFilter === f.k ? '#0a66c2' : '#f1f5f9', color: liFilter === f.k ? '#fff' : '#374151', border: 'none', borderRadius: 8, padding: '4px 12px', fontSize: 12, cursor: 'pointer', fontWeight: liFilter === f.k ? 600 : 400 }}>
+                    {f.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <input
+              placeholder="🔍 Buscar por nome ou empresa..."
+              value={liSearch}
+              onChange={e => setLiSearch(e.target.value)}
+              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13, marginBottom: 12, boxSizing: 'border-box' }}
+            />
+            <div style={{ maxHeight: 480, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {leads
+                .filter(l => liFilter === 'with_li' ? !!l.linkedin : liFilter === 'without_li' ? !l.linkedin : true)
+                .filter(l => !liSearch || `${l.name} ${l.company}`.toLowerCase().includes(liSearch.toLowerCase()))
+                .slice(0, 80)
+                .map((l: any) => (
+                  <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                    <div style={{ width: 34, height: 34, borderRadius: '50%', background: l.linkedin ? '#dbeafe' : '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: l.linkedin ? '#1d4ed8' : '#94a3b8', flexShrink: 0 }}>
+                      {(l.name || l.company || '?')[0].toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{l.name || '—'} <span style={{ fontSize: 11, color: '#64748b', fontWeight: 400 }}>{l.company}</span></div>
+                      <div style={{ fontSize: 11, color: '#94a3b8' }}>{l.role || l.status}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      {l.linkedin ? (
+                        <>
+                          <a href={l.linkedin.startsWith('http') ? l.linkedin : `https://linkedin.com/in/${l.linkedin}`} target="_blank" rel="noreferrer"
+                            style={{ background: '#0a66c2', color: '#fff', border: 'none', borderRadius: 7, padding: '5px 10px', fontSize: 11, fontWeight: 600, textDecoration: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            👤 Ver Perfil
+                          </a>
+                          <a href={`https://www.linkedin.com/messaging/compose/?recipient=${encodeURIComponent(l.linkedin.replace(/.*linkedin\.com\/in\//,'').replace(/\//,''))}`} target="_blank" rel="noreferrer"
+                            style={{ background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe', borderRadius: 7, padding: '5px 10px', fontSize: 11, fontWeight: 600, textDecoration: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            ✉ Mensagem
+                          </a>
+                          <button onClick={() => { setLiMsgLead(l); setLiMsg(`Olá ${(l.name||'').split(' ')[0]}, tudo bem? Vi que você atua na área de logística na ${l.company}. Tenho uma solução de TMS que pode otimizar sua operação. Posso te mostrar em 15 minutos?`); }}
+                            style={{ background: '#f0fdf4', color: '#16a34a', border: '1px solid #bbf7d0', borderRadius: 7, padding: '5px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                            📝 Sugerir Msg
+                          </button>
+                        </>
+                      ) : (
+                        <a href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent((l.name||'') + ' ' + (l.company||''))}`} target="_blank" rel="noreferrer"
+                          style={{ background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 7, padding: '5px 10px', fontSize: 11, fontWeight: 600, textDecoration: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          🔍 Buscar no LinkedIn
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              {leads.filter(l => liFilter === 'with_li' ? !!l.linkedin : liFilter === 'without_li' ? !l.linkedin : true).filter(l => !liSearch || `${l.name} ${l.company}`.toLowerCase().includes(liSearch.toLowerCase())).length === 0 && (
+                <div style={{ textAlign: 'center', color: '#94a3b8', padding: 20, fontSize: 13 }}>Nenhum lead encontrado</div>
+              )}
+            </div>
+          </div>
+
+          {/* Modal de sugestão de mensagem LinkedIn */}
+          {liMsgLead && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setLiMsgLead(null)}>
+              <div style={{ background: '#fff', borderRadius: 14, padding: 24, width: '100%', maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>✉ Sugestão de Mensagem LinkedIn</div>
+                <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>{liMsgLead.name} — {liMsgLead.company}</div>
+                <textarea
+                  value={liMsg}
+                  onChange={e => setLiMsg(e.target.value)}
+                  rows={6}
+                  style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5 }}
+                />
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                  <button onClick={() => setLiMsgLead(null)} style={{ flex: 1, background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '8px 0', cursor: 'pointer', fontSize: 13 }}>Fechar</button>
+                  <button onClick={() => { navigator.clipboard.writeText(liMsg); showToast('✅ Mensagem copiada! Cole no LinkedIn.'); }}
+                    style={{ flex: 1, background: '#0066ff', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 0', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>📋 Copiar Mensagem</button>
+                  <a href={liMsgLead.linkedin?.startsWith('http') ? liMsgLead.linkedin : `https://linkedin.com/in/${liMsgLead.linkedin}`} target="_blank" rel="noreferrer"
+                    style={{ flex: 1, background: '#0a66c2', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 0', cursor: 'pointer', fontSize: 13, fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>💼 Abrir LinkedIn</a>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Seção: Leads Prioritários */}
           <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px', marginTop: 20, border: '1px solid #e2e8f0' }}>
