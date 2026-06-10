@@ -3028,17 +3028,108 @@ function SearchView({ workspace, onImport, showToast }: any) {
 // ---------- Modal de Lead ----------
 function LeadModal({ lead, workspace, onClose, onSave, onDelete }: any) {
   const [f, setF] = useState<any>(lead || { status: 'novo' });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [empresaData, setEmpresaData] = useState<any>(null);
   const set = (k: string, v: string) => setF((p: any) => ({ ...p, [k]: v }));
+
+  const buscarEmpresa = async () => {
+    if (!searchQuery.trim()) return;
+    setSearching(true);
+    setSearchResults([]);
+    try {
+      const isCnpj = searchQuery.replace(/\D/g, '').length === 14;
+      const url = isCnpj
+        ? `/api/busca-empresa?cnpj=${searchQuery.replace(/\D/g, '')}`
+        : `/api/busca-empresa?nome=${encodeURIComponent(searchQuery)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (isCnpj && data.cnpj) {
+        preencherDados(data);
+      } else if (data.results?.length > 0) {
+        setSearchResults(data.results);
+      } else {
+        alert('Nenhuma empresa encontrada.');
+      }
+    } catch (e) {
+      alert('Erro ao buscar empresa.');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const preencherDados = (data: any) => {
+    setEmpresaData(data);
+    setSearchResults([]);
+    setF((p: any) => ({
+      ...p,
+      company: data.nome_fantasia || data.razao_social || p.company,
+      email: data.email || p.email,
+      phone: data.telefone || p.phone,
+      notes: [
+        p.notes || '',
+        `CNPJ: ${data.cnpj}`,
+        data.razao_social ? `Razão Social: ${data.razao_social}` : '',
+        data.atividade_principal ? `Atividade: ${data.atividade_principal}` : '',
+        data.municipio ? `Cidade: ${data.municipio}/${data.uf}` : '',
+        data.porte ? `Porte: ${data.porte}` : '',
+        data.data_inicio_atividade ? `Fundação: ${data.data_inicio_atividade}` : '',
+        data.socios?.length > 0 ? `Sócios: ${data.socios.map((s: any) => s.nome).join(', ')}` : ''
+      ].filter(Boolean).join('\n').trim()
+    }));
+  };
+
   const submit = () => {
     if (!f.name?.trim()) { alert('Nome é obrigatório'); return; }
     const now = Date.now();
     onSave({ id: f.id || uid(), workspace, name: f.name.trim(), company: f.company || '', role: f.role || '', email: f.email || '', whatsapp: cleanPhone(f.whatsapp || ''), linkedin: f.linkedin || '', phone: f.phone || '', source: f.source || '', notes: f.notes || '', status: f.status || 'novo', created_at: f.created_at || now, updated_at: now, call_count: f.call_count || 0, last_contact: f.last_contact || null });
   };
+
   return (
     <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal">
+      <div className="modal" style={{ maxWidth: 560 }}>
         <div className="modal-header"><div className="modal-title">{lead ? 'Editar lead' : 'Novo lead'}</div><button className="modal-close" onClick={onClose}>×</button></div>
         <div className="modal-body">
+
+          {/* Busca automática por CNPJ ou nome */}
+          {!lead && (
+            <div style={{ background: '#f0f7ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#1d4ed8', marginBottom: 8 }}>🔍 Buscar empresa por CNPJ ou nome</div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  className="field-input"
+                  style={{ flex: 1, margin: 0 }}
+                  placeholder="Ex: 60.701.190/0001-04 ou Itaú Unibanco"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') buscarEmpresa(); }}
+                />
+                <button className="btn btn-primary" style={{ whiteSpace: 'nowrap', padding: '0 14px' }} onClick={buscarEmpresa} disabled={searching}>
+                  {searching ? '⏳' : '🔍 Buscar'}
+                </button>
+              </div>
+              {searchResults.length > 0 && (
+                <div style={{ marginTop: 8, maxHeight: 180, overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: 6, background: 'white' }}>
+                  {searchResults.map((r, i) => (
+                    <div key={i} style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', fontSize: 13 }}
+                      onClick={() => preencherDados(r)}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
+                      <div style={{ fontWeight: 600 }}>{r.nome_fantasia || r.razao_social}</div>
+                      <div style={{ color: '#64748b', fontSize: 11 }}>{r.cnpj} · {r.municipio}/{r.uf} · {r.atividade_principal?.slice(0, 50)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {empresaData && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#16a34a', fontWeight: 600 }}>
+                  ✅ Dados preenchidos: {empresaData.razao_social} ({empresaData.municipio}/{empresaData.uf})
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="field-row">
             <div className="field"><label className="field-label">Nome *</label><input className="field-input" value={f.name || ''} onChange={e => set('name', e.target.value)} /></div>
             <div className="field"><label className="field-label">Empresa</label><input className="field-input" value={f.company || ''} onChange={e => set('company', e.target.value)} /></div>

@@ -636,6 +636,26 @@ export default function GestorPage() {
           <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px', marginTop: 20, border: '1px solid #e2e8f0' }}>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>➕ Cadastrar Lead para Prospecção Futura</div>
             <div style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>Vandir pode adicionar leads que ficarão na fila para qualquer usuário prospectar futuramente.</div>
+
+            {/* Busca automática por CNPJ ou nome */}
+            <GestorBuscaEmpresa onPreencher={(data: any) => {
+              setNewPendingLead(p => ({
+                ...p,
+                company: data.nome_fantasia || data.razao_social || p.company,
+                phone: data.telefone || p.phone,
+                email: data.email || p.email,
+                note: [
+                  p.note || '',
+                  `CNPJ: ${data.cnpj}`,
+                  data.razao_social ? `Razão Social: ${data.razao_social}` : '',
+                  data.atividade_principal ? `Atividade: ${data.atividade_principal}` : '',
+                  data.municipio ? `Cidade: ${data.municipio}/${data.uf}` : '',
+                  data.porte ? `Porte: ${data.porte}` : '',
+                  data.socios?.length > 0 ? `Sócios: ${data.socios.map((s: any) => s.nome).join(', ')}` : ''
+                ].filter(Boolean).join(' | ').trim()
+              }));
+            }} />
+
             <div className="gestor-lead-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 10 }}>
               {[{key:'name',label:'Nome do Contato',ph:'Ex: João Silva'},{key:'company',label:'Empresa',ph:'Ex: Gestamp'},{key:'phone',label:'Telefone',ph:'Ex: (41) 99999-0000'},{key:'email',label:'E-mail',ph:'Ex: joao@empresa.com'},{key:'note',label:'Observação / Instrução',ph:'Ex: Ligar segunda-feira, tem interesse em TMS'}].map(f => (
                 <div key={f.key} style={{ gridColumn: f.key === 'note' ? 'span 3' : undefined }}>
@@ -802,6 +822,88 @@ export default function GestorPage() {
         </>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Componente de Busca de Empresa por CNPJ/Nome ──────────────────────────────
+function GestorBuscaEmpresa({ onPreencher }: { onPreencher: (data: any) => void }) {
+  const [query, setQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [results, setResults] = useState<any[]>([]);
+  const [filled, setFilled] = useState<any>(null);
+
+  const buscar = async () => {
+    if (!query.trim()) return;
+    setSearching(true);
+    setResults([]);
+    setFilled(null);
+    try {
+      const isCnpj = query.replace(/\D/g, '').length === 14;
+      const url = isCnpj
+        ? `/api/busca-empresa?cnpj=${query.replace(/\D/g, '')}`
+        : `/api/busca-empresa?nome=${encodeURIComponent(query)}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (isCnpj && data.cnpj) {
+        setFilled(data);
+        onPreencher(data);
+      } else if (data.results?.length > 0) {
+        setResults(data.results);
+      } else {
+        alert('Nenhuma empresa encontrada.');
+      }
+    } catch {
+      alert('Erro ao buscar empresa.');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const selecionar = (data: any) => {
+    setFilled(data);
+    setResults([]);
+    onPreencher(data);
+  };
+
+  return (
+    <div style={{ background: '#f0f7ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#1d4ed8', marginBottom: 8 }}>🔍 Buscar empresa por CNPJ ou nome (preenchimento automático)</div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <input
+          style={{ flex: 1, border: '1px solid #bfdbfe', borderRadius: 8, padding: '7px 10px', fontSize: 13, boxSizing: 'border-box' as const }}
+          placeholder="Ex: 60.701.190/0001-04 ou Itaú Unibanco"
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') buscar(); }}
+        />
+        <button
+          onClick={buscar}
+          disabled={searching}
+          style={{ background: '#1d4ed8', color: '#fff', border: 'none', borderRadius: 8, padding: '0 16px', fontWeight: 600, cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap' as const }}
+        >
+          {searching ? '⏳' : '🔍 Buscar'}
+        </button>
+      </div>
+      {results.length > 0 && (
+        <div style={{ marginTop: 8, maxHeight: 180, overflowY: 'auto' as const, border: '1px solid #e2e8f0', borderRadius: 6, background: 'white' }}>
+          {results.map((r, i) => (
+            <div key={i}
+              style={{ padding: '8px 12px', cursor: 'pointer', borderBottom: '1px solid #f1f5f9', fontSize: 13 }}
+              onClick={() => selecionar(r)}
+              onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'white')}>
+              <div style={{ fontWeight: 600 }}>{r.nome_fantasia || r.razao_social}</div>
+              <div style={{ color: '#64748b', fontSize: 11 }}>{r.cnpj} · {r.municipio}/{r.uf} · {r.atividade_principal?.slice(0, 50)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {filled && (
+        <div style={{ marginTop: 8, fontSize: 11, color: '#16a34a', fontWeight: 600 }}>
+          ✅ Dados preenchidos: {filled.razao_social} ({filled.municipio}/{filled.uf})
+        </div>
+      )}
     </div>
   );
 }
