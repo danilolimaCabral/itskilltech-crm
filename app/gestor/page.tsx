@@ -263,19 +263,58 @@ export default function GestorPage() {
                 {selectedData.leads?.length === 0 ? (
                   <div style={{ color: '#94a3b8', fontSize: 14 }}>Nenhum lead registrado neste dia</div>
                 ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
-                    {selectedData.leads.map((lead: any) => (
-                      <div key={lead.id} style={{ background: '#f8fafc', borderRadius: 10, padding: '10px 14px', border: '1px solid #e2e8f0' }}>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{lead.name}</div>
-                        <div style={{ fontSize: 12, color: '#64748b' }}>{lead.company}</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
-                          <span style={{ fontSize: 11, background: lead.type === 'whatsapp' ? '#dcfce7' : lead.type === 'email' ? '#dbeafe' : '#ffedd5', color: lead.type === 'whatsapp' ? '#16a34a' : lead.type === 'email' ? '#1d4ed8' : '#ea580c', borderRadius: 20, padding: '2px 8px' }}>
-                            {lead.type === 'whatsapp' ? '💬 WhatsApp' : lead.type === 'email' ? '✉ E-mail' : '📞 Ligação'}
-                          </span>
-                          <span style={{ fontSize: 11, color: '#94a3b8' }}>{new Date(lead.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {selectedData.leads.map((lead: any) => {
+                      const channelColors: Record<string, { bg: string; color: string; label: string }> = {
+                        whatsapp: { bg: '#dcfce7', color: '#16a34a', label: '💬 WhatsApp' },
+                        email: { bg: '#dbeafe', color: '#1d4ed8', label: '✉ E-mail' },
+                        call: { bg: '#ffedd5', color: '#ea580c', label: '📞 Ligação' },
+                        linkedin: { bg: '#dbeafe', color: '#0077b5', label: '💼 LinkedIn' },
+                      };
+                      const channels = lead.channels || [lead.type];
+                      const nextCall = lead.next_call_at ? new Date(lead.next_call_at) : null;
+                      const isOverdue = nextCall && nextCall < new Date();
+                      const isToday = nextCall && nextCall.toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10);
+                      return (
+                        <div key={lead.id} style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 16px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'start' }}>
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                              <span style={{ fontWeight: 700, fontSize: 14 }}>{lead.name || '(sem nome)'}</span>
+                              {lead.role && <span style={{ fontSize: 11, color: '#64748b', background: '#f1f5f9', borderRadius: 20, padding: '1px 8px' }}>{lead.role}</span>}
+                            </div>
+                            <div style={{ fontSize: 12, color: '#0066ff', fontWeight: 600, marginTop: 2 }}>{lead.company}</div>
+                            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                              {channels.map((ch: string) => {
+                                const c = channelColors[ch] || { bg: '#f1f5f9', color: '#374151', label: ch };
+                                return <span key={ch} style={{ fontSize: 11, background: c.bg, color: c.color, borderRadius: 20, padding: '2px 8px', fontWeight: 600 }}>{c.label}</span>;
+                              })}
+                              <span style={{ fontSize: 11, color: '#94a3b8' }}>{new Date(lead.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                            {lead.result && lead.result.length > 5 && (
+                              <div style={{ fontSize: 11, color: '#475569', marginTop: 4, fontStyle: 'italic' }}>Resultado: {lead.result.replace(/^Ligação: /, '').replace(/^LinkedIn: /, '')}</div>
+                            )}
+                            <div style={{ display: 'flex', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
+                              {lead.email && <a href={`mailto:${lead.email}`} style={{ fontSize: 11, color: '#1d4ed8', textDecoration: 'none' }}>✉ {lead.email}</a>}
+                              {lead.phone && <span style={{ fontSize: 11, color: '#374151' }}>📞 {lead.phone}</span>}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right', minWidth: 120 }}>
+                            {nextCall ? (
+                              <div style={{ background: isOverdue ? '#fef2f2' : isToday ? '#fff7ed' : '#f0fdf4', borderRadius: 8, padding: '6px 10px', border: `1px solid ${isOverdue ? '#fca5a5' : isToday ? '#fcd34d' : '#86efac'}` }}>
+                                <div style={{ fontSize: 10, color: isOverdue ? '#dc2626' : isToday ? '#b45309' : '#16a34a', fontWeight: 700 }}>
+                                  {isOverdue ? '⚠ Atrasado' : isToday ? '🔔 Hoje' : '📅 Próxima ligação'}
+                                </div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginTop: 2 }}>
+                                  {nextCall.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={{ fontSize: 11, color: '#94a3b8' }}>Sem retorno agendado</div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
