@@ -1,6 +1,19 @@
 'use client';
 import React, { useState, useEffect, useCallback } from 'react';
 
+// Estilos mobile
+const mobileStyle = `
+  @media (max-width: 768px) {
+    .gestor-grid-2 { grid-template-columns: 1fr !important; }
+    .gestor-grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+    .gestor-header { padding: 14px 16px !important; flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; }
+    .gestor-content { padding: 16px 12px !important; }
+    .gestor-priority-row { flex-direction: column !important; }
+    .gestor-priority-row input { width: 100% !important; }
+    .gestor-lead-form-grid { grid-template-columns: 1fr !important; }
+  }
+`;
+
 const WORKSPACE = 'lottus';
 
 function ProgressBar({ value, max, color }: { value: number; max: number; color: string }) {
@@ -27,23 +40,51 @@ export default function GestorPage() {
   const [savingGoals, setSavingGoals] = useState(false);
   const [toast, setToast] = useState('');
 
+  const [leads, setLeads] = useState<any[]>([]);
+  const [leadsSearch, setLeadsSearch] = useState('');
+  const [leadsFilter, setLeadsFilter] = useState('all');
+  const [commentLead, setCommentLead] = useState<any>(null);
+  const [commentText, setCommentText] = useState('');
+  const [savingComment, setSavingComment] = useState(false);
+  const [pendingLeads, setPendingLeads] = useState<any[]>([]);
+  const [newPendingLead, setNewPendingLead] = useState({ name: '', company: '', phone: '', email: '', note: '' });
+  const [addingPending, setAddingPending] = useState(false);
+
+  // Aplicar classe no body para habilitar scroll
+  useEffect(() => {
+    document.body.classList.add('gestor-page');
+    document.documentElement.style.height = 'auto';
+    document.documentElement.style.overflow = 'auto';
+    return () => {
+      document.body.classList.remove('gestor-page');
+      document.documentElement.style.height = '';
+      document.documentElement.style.overflow = '';
+    };
+  }, []);
+
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [goalsRes, statsRes, sugRes] = await Promise.all([
+      const [goalsRes, statsRes, sugRes, leadsRes] = await Promise.all([
         fetch(`/api/gestor-goals?workspace=${WORKSPACE}`),
         fetch(`/api/gestor-stats?workspace=${WORKSPACE}&days=${period}`),
         fetch(`/api/gestor-suggestions?workspace=${WORKSPACE}`),
+        fetch(`/api/leads?workspace=${WORKSPACE}`),
       ]);
       const g = await goalsRes.json();
       const s = await statsRes.json();
       const sug = await sugRes.json();
+      const leadsData = await leadsRes.json();
       setGoals(g);
       setGoalDraft(g);
       setStats(s);
       setSuggestions(Array.isArray(sug) ? sug : []);
+      const allLeads = Array.isArray(leadsData) ? leadsData : (leadsData.leads || []);
+      setLeads(allLeads);
+      // Leads pendentes = leads com status 'pending' ou com gestor_note
+      setPendingLeads(allLeads.filter((l: any) => l.status === 'pending' || l.gestor_note));
     } catch (e) { console.error(e); }
     setLoading(false);
   }, [period]);
@@ -89,8 +130,9 @@ export default function GestorPage() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <style>{mobileStyle}</style>
       {/* Header */}
-      <div style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #0066ff 100%)', color: '#fff', padding: '20px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div className="gestor-header" style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #0066ff 100%)', color: '#fff', padding: '20px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5 }}>📊 Painel do Gestor</div>
           <div style={{ fontSize: 13, opacity: 0.85, marginTop: 2 }}>getLOG/Lottustech — Monitoramento de Prospecção</div>
@@ -109,13 +151,13 @@ export default function GestorPage() {
         </div>
       )}
 
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 20px' }}>
+      <div className="gestor-content" style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 20px' }}>
         {loading ? (
           <div style={{ textAlign: 'center', padding: 60, color: '#64748b' }}>Carregando dados...</div>
         ) : (
           <>
             {/* Cards de hoje */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
+            <div className="gestor-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
               {[
                 { label: 'WhatsApp Hoje', value: todayData.whatsapp, goal: goals.whatsapp_goal, color: '#16a34a', bg: '#f0fdf4', icon: '💬' },
                 { label: 'E-mails Hoje', value: todayData.email, goal: goals.email_goal, color: '#1a56db', bg: '#eff6ff', icon: '✉' },
@@ -138,7 +180,7 @@ export default function GestorPage() {
             </div>
 
             {/* Metas + Histórico */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 20, marginBottom: 24 }}>
+            <div className="gestor-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 20, marginBottom: 24 }}>
               {/* Metas */}
               <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -321,7 +363,7 @@ export default function GestorPage() {
             )}
 
             {/* Sugestões do Gestor */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+            <div className="gestor-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
               {/* Enviar sugestão */}
               <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
                 <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 14 }}>💡 Enviar Sugestão / Orientação para Danilo</div>
@@ -406,13 +448,143 @@ export default function GestorPage() {
                 ))}
               </div>
             </div>
+          {/* Seção: Lista Completa de Leads */}
+          <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px', marginTop: 20, border: '1px solid #e2e8f0' }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+              <span>👥 Todos os Leads ({leads.length})</span>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {['all','Prospecção','Qualificação','Apresentação','Pós-venda'].map(f => (
+                  <button key={f} onClick={() => setLeadsFilter(f)}
+                    style={{ background: leadsFilter === f ? '#0066ff' : '#f1f5f9', color: leadsFilter === f ? '#fff' : '#374151', border: 'none', borderRadius: 8, padding: '4px 12px', fontSize: 12, cursor: 'pointer', fontWeight: leadsFilter === f ? 600 : 400 }}>
+                    {f === 'all' ? 'Todos' : f}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <input
+              placeholder="🔍 Buscar por nome, empresa ou e-mail..."
+              value={leadsSearch}
+              onChange={e => setLeadsSearch(e.target.value)}
+              style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13, marginBottom: 12, boxSizing: 'border-box' }}
+            />
+            <div style={{ maxHeight: 500, overflowY: 'auto' }}>
+              {leads
+                .filter(l => leadsFilter === 'all' || l.status === leadsFilter)
+                .filter(l => !leadsSearch || `${l.name} ${l.company} ${l.email}`.toLowerCase().includes(leadsSearch.toLowerCase()))
+                .slice(0, 100)
+                .map((l: any) => {
+                  const timeline = (() => { try { return JSON.parse(l.notes || '[]'); } catch { return []; } })();
+                  const lastActivity = timeline.length > 0 ? timeline[timeline.length - 1] : null;
+                  const nextCall = l.next_call_at ? new Date(l.next_call_at) : null;
+                  const isOverdue = nextCall && nextCall < new Date();
+                  return (
+                    <div key={l.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
+                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#1a56db', flexShrink: 0 }}>
+                        {(l.name || l.company || '?')[0].toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 600, fontSize: 13 }}>{l.name || '—'}</span>
+                          <span style={{ fontSize: 11, color: '#64748b' }}>{l.company}</span>
+                          <span style={{ fontSize: 11, background: l.status === 'Prospecção' ? '#eff6ff' : l.status === 'Qualificação' ? '#f0fdf4' : '#fff7ed', color: l.status === 'Prospecção' ? '#1a56db' : l.status === 'Qualificação' ? '#16a34a' : '#ea580c', borderRadius: 6, padding: '1px 8px' }}>{l.status}</span>
+                          {nextCall && <span style={{ fontSize: 11, background: isOverdue ? '#fee2e2' : '#fef9c3', color: isOverdue ? '#dc2626' : '#92400e', borderRadius: 6, padding: '1px 8px' }}>{isOverdue ? '⚠ Retorno atrasado' : `🔔 Retorno: ${nextCall.toLocaleDateString('pt-BR')}`}</span>}
+                        </div>
+                        <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{l.email} {l.phone ? `· ${l.phone}` : ''}</div>
+                        {lastActivity && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Último contato: {lastActivity.type || lastActivity.action} — {new Date(lastActivity.date || lastActivity.ts).toLocaleDateString('pt-BR')}</div>}
+                        {l.gestor_note && <div style={{ fontSize: 12, background: '#fef9c3', color: '#92400e', borderRadius: 6, padding: '4px 8px', marginTop: 4 }}>💡 Nota do gestor: {l.gestor_note}</div>}
+                      </div>
+                      <button
+                        onClick={() => { setCommentLead(l); setCommentText(l.gestor_note || ''); }}
+                        style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+                      >✏️ Comentar</button>
+                    </div>
+                  );
+                })}
+              {leads.filter(l => leadsFilter === 'all' || l.status === leadsFilter).filter(l => !leadsSearch || `${l.name} ${l.company} ${l.email}`.toLowerCase().includes(leadsSearch.toLowerCase())).length > 100 && (
+                <div style={{ textAlign: 'center', padding: 12, color: '#64748b', fontSize: 12 }}>Mostrando os primeiros 100 resultados. Use a busca para filtrar.</div>
+              )}
+            </div>
+          </div>
+
+          {/* Modal de comentário do gestor */}
+          {commentLead && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setCommentLead(null)}>
+              <div style={{ background: '#fff', borderRadius: 14, padding: 24, width: '100%', maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+                <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>✏️ Comentário do Gestor</div>
+                <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>{commentLead.name} — {commentLead.company}</div>
+                <textarea
+                  value={commentText}
+                  onChange={e => setCommentText(e.target.value)}
+                  placeholder="Ex: Ligar amanhã cedo, tem interesse em TMS. Falar sobre integração com ERP."
+                  rows={4}
+                  style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13, resize: 'vertical', boxSizing: 'border-box' }}
+                />
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                  <button onClick={() => setCommentLead(null)} style={{ flex: 1, background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '8px 0', cursor: 'pointer', fontSize: 13 }}>Cancelar</button>
+                  <button
+                    disabled={savingComment}
+                    onClick={async () => {
+                      setSavingComment(true);
+                      const updated = { ...commentLead, gestor_note: commentText };
+                      await fetch('/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updated) });
+                      // Enviar sugestão para o Danilo se tiver texto
+                      if (commentText.trim()) {
+                        await fetch('/api/gestor-suggestions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workspace: WORKSPACE, message: `💡 Nota sobre ${commentLead.name} (${commentLead.company}): ${commentText}`, from_name: 'Vandir', priority: 'normal' }) });
+                      }
+                      setSavingComment(false);
+                      setCommentLead(null);
+                      showToast('✅ Comentário salvo! Danilo será notificado.');
+                      load();
+                    }}
+                    style={{ flex: 2, background: '#0066ff', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 0', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
+                  >{savingComment ? 'Salvando...' : '💾 Salvar Comentário'}</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Seção: Cadastrar Lead Pendente */}
+          <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px', marginTop: 20, border: '1px solid #e2e8f0' }}>
+            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>➕ Cadastrar Lead para Prospecção Futura</div>
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>Vandir pode adicionar leads que ficarão na fila para qualquer usuário prospectar futuramente.</div>
+            <div className="gestor-lead-form-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 10 }}>
+              {[{key:'name',label:'Nome do Contato',ph:'Ex: João Silva'},{key:'company',label:'Empresa',ph:'Ex: Gestamp'},{key:'phone',label:'Telefone',ph:'Ex: (41) 99999-0000'},{key:'email',label:'E-mail',ph:'Ex: joao@empresa.com'},{key:'note',label:'Observação / Instrução',ph:'Ex: Ligar segunda-feira, tem interesse em TMS'}].map(f => (
+                <div key={f.key} style={{ gridColumn: f.key === 'note' ? 'span 3' : undefined }}>
+                  <label style={{ fontSize: 11, color: '#64748b', display: 'block', marginBottom: 4 }}>{f.label}</label>
+                  <input
+                    placeholder={f.ph}
+                    value={(newPendingLead as any)[f.key]}
+                    onChange={e => setNewPendingLead({ ...newPendingLead, [f.key]: e.target.value })}
+                    style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: '7px 10px', fontSize: 13, boxSizing: 'border-box' }}
+                  />
+                </div>
+              ))}
+            </div>
+            <button
+              disabled={addingPending || !newPendingLead.name.trim()}
+              onClick={async () => {
+                setAddingPending(true);
+                const lead = { id: `lead_${Date.now()}`, workspace: WORKSPACE, name: newPendingLead.name, company: newPendingLead.company, phone: newPendingLead.phone, email: newPendingLead.email, status: 'Prospecção', gestor_note: newPendingLead.note, notes: '[]', created_at: new Date().toISOString() };
+                await fetch('/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lead) });
+                if (newPendingLead.note) {
+                  await fetch('/api/gestor-suggestions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ workspace: WORKSPACE, message: `🆕 Lead cadastrado pelo gestor: ${newPendingLead.name} (${newPendingLead.company}) — ${newPendingLead.note}`, from_name: 'Vandir', priority: 'high' }) });
+                }
+                setNewPendingLead({ name: '', company: '', phone: '', email: '', note: '' });
+                setAddingPending(false);
+                showToast('✅ Lead cadastrado! Aparecerá na lista do Danilo Cabral.');
+                load();
+              }}
+              style={{ background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 24px', fontWeight: 600, cursor: 'pointer', fontSize: 13 }}
+            >{addingPending ? 'Cadastrando...' : '➕ Cadastrar Lead'}</button>
+          </div>
+
           {/* Seção: Leads Prioritários */}
           <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px', marginTop: 20, border: '1px solid #e2e8f0' }}>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
               🎯 Marcar Lead Prioritário
               <span style={{ fontSize: 12, color: '#64748b', fontWeight: 400 }}>— Vandir pode indicar leads que o Danilo deve contatar hoje</span>
             </div>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+            <div className="gestor-priority-row" style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
               <input
                 id="priority-lead-name"
                 placeholder="Nome do lead ou empresa (ex: Gestamp, Stihl, Marcos Miranda...)"
