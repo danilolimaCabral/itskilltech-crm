@@ -49,6 +49,7 @@ export default function GestorPage() {
   const [pendingLeads, setPendingLeads] = useState<any[]>([]);
   const [newPendingLead, setNewPendingLead] = useState({ name: '', company: '', phone: '', email: '', note: '' });
   const [addingPending, setAddingPending] = useState(false);
+  const [dayModal, setDayModal] = useState<{ date: string; channel: string; channelLabel: string; leads: any[] } | null>(null);
 
   // Aplicar classe no body para habilitar scroll
   useEffect(() => {
@@ -156,28 +157,85 @@ export default function GestorPage() {
           <div style={{ textAlign: 'center', padding: 60, color: '#64748b' }}>Carregando dados...</div>
         ) : (
           <>
-            {/* Cards de hoje */}
+            {/* Cards de hoje — clicáveis por canal */}
             <div className="gestor-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
               {[
-                { label: 'WhatsApp Hoje', value: todayData.whatsapp, goal: goals.whatsapp_goal, color: '#16a34a', bg: '#f0fdf4', icon: '💬' },
-                { label: 'E-mails Hoje', value: todayData.email, goal: goals.email_goal, color: '#1a56db', bg: '#eff6ff', icon: '✉' },
-                { label: 'Ligações Hoje', value: todayData.call, goal: goals.call_goal, color: '#ea580c', bg: '#fff7ed', icon: '📞' },
-                { label: 'Total Hoje', value: todayData.total, goal: goals.total_goal, color: '#7c3aed', bg: '#f5f3ff', icon: '🎯' },
-              ].map(c => (
-                <div key={c.label} style={{ background: '#fff', borderRadius: 14, padding: '18px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', border: `1px solid ${c.color}22` }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ fontSize: 13, color: '#64748b' }}>{c.icon} {c.label}</span>
-                    <span style={{ fontSize: 11, color: '#94a3b8' }}>Meta: {c.goal}</span>
+                { label: 'WhatsApp Hoje', value: todayData.whatsapp, goal: goals.whatsapp_goal, color: '#16a34a', bg: '#f0fdf4', icon: '💬', channel: 'whatsapp', channelLabel: 'WhatsApp' },
+                { label: 'E-mails Hoje', value: todayData.email, goal: goals.email_goal, color: '#1a56db', bg: '#eff6ff', icon: '✉', channel: 'email', channelLabel: 'E-mail' },
+                { label: 'Ligações Hoje', value: todayData.call, goal: goals.call_goal, color: '#ea580c', bg: '#fff7ed', icon: '📞', channel: 'call', channelLabel: 'Ligação' },
+                { label: 'Total Hoje', value: todayData.total, goal: goals.total_goal, color: '#7c3aed', bg: '#f5f3ff', icon: '🎯', channel: 'all', channelLabel: 'Todos os canais' },
+              ].map(c => {
+                const todayKey = new Date().toISOString().slice(0, 10);
+                const dayLeads = todayData.leads || [];
+                const filteredLeads = c.channel === 'all' ? dayLeads : dayLeads.filter((l: any) => l.channels?.includes(c.channel));
+                return (
+                  <div key={c.label}
+                    onClick={() => c.value > 0 && setDayModal({ date: todayKey, channel: c.channel, channelLabel: c.channelLabel, leads: filteredLeads })}
+                    style={{ background: '#fff', borderRadius: 14, padding: '18px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', border: `1px solid ${c.color}22`, cursor: c.value > 0 ? 'pointer' : 'default', transition: 'transform 0.1s, box-shadow 0.1s' }}
+                    onMouseEnter={e => { if (c.value > 0) { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = `0 4px 16px ${c.color}33`; } }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.07)'; }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ fontSize: 13, color: '#64748b' }}>{c.icon} {c.label}</span>
+                      <span style={{ fontSize: 11, color: '#94a3b8' }}>Meta: {c.goal}</span>
+                    </div>
+                    <div style={{ fontSize: 32, fontWeight: 700, color: c.color }}>{c.value}</div>
+                    <ProgressBar value={c.value} max={c.goal} color={c.color} />
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                      <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                        {c.goal > 0 ? `${Math.round((c.value / c.goal) * 100)}% da meta` : '—'}
+                        {c.value >= c.goal && c.goal > 0 && <span style={{ color: '#16a34a', marginLeft: 6 }}>✅</span>}
+                      </span>
+                      {c.value > 0 && <span style={{ fontSize: 10, color: c.color, fontWeight: 600 }}>Ver leads →</span>}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 32, fontWeight: 700, color: c.color }}>{c.value}</div>
-                  <ProgressBar value={c.value} max={c.goal} color={c.color} />
-                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>
-                    {c.goal > 0 ? `${Math.round((c.value / c.goal) * 100)}% da meta` : '—'}
-                    {c.value >= c.goal && c.goal > 0 && <span style={{ color: '#16a34a', marginLeft: 6 }}>✅ Meta atingida!</span>}
+                );
+              })}
+            </div>
+
+            {/* Modal de leads do dia por canal */}
+            {dayModal && (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setDayModal(null)}>
+                <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 560, maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+                  <div style={{ padding: '18px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 15 }}>📋 Leads prospectados — {dayModal.channelLabel}</div>
+                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{new Date(dayModal.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</div>
+                    </div>
+                    <button onClick={() => setDayModal(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', fontSize: 16 }}>✕</button>
+                  </div>
+                  <div style={{ overflowY: 'auto', flex: 1, padding: '12px 20px' }}>
+                    {dayModal.leads.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8' }}>Nenhum lead encontrado para este canal neste dia.</div>
+                    ) : dayModal.leads.map((l: any, i: number) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 0', borderBottom: '1px solid #f8fafc' }}>
+                        <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#1a56db', flexShrink: 0 }}>
+                          {(l.name || l.company || '?')[0]?.toUpperCase()}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{l.name || '—'}</div>
+                          <div style={{ fontSize: 12, color: '#64748b' }}>{l.company} {l.role ? `· ${l.role}` : ''}</div>
+                          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{l.email}</div>
+                          {l.channels && l.channels.length > 0 && (
+                            <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+                              {l.channels.map((ch: string) => (
+                                <span key={ch} style={{ fontSize: 10, background: ch === 'whatsapp' ? '#f0fdf4' : ch === 'email' ? '#eff6ff' : ch === 'call' ? '#fff7ed' : '#f5f3ff', color: ch === 'whatsapp' ? '#16a34a' : ch === 'email' ? '#1a56db' : ch === 'call' ? '#ea580c' : '#7c3aed', borderRadius: 5, padding: '2px 7px', fontWeight: 500 }}>
+                                  {ch === 'whatsapp' ? '💬 WhatsApp' : ch === 'email' ? '✉ E-mail' : ch === 'call' ? '📞 Ligação' : '💼 LinkedIn'}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0 }}>{l.time || ''}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ padding: '12px 20px', borderTop: '1px solid #f1f5f9', fontSize: 12, color: '#64748b' }}>
+                    {dayModal.leads.length} lead(s) encontrado(s)
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
 
             {/* Metas + Histórico */}
             <div className="gestor-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 20, marginBottom: 24 }}>
