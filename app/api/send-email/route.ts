@@ -118,7 +118,8 @@ export async function POST(req: NextRequest) {
           <div class="sig-contact">
             <a href="mailto:${sender.contactEmail}">${sender.contactEmail}</a><br>
             <a href="tel:${sender.phone.replace(/\D/g, '')}">${sender.phone}</a><br>
-            <a href="https://www.gettms.com.br" style="color:${sender.color};">www.gettms.com.br</a>
+            <a href="https://www.gettms.com.br" style="color:${sender.color};">www.gettms.com.br</a> &nbsp;|&nbsp;
+            <a href="https://www.lottustech.com.br" style="color:${sender.color};">www.lottustech.com.br</a>
           </div>
         </div>
       </div>
