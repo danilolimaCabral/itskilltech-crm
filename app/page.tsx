@@ -21,6 +21,7 @@ const DEFAULT_WORKSPACES: Workspace[] = [
 const STORAGE_KEY = 'itskill_crm_full_v1';
 const uid = () => 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
 const cleanPhone = (p: string) => (p || '').replace(/\D/g, '');
+const getSaudacao = () => { const h = new Date().getHours(); if (h < 12) return 'Bom dia'; if (h < 18) return 'Boa tarde'; return 'Boa noite'; };
 // Funil de vendas — 5 etapas
 const FUNNEL = [
   { id: 'prospeccao',   label: '1 · Prospecção',   short: 'Prospecção',   color: '#6366f1', bg: '#eef2ff' },
@@ -210,7 +211,7 @@ export default function CRM() {
         const wsName = ws?.name || 'getLOG/Lottustech';
         const emailTpl = templates.find(t => t.type === 'email');
         let subject = `Apresentação ${wsName} — Solução TMS para ${lead.company || 'sua empresa'}`;
-        let body = `Olá ${lead.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo, da ${wsName}. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar significativamente a operação logística de vocês.\n\nGostaria de agendar uma conversa rápida de 15 minutos para apresentar os resultados que estamos gerando para empresas do mesmo segmento.\n\nQual seria o melhor horário para você?\n\nAtenciosamente,\nDanilo Cabral\n${wsName}\ndanilo@lottustech.com.br\n(41) 99949-9815\nwww.gettms.com.br | www.lottustech.com.br`;
+        let body = `${getSaudacao()}, ${lead.name.split(' ')[0]}!\n\nTudo bem?\n\nMeu nome é Danilo, da ${wsName}. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar significativamente a operação logística de vocês.\n\nGostaria de agendar uma conversa rápida de 15 minutos para apresentar os resultados que estamos gerando para empresas do mesmo segmento.\n\nQual seria o melhor horário para você?\n\nAtenciosamente,\nDanilo Cabral\n${wsName}\ndanilo@lottustech.com.br\n(41) 99949-9815\nwww.gettms.com.br | www.lottustech.com.br`;
         if (emailTpl) {
           subject = (emailTpl.subject || subject).replace(/\{\{nome\}\}/g, lead.name.split(' ')[0]).replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa').replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
           body = emailTpl.body.replace(/\{\{nome\}\}/g, lead.name.split(' ')[0]).replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa').replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
@@ -452,7 +453,7 @@ export default function CRM() {
     } else {
       const wsName = ws?.name || 'getLOG/Lottustech';
       setEmailSubject(`Apresentação ${wsName} — Solução TMS para ${lead.company || 'sua empresa'}`);
-      setEmailBody(`Olá ${lead.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo Cabral, da ${wsName}. Percebo que a ${lead.company || 'sua empresa'} busca constantemente otimizar a operação logística e reduzir custos com frete.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas. Que tal explorar como podemos gerar resultados semelhantes para a ${lead.company || 'sua empresa'}?\n\nMe diga qual o melhor horário para um bate-papo de 15 minutos.\n\nAtenciosamente,\nDanilo Cabral\nGerente Comercial | ${wsName}\ndanilo@lottustech.com.br | (41) 99949-9815\nwww.gettms.com.br | www.lottustech.com.br`);
+      setEmailBody(`${getSaudacao()}, ${lead.name.split(' ')[0]}!\n\nTudo bem?\n\nMeu nome é Danilo Cabral, da ${wsName}. Percebo que a ${lead.company || 'sua empresa'} busca constantemente otimizar a operação logística e reduzir custos com frete.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas. Que tal explorar como podemos gerar resultados semelhantes para a ${lead.company || 'sua empresa'}?\n\nMe diga qual o melhor horário para um bate-papo de 15 minutos.\n\nAtenciosamente,\nDanilo Cabral\nGerente Comercial | ${wsName}\ndanilo@lottustech.com.br | (41) 99949-9815\nwww.gettms.com.br | www.lottustech.com.br`);
     }
     setShowEmailTemplates(false);
   };
@@ -461,7 +462,7 @@ export default function CRM() {
     setWhatsModal(lead);
     // Montar mensagem padrão imediatamente (garante que o botão nunca fica vazio)
     const wsNameW = ws?.name || 'getLOG/Lottustech';
-    const defaultMsg = `Olá ${lead.name.split(' ')[0]}, tudo bem?\n\nSou o Danilo Cabral, da ${wsNameW}.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas.\n\nQue tal explorar como podemos gerar resultados semelhantes para a ${lead.company || 'sua empresa'}? Me diga qual o melhor horário para um bate-papo de 15 minutos. 😊`;
+    const defaultMsg = `${getSaudacao()}, ${lead.name.split(' ')[0]}! Tudo bem?\n\nSou o Danilo Cabral, da ${wsNameW}.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas.\n\nQue tal explorar como podemos gerar resultados semelhantes para a ${lead.company || 'sua empresa'}? Me diga qual o melhor horário para um bate-papo de 15 minutos. 😊`;
     // Tentar usar template salvo (do estado ou buscar da API)
     const tplFromState = templates.find((t: any) => t.type === 'whatsapp');
     if (tplFromState) {
@@ -834,7 +835,7 @@ export default function CRM() {
                           withPhone.forEach((lead, i) => {
                             setTimeout(() => {
                               const wsNameW = ws?.name || 'getLOG/Lottustech';
-                              const body = encodeURIComponent(`Olá ${lead.name.split(' ')[0]}, tudo bem?
+                              const body = encodeURIComponent(`${getSaudacao()}, ${lead.name.split(' ')[0]}! Tudo bem?
 
 Meu nome é Danilo, da ${wsNameW}. Vi que você é ${lead.role || 'decisor'} na ${lead.company || 'sua empresa'} e acredito que nossa solução de TMS pode otimizar a operação logística de vocês.
 
@@ -1312,7 +1313,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                       onClick={() => {
                         const wsName = ws?.name || 'getLOG/Lottustech';
                         setEmailSubject(`Apresentação ${wsName} — Solução TMS para ${emailModal.company || 'sua empresa'}`);
-                        setEmailBody(`Olá ${emailModal.name.split(' ')[0]},\n\nTudo bem?\n\nMeu nome é Danilo Cabral, da ${wsName}. Percebo que a ${emailModal.company || 'sua empresa'} busca constantemente otimizar a operação logística e reduzir custos com frete.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas. Que tal explorar como podemos gerar resultados semelhantes para a ${emailModal.company || 'sua empresa'}?\n\nMe diga qual o melhor horário para um bate-papo de 15 minutos.\n\nAtenciosamente,\nDanilo Cabral\nGerente Comercial | ${wsName}\ndanilo@lottustech.com.br | (41) 99949-9815\nwww.gettms.com.br | www.lottustech.com.br`);
+                        setEmailBody(`${getSaudacao()}, ${emailModal.name.split(' ')[0]}!\n\nTudo bem?\n\nMeu nome é Danilo Cabral, da ${wsName}. Percebo que a ${emailModal.company || 'sua empresa'} busca constantemente otimizar a operação logística e reduzir custos com frete.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas. Que tal explorar como podemos gerar resultados semelhantes para a ${emailModal.company || 'sua empresa'}?\n\nMe diga qual o melhor horário para um bate-papo de 15 minutos.\n\nAtenciosamente,\nDanilo Cabral\nGerente Comercial | ${wsName}\ndanilo@lottustech.com.br | (41) 99949-9815\nwww.gettms.com.br | www.lottustech.com.br`);
                       }}
                     >
                       📝 Padrão
