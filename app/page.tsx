@@ -385,7 +385,7 @@ export default function CRM() {
     setWhatsModal(lead);
     // Montar mensagem padrão imediatamente (garante que o botão nunca fica vazio)
     const wsNameW = ws?.name || 'getLOG/Lottustech';
-    const defaultMsg = `Olá ${lead.name.split(' ')[0]}, tudo bem?\n\nSou o Danilo Cabral, da ${wsNameW}. Percebo que ${(lead as any).sector ? 'empresas do setor de ' + (lead as any).sector : 'empresas'} como a ${lead.company || 'sua empresa'} buscam constantemente otimizar custos logísticos.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas.\n\nQue tal explorar como podemos gerar resultados semelhantes para a ${lead.company || 'sua empresa'}? Me diga qual o melhor horário para um bate-papo de 15 minutos.\n\nAtenciosamente,\nDanilo Cabral | (41) 99949-9815\nwww.gettms.com.br | www.lottustech.com.br`;
+    const defaultMsg = `Olá ${lead.name.split(' ')[0]}, tudo bem?\n\nSou o Danilo Cabral, da ${wsNameW}.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas.\n\nQue tal explorar como podemos gerar resultados semelhantes para a ${lead.company || 'sua empresa'}? Me diga qual o melhor horário para um bate-papo de 15 minutos.\n\nAtenciosamente,\nDanilo Cabral | (41) 99949-9815\nwww.gettms.com.br | www.lottustech.com.br`;
     // Tentar usar template salvo (do estado ou buscar da API)
     const tplFromState = templates.find((t: any) => t.type === 'whatsapp');
     if (tplFromState) {
@@ -1241,7 +1241,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
             {/* Modal WhatsApp */}
       {whatsModal && (
         <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) setWhatsModal(null); }}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 680, width: '95vw' }}>
             <div className="modal-header">
               <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ width: 28, height: 28, borderRadius: '50%', background: '#25d366', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1273,8 +1273,8 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
               )}
               <div className="field-group">
                 <label className="field-label">Mensagem</label>
-                <textarea className="field-input" rows={8} value={whatsBody} onChange={e => setWhatsBody(e.target.value)}
-                  style={{ resize: 'vertical', fontFamily: 'inherit', fontSize: 13 }} />
+                <textarea className="field-input" rows={12} value={whatsBody} onChange={e => setWhatsBody(e.target.value)}
+                  style={{ resize: 'vertical', fontFamily: 'inherit', fontSize: 14, lineHeight: '1.6' }} />
               </div>
               {zapiConfigured ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#079455', marginTop: 8 }}>
