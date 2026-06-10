@@ -4,60 +4,51 @@ export async function POST(req: NextRequest) {
   try {
     const { prompt, style = 'professional', platform = 'linkedin', topic } = await req.json();
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: 'API key não configurada' }, { status: 500 });
-    }
-
     // Montar prompt otimizado para posts B2B
     const platformSpec = platform === 'linkedin'
-      ? 'LinkedIn post image, 1200x627px aspect ratio, professional business style'
-      : 'Instagram post image, 1080x1080px square format, modern business style';
+      ? 'professional LinkedIn business post, wide format, corporate style'
+      : 'Instagram square post, modern business style, vibrant';
 
     const styleGuide = style === 'professional'
-      ? 'clean corporate design, blue and white color scheme, modern typography, minimalist layout'
+      ? 'clean corporate design, blue and white color scheme, modern minimalist layout, professional business'
       : style === 'bold'
-      ? 'bold colors, strong typography, high contrast, impactful visual'
-      : 'warm colors, friendly tone, approachable design, soft gradients';
+      ? 'bold colors, strong visual impact, high contrast, dynamic composition'
+      : 'warm colors, friendly approachable design, soft gradients, welcoming';
 
     const fullPrompt = prompt
-      ? `${prompt}. ${platformSpec}. ${styleGuide}. No text overlays. High quality.`
-      : `Professional B2B technology post about ${topic || 'logistics management software TMS'}. ${platformSpec}. ${styleGuide}. Abstract business concept visualization, no text. High quality photorealistic.`;
+      ? `${prompt}, ${platformSpec}, ${styleGuide}, no text, high quality`
+      : `Professional B2B technology logistics TMS software concept, ${topic ? topic + ', ' : ''}trucks and technology, digital transformation, ${platformSpec}, ${styleGuide}, no text overlays, photorealistic high quality`;
 
-    // Tentar DALL-E 3 via API OpenAI direta
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'dall-e-3',
-        prompt: fullPrompt,
-        n: 1,
-        size: platform === 'linkedin' ? '1792x1024' : '1024x1024',
-        quality: 'standard',
-        response_format: 'url',
-      }),
-    });
+    // Usar Pollinations.ai — API gratuita e sem chave
+    const width = platform === 'linkedin' ? 1200 : 1080;
+    const height = platform === 'linkedin' ? 627 : 1080;
+    const encodedPrompt = encodeURIComponent(fullPrompt);
+    const seed = Math.floor(Math.random() * 999999);
 
-    if (!response.ok) {
-      const err = await response.text();
-      console.error('DALL-E error:', err);
-      // Fallback: retornar imagem placeholder profissional
-      return NextResponse.json({
-        url: null,
-        error: 'Geração de imagem não disponível. Use uma imagem própria.',
-        fallback: true,
-      });
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true&enhance=true`;
+
+    // Verificar se a URL é acessível (Pollinations retorna imagem diretamente)
+    const checkRes = await fetch(imageUrl, { method: 'HEAD' });
+    if (!checkRes.ok) {
+      // Tentar sem parâmetros extras
+      const simpleUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}`;
+      return NextResponse.json({ url: simpleUrl, provider: 'pollinations' });
     }
 
-    const data = await response.json();
-    const imageUrl = data.data?.[0]?.url;
+    return NextResponse.json({
+      url: imageUrl,
+      provider: 'pollinations',
+      prompt: fullPrompt
+    });
 
-    return NextResponse.json({ url: imageUrl, revised_prompt: data.data?.[0]?.revised_prompt });
   } catch (e: any) {
     console.error('generate-image error:', e);
-    return NextResponse.json({ error: e.message, fallback: true }, { status: 500 });
+    // Retornar URL de fallback mesmo em caso de erro
+    const fallbackPrompt = encodeURIComponent('professional logistics technology business concept, trucks and digital systems, blue corporate style, no text');
+    return NextResponse.json({
+      url: `https://image.pollinations.ai/prompt/${fallbackPrompt}?width=1200&height=627&nologo=true`,
+      provider: 'pollinations',
+      error: e.message
+    });
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const CNPJA_KEY = '9ad25b99-e3cf-448f-9449-836c4b68690b-65a8476e-a6fb-43c3-9202-2a8a3158f429'
+const BASE_URL = 'https://api.cnpja.com'
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
@@ -8,13 +9,14 @@ export async function GET(request: NextRequest) {
   const nome = searchParams.get('nome')
 
   try {
+    // ── Busca por CNPJ ──────────────────────────────────────────────────────
     if (cnpj) {
       const cnpjLimpo = cnpj.replace(/\D/g, '')
       if (cnpjLimpo.length !== 14) {
         return NextResponse.json({ error: 'CNPJ inválido — digite os 14 dígitos' }, { status: 400 })
       }
 
-      const res = await fetch(`https://api.cnpja.com/office/${cnpjLimpo}?simples=true&registrations=BR`, {
+      const res = await fetch(`${BASE_URL}/office/${cnpjLimpo}?simples=true&registrations=BR`, {
         headers: {
           'Authorization': CNPJA_KEY,
           'Accept': 'application/json'
@@ -37,17 +39,104 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(formatCNPJA(data))
     }
 
+    // ── Busca por Nome via CNPJ.já ──────────────────────────────────────────
     if (nome) {
       if (nome.length < 3) {
         return NextResponse.json({ error: 'Digite pelo menos 3 letras' }, { status: 400 })
       }
 
-      // A Receita Federal não disponibiliza busca por nome de forma gratuita
-      // Retornar sugestão para buscar o CNPJ no Google
-      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(`CNPJ ${nome} site:receita.fazenda.gov.br OR site:cnpj.biz`)}`
+      // Busca real via CNPJ.já search endpoint
+      const params = new URLSearchParams({
+        company: nome,
+        limit: '10',
+        status: 'ATIVA'
+      })
+
+      const searchRes = await fetch(`${BASE_URL}/search?${params}`, {
+        headers: {
+          'Authorization': CNPJA_KEY,
+          'Accept': 'application/json'
+        }
+      })
+
+      if (searchRes.ok) {
+        const data = await searchRes.json()
+        const offices = data.offices || data.results || []
+
+        if (offices.length === 0) {
+          return NextResponse.json({
+            results: [],
+            total: 0,
+            message: `Nenhuma empresa encontrada com o nome "${nome}". Tente buscar pelo CNPJ.`
+          })
+        }
+
+        const results = offices.slice(0, 10).map((o: any) => {
+          const company = o.company || {}
+          const phones = o.phones || []
+          const emails = o.emails || []
+          const telArea = phones[0]?.area || ''
+          const tel = phones[0]?.number || ''
+          const telFormatado = telArea && tel ? `(${telArea}) ${tel}` : tel
+
+          return {
+            cnpj: o.taxId || o.cnpj || '',
+            razao_social: company.name || o.name || '',
+            nome_fantasia: o.alias || company.name || '',
+            situacao: o.status?.text || 'Ativa',
+            atividade_principal: o.mainActivity?.text || '',
+            municipio: o.address?.city || '',
+            uf: o.address?.state || '',
+            email: emails[0]?.address || '',
+            telefone: telFormatado,
+            porte: company.size?.text || '',
+            data_inicio_atividade: o.founded || '',
+            socios: (company.members || []).slice(0, 3).map((m: any) => ({
+              nome: m.person?.name || m.name || '',
+              qualificacao: m.role?.text || ''
+            })),
+            source: 'CNPJ.já'
+          }
+        })
+
+        return NextResponse.json({ results, total: data.total || results.length })
+      }
+
+      // Se CNPJ.já falhar (plano não suporta), tentar busca alternativa via ReceitaWS
+      const receitaRes = await fetch(`https://www.receitaws.com.br/v1/cnpj/search?q=${encodeURIComponent(nome)}`, {
+        headers: { 'Accept': 'application/json' }
+      }).catch(() => null)
+
+      if (receitaRes?.ok) {
+        const receitaData = await receitaRes.json()
+        if (receitaData.empresas?.length > 0) {
+          const results = receitaData.empresas.slice(0, 10).map((e: any) => ({
+            cnpj: e.cnpj || '',
+            razao_social: e.nome || '',
+            nome_fantasia: e.fantasia || e.nome || '',
+            situacao: e.situacao || 'Ativa',
+            atividade_principal: e.atividade_principal?.[0]?.text || '',
+            municipio: e.municipio || '',
+            uf: e.uf || '',
+            email: e.email || '',
+            telefone: e.telefone || '',
+            porte: e.porte || '',
+            data_inicio_atividade: e.abertura || '',
+            socios: (e.qsa || []).slice(0, 3).map((s: any) => ({
+              nome: s.nome || '',
+              qualificacao: s.qual || ''
+            })),
+            source: 'ReceitaWS'
+          }))
+          return NextResponse.json({ results, total: results.length })
+        }
+      }
+
+      // Fallback final: sugerir Google
+      const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(`CNPJ "${nome}" site:cnpj.biz OR site:receitaws.com.br`)}`
       return NextResponse.json({
         suggestion: true,
-        message: `Busca por nome não disponível. Encontre o CNPJ da empresa e cole no campo acima.`,
+        message: `Não foi possível encontrar "${nome}" automaticamente. Cole o CNPJ no campo acima ou busque no Google.`,
         googleUrl,
         googleLabel: `🔍 Buscar CNPJ de "${nome}" no Google`
       })

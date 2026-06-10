@@ -850,8 +850,12 @@ function GestorBuscaEmpresa({ onPreencher }: { onPreencher: (data: any) => void 
         onPreencher(data);
       } else if (data.results?.length > 0) {
         setResults(data.results);
+      } else if (data.suggestion) {
+        if (window.confirm(`${data.message}\n\nClicar em OK para abrir o Google.`)) {
+          window.open(data.googleUrl, '_blank');
+        }
       } else {
-        alert('Nenhuma empresa encontrada.');
+        alert(data.message || data.error || 'Nenhuma empresa encontrada. Tente buscar pelo CNPJ.');
       }
     } catch {
       alert('Erro ao buscar empresa.');
@@ -868,11 +872,12 @@ function GestorBuscaEmpresa({ onPreencher }: { onPreencher: (data: any) => void 
 
   return (
     <div style={{ background: '#f0f7ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '12px 14px', marginBottom: 14 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: '#1d4ed8', marginBottom: 8 }}>🔍 Buscar empresa por CNPJ ou nome (preenchimento automático)</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#1d4ed8', marginBottom: 4 }}>🔍 Buscar empresa por CNPJ ou Nome — preenchimento automático</div>
+      <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>Digite o CNPJ (14 dígitos) <strong>ou o nome da empresa</strong> e pressione Enter</div>
       <div style={{ display: 'flex', gap: 8 }}>
         <input
           style={{ flex: 1, border: '1px solid #bfdbfe', borderRadius: 8, padding: '7px 10px', fontSize: 13, boxSizing: 'border-box' as const }}
-          placeholder="Ex: 60.701.190/0001-04 ou Itaú Unibanco"
+          placeholder="CNPJ (60.701.190/0001-04) ou nome da empresa..."
           value={query}
           onChange={e => setQuery(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') buscar(); }}

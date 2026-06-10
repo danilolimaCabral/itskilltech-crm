@@ -3059,7 +3059,7 @@ function LeadModal({ lead, workspace, onClose, onSave, onDelete }: any) {
           window.open(data.googleUrl, '_blank');
         }
       } else {
-        alert(data.error || 'Nenhuma empresa encontrada. Tente buscar pelo CNPJ (14 dígitos).');
+        alert(data.message || data.error || 'Nenhuma empresa encontrada. Tente buscar pelo CNPJ (14 dígitos) ou outro nome.');
       }
     } catch (e) {
       alert('Erro ao buscar empresa.');
@@ -3104,13 +3104,13 @@ function LeadModal({ lead, workspace, onClose, onSave, onDelete }: any) {
           {/* Busca automática por CNPJ ou nome */}
           {!lead && (
             <div style={{ background: '#f0f7ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#1d4ed8', marginBottom: 4 }}>🔍 Buscar empresa pelo CNPJ — preenchimento automático</div>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>Digite o CNPJ (14 dígitos) e pressione Enter para preencher os dados automaticamente</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#1d4ed8', marginBottom: 4 }}>🔍 Buscar empresa por CNPJ ou Nome — preenchimento automático</div>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>Digite o CNPJ (14 dígitos) <strong>ou o nome da empresa</strong> e pressione Enter para preencher os dados automaticamente</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input
                   className="field-input"
                   style={{ flex: 1, margin: 0 }}
-                  placeholder="CNPJ (ex: 60.701.190/0001-04) — busca automática"
+                  placeholder="CNPJ (60.701.190/0001-04) ou nome da empresa..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') buscarEmpresa(); }}
