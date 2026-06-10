@@ -352,3 +352,8 @@ table.data tbody tr:hover { background: var(--surface-hover); }
 @media (min-width: 769px) {
   .sidebar-overlay { display: none !important; }
 }
+
+/* LinkedIn dropdown */
+.li-dropdown-wrap:hover .li-dropdown,
+.li-dropdown-wrap:focus-within .li-dropdown { display: block !important; }
+.li-dropdown a:hover, .li-dropdown button:hover { background: #f0f7ff !important; }

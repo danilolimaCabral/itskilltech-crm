@@ -219,6 +219,12 @@ export default function GestorPage() {
                             {l.email && <span style={{ fontSize: 11, color: '#94a3b8' }}>✉ {l.email}</span>}
                             {l.phone && <span style={{ fontSize: 11, color: '#0066ff', fontWeight: 500 }}>📞 {l.phone}</span>}
                             {l.whatsapp && l.whatsapp !== l.phone && <span style={{ fontSize: 11, color: '#16a34a', fontWeight: 500 }}>💬 {l.whatsapp}</span>}
+                            {l.linkedin && (
+                              <a href={l.linkedin.startsWith('http') ? l.linkedin : `https://linkedin.com/in/${l.linkedin}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#0a66c2', fontWeight: 600, textDecoration: 'none' }}>💼 LinkedIn</a>
+                            )}
+                            {!l.linkedin && l.name && (
+                              <a href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent((l.name || '') + ' ' + (l.company || ''))}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#94a3b8', textDecoration: 'none' }}>🔍 Buscar LinkedIn</a>
+                            )}
                           </div>
                           {l.channels && l.channels.length > 0 && (
                             <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
@@ -405,7 +411,11 @@ export default function GestorPage() {
                               {lead.email && <a href={`mailto:${lead.email}`} style={{ fontSize: 11, color: '#1d4ed8', textDecoration: 'none' }}>✉ {lead.email}</a>}
                               {lead.phone && <a href={`tel:${lead.phone}`} style={{ fontSize: 11, color: '#0066ff', fontWeight: 600, textDecoration: 'none' }}>📞 {lead.phone}</a>}
                               {lead.whatsapp && lead.whatsapp !== lead.phone && <a href={`https://wa.me/55${lead.whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, textDecoration: 'none' }}>💬 {lead.whatsapp}</a>}
-                              {lead.linkedin && <a href={lead.linkedin.startsWith('http') ? lead.linkedin : `https://linkedin.com/in/${lead.linkedin}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#0a66c2', fontWeight: 600, textDecoration: 'none' }}>💼 LinkedIn</a>}
+                              {lead.linkedin ? (
+                                <a href={lead.linkedin.startsWith('http') ? lead.linkedin : `https://linkedin.com/in/${lead.linkedin}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#0a66c2', fontWeight: 600, textDecoration: 'none' }}>💼 LinkedIn</a>
+                              ) : lead.name ? (
+                                <a href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent((lead.name || '') + ' ' + (lead.company || ''))}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#94a3b8', textDecoration: 'none' }}>🔍 Buscar LinkedIn</a>
+                              ) : null}
                             </div>
                           </div>
                           <div style={{ textAlign: 'right', minWidth: 120 }}>

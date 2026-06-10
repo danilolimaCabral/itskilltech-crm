@@ -160,6 +160,19 @@ export default function CRM() {
     showToast('LinkedIn salvo!');
   };
 
+  // Registrar atividade genérica (LinkedIn, etc.) na timeline do lead
+  const registerActivity = async (lead: Lead, type: string) => {
+    const notesRaw = lead.notes || '';
+    const timelineMatch = notesRaw.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/);
+    const timeline = timelineMatch ? JSON.parse(timelineMatch[1]) : [];
+    const labels: Record<string, string> = { linkedin: 'Contato via LinkedIn', whatsapp: 'WhatsApp enviado', call: 'Ligação realizada', email: 'E-mail enviado' };
+    timeline.unshift({ type, label: labels[type] || type, ts: Date.now() });
+    const notesBase = notesRaw.replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
+    const updatedLead = { ...lead, notes: notesBase + `\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]`, updated_at: Date.now() };
+    await saveLead(updatedLead as Lead);
+    showToast(`✅ Contato LinkedIn registrado para ${lead.name}!`);
+  };
+
   // Publicar no Instagram
   const postInstagram = async () => {
     if (!instagramCaption.trim()) return;
@@ -907,11 +920,19 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                         </button>
                         {/* LinkedIn */}
                         {lead.linkedin ? (
-                          <a href={lead.linkedin.startsWith('http') ? lead.linkedin : `https://linkedin.com/in/${lead.linkedin}`} target="_blank" rel="noopener noreferrer" className="ch-icon" title={`Abrir LinkedIn: ${lead.name}`} style={{ color: '#0a66c2', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
-                          </a>
+                          <div style={{ position: 'relative', display: 'inline-flex' }} className="li-dropdown-wrap">
+                            <button className="ch-icon" title={`LinkedIn: ${lead.name}`} style={{ color: '#0a66c2' }} onClick={() => { setLinkedinModal(lead); setLinkedinInput(lead.linkedin || ''); }}>
+                              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+                            </button>
+                            <div className="li-dropdown" style={{ display: 'none', position: 'absolute', top: '100%', right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.12)', zIndex: 100, minWidth: 180, padding: '4px 0' }}>
+                              <a href={lead.linkedin.startsWith('http') ? lead.linkedin : `https://linkedin.com/in/${lead.linkedin}`} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', fontSize: 13, color: '#0a66c2', textDecoration: 'none', whiteSpace: 'nowrap' }}>👤 Ver Perfil</a>
+                              <a href={`https://www.linkedin.com/messaging/compose/?recipient=${encodeURIComponent(lead.linkedin.replace(/.*linkedin.com\/in\//,'').replace(/\/.*/,''))}`} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', fontSize: 13, color: '#0a66c2', textDecoration: 'none', whiteSpace: 'nowrap' }}>✉ Enviar Mensagem</a>
+                              <button style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', fontSize: 13, color: '#16a34a', background: 'none', border: 'none', cursor: 'pointer', width: '100%', whiteSpace: 'nowrap' }} onClick={() => registerActivity(lead, 'linkedin')}>✅ Registrar Contato</button>
+                              <button style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', fontSize: 13, color: '#64748b', background: 'none', border: 'none', cursor: 'pointer', width: '100%', whiteSpace: 'nowrap' }} onClick={() => { setLinkedinModal(lead); setLinkedinInput(lead.linkedin || ''); }}>✏️ Editar URL</button>
+                            </div>
+                          </div>
                         ) : (
-                          <button className="ch-icon" title="Adicionar LinkedIn" style={{ color: '#94a3b8' }} onClick={() => { setLinkedinModal(lead); setLinkedinInput(lead.linkedin || ''); }}>
+                          <button className="ch-icon" title="Adicionar LinkedIn" style={{ color: '#94a3b8' }} onClick={() => { setLinkedinModal(lead); setLinkedinInput(''); }}>
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
                           </button>
                         )}
@@ -1511,7 +1532,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
           <div className="modal" style={{ maxWidth: 520 }}>
             <div className="modal-header">
               <div className="modal-title" style={{ color: '#c13584' }}>
-                📸 Publicar no Instagram — @drivoncrm
+                📸 Publicar no Instagram — @get.tms
               </div>
               <button className="modal-close" onClick={() => setInstagramModal(false)}>×</button>
             </div>
