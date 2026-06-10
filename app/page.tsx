@@ -130,6 +130,11 @@ export default function CRM() {
   const [calSelectedSlot, setCalSelectedSlot] = useState('');
   const [calLoadingSlots, setCalLoadingSlots] = useState(false);
   const [calSaving, setCalSaving] = useState(false);
+  // Metas do gestor
+  const [dailyGoals, setDailyGoals] = useState({ whatsapp_goal: 20, email_goal: 20, call_goal: 10, total_goal: 50 });
+  // Sugestões do gestor não lidas
+  const [unreadSuggestions, setUnreadSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2800); };
 
@@ -209,6 +214,18 @@ export default function CRM() {
         const j = await r.json();
         setZapiConfigured(false); // Z-API desativada temporariamente
       } catch { setZapiConfigured(false); }
+      // carregar metas do gestor
+      try {
+        const r = await fetch(`/api/gestor-goals?workspace=${workspace}`);
+        const j = await r.json();
+        if (j.whatsapp_goal !== undefined) setDailyGoals(j);
+      } catch {}
+      // carregar sugestões não lidas do gestor
+      try {
+        const r = await fetch(`/api/gestor-suggestions?workspace=${workspace}`);
+        const j = await r.json();
+        if (Array.isArray(j)) setUnreadSuggestions(j.filter((s: any) => !s.read_at));
+      } catch {}
     })();
     const params = new URLSearchParams(window.location.search);
     if (params.get('auth') === 'ok') { showToast('Conta conectada'); window.history.replaceState({}, '', '/'); }
@@ -643,21 +660,42 @@ export default function CRM() {
                   </div>
                 ))}
               </div>
-              {/* Prospecção de hoje */}
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', margin: '8px 0', padding: '10px 14px', background: 'var(--surface-2, #f9fafb)', borderRadius: 10, border: '1px solid var(--border)' }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginRight: 4 }}>📊 Hoje:</span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: todayTotal > 0 ? '#eff6ff' : 'var(--surface)', color: '#0066ff', border: '1px solid #0066ff33' }}>
-                  🎯 {todayTotal} prospectado{todayTotal !== 1 ? 's' : ''}
-                </span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '3px 10px', borderRadius: 20, background: todayWhats > 0 ? '#f0fdf4' : 'var(--surface)', color: '#16a34a', border: '1px solid #16a34a33' }}>
-                  💬 WhatsApp: <strong>{todayWhats}</strong>
-                </span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '3px 10px', borderRadius: 20, background: todayEmail > 0 ? '#eff6ff' : 'var(--surface)', color: '#1a56db', border: '1px solid #1a56db33' }}>
-                  ✉ E-mail: <strong>{todayEmail}</strong>
-                </span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '3px 10px', borderRadius: 20, background: todayCall > 0 ? '#fff7ed' : 'var(--surface)', color: '#ea580c', border: '1px solid #ea580c33' }}>
-                  📞 Telefone: <strong>{todayCall}</strong>
-                </span>
+              {/* Prospecção de hoje com metas */}
+              <div style={{ margin: '8px 0', padding: '12px 14px', background: 'var(--surface-2, #f9fafb)', borderRadius: 10, border: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>📊 Prospecção de Hoje</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {unreadSuggestions.length > 0 && (
+                      <button onClick={() => setShowSuggestions(true)} style={{ background: '#fef3c7', border: '1px solid #f59e0b', color: '#b45309', borderRadius: 20, padding: '2px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 700 }}>
+                        💡 {unreadSuggestions.length} sugestão do gestor
+                      </button>
+                    )}
+                    <a href="/gestor" target="_blank" style={{ fontSize: 11, color: '#0066ff', textDecoration: 'none', background: '#eff6ff', padding: '2px 10px', borderRadius: 20, border: '1px solid #0066ff33' }}>📊 Painel Gestor</a>
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                  {[
+                    { label: '💬 WhatsApp', value: todayWhats, goal: dailyGoals.whatsapp_goal, color: '#16a34a' },
+                    { label: '✉ E-mail', value: todayEmail, goal: dailyGoals.email_goal, color: '#1a56db' },
+                    { label: '📞 Ligações', value: todayCall, goal: dailyGoals.call_goal, color: '#ea580c' },
+                    { label: '🎯 Total', value: todayTotal, goal: dailyGoals.total_goal, color: '#7c3aed' },
+                  ].map(c => {
+                    const pct = c.goal > 0 ? Math.min(100, Math.round((c.value / c.goal) * 100)) : 0;
+                    return (
+                      <div key={c.label} style={{ background: 'var(--surface)', borderRadius: 8, padding: '8px 10px', border: `1px solid ${c.color}22` }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{c.label}</span>
+                          <span style={{ fontSize: 11, color: '#94a3b8' }}>{c.value}/{c.goal}</span>
+                        </div>
+                        <div style={{ fontSize: 20, fontWeight: 700, color: c.color, lineHeight: 1 }}>{c.value}</div>
+                        <div style={{ background: '#f1f5f9', borderRadius: 4, height: 5, marginTop: 5, overflow: 'hidden' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: c.color, borderRadius: 4, transition: 'width 0.4s' }} />
+                        </div>
+                        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 3 }}>{pct}% da meta{pct >= 100 ? ' ✅' : ''}</div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
               {/* Painel de alertas de retorno */}
               {pendingAlerts.length > 0 && (
@@ -1483,6 +1521,40 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                   setWsPassModal(null); setWsPassInput('');
                 } else { alert('Senha incorreta!'); setWsPassInput(''); }
               }}>Entrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal de Sugestões do Gestor */}
+      {showSuggestions && (
+        <div className="modal-bg" onClick={() => setShowSuggestions(false)}>
+          <div className="modal" style={{ maxWidth: 520 }} onClick={(e: any) => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-title">💡 Sugestões do Gestor Vandir</span>
+              <button className="modal-close" onClick={() => setShowSuggestions(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              {unreadSuggestions.length === 0 ? (
+                <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Nenhuma sugestão nova.</p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {unreadSuggestions.map((s: any) => (
+                    <div key={s.id} style={{ padding: '12px 14px', background: '#fffbeb', borderRadius: 10, border: '1px solid #f59e0b55' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#b45309' }}>Vandir • {new Date(s.created_at).toLocaleDateString('pt-BR')}</span>
+                        <button onClick={async () => {
+                          await fetch('/api/gestor-suggestions', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: s.id }) });
+                          setUnreadSuggestions(prev => prev.filter(x => x.id !== s.id));
+                        }} style={{ fontSize: 11, background: '#f0fdf4', border: '1px solid #16a34a33', color: '#16a34a', borderRadius: 8, padding: '2px 8px', cursor: 'pointer' }}>✓ Lido</button>
+                      </div>
+                      <p style={{ fontSize: 14, color: 'var(--text)', margin: 0 }}>{s.message}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn" onClick={() => setShowSuggestions(false)}>Fechar</button>
             </div>
           </div>
         </div>

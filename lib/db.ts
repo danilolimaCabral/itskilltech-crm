@@ -353,3 +353,87 @@ export async function getLeadEmails(workspace: string): Promise<string[]> {
     return rows.map((r: any) => r.email).filter(Boolean);
   } catch { return []; }
 }
+
+// ---- Painel do Gestor: Metas e Sugestões ----
+export async function initGestorTables() {
+  if (!hasDatabase) return;
+  try {
+    // Tabela de metas diárias
+    await sql`
+      CREATE TABLE IF NOT EXISTS daily_goals (
+        id TEXT PRIMARY KEY,
+        workspace TEXT NOT NULL,
+        whatsapp_goal INTEGER DEFAULT 20,
+        email_goal INTEGER DEFAULT 20,
+        call_goal INTEGER DEFAULT 10,
+        total_goal INTEGER DEFAULT 50,
+        created_by TEXT DEFAULT 'vandir',
+        updated_at BIGINT
+      );
+    `;
+    // Tabela de sugestões/feedbacks do gestor
+    await sql`
+      CREATE TABLE IF NOT EXISTS manager_suggestions (
+        id TEXT PRIMARY KEY,
+        workspace TEXT NOT NULL,
+        message TEXT NOT NULL,
+        from_name TEXT DEFAULT 'Vandir',
+        priority TEXT DEFAULT 'normal',
+        read_at BIGINT,
+        created_at BIGINT
+      );
+    `;
+    // Inserir metas padrão se não existirem
+    await sql`
+      INSERT INTO daily_goals (id, workspace, whatsapp_goal, email_goal, call_goal, total_goal, updated_at)
+      VALUES ('lottus-goals', 'lottus', 20, 20, 10, 50, ${Date.now()})
+      ON CONFLICT (id) DO NOTHING;
+    `;
+  } catch (e) { console.error('initGestorTables error:', e); }
+}
+
+export async function getDailyGoals(workspace: string) {
+  if (!hasDatabase) return { whatsapp_goal: 20, email_goal: 20, call_goal: 10, total_goal: 50 };
+  try {
+    const { rows } = await sql`SELECT * FROM daily_goals WHERE workspace = ${workspace} LIMIT 1;`;
+    return rows[0] || { whatsapp_goal: 20, email_goal: 20, call_goal: 10, total_goal: 50 };
+  } catch { return { whatsapp_goal: 20, email_goal: 20, call_goal: 10, total_goal: 50 }; }
+}
+
+export async function upsertDailyGoals(workspace: string, goals: any) {
+  if (!hasDatabase) return goals;
+  await sql`
+    INSERT INTO daily_goals (id, workspace, whatsapp_goal, email_goal, call_goal, total_goal, updated_at)
+    VALUES (${workspace + '-goals'}, ${workspace}, ${goals.whatsapp_goal || 20}, ${goals.email_goal || 20}, ${goals.call_goal || 10}, ${goals.total_goal || 50}, ${Date.now()})
+    ON CONFLICT (id) DO UPDATE SET
+      whatsapp_goal = EXCLUDED.whatsapp_goal,
+      email_goal = EXCLUDED.email_goal,
+      call_goal = EXCLUDED.call_goal,
+      total_goal = EXCLUDED.total_goal,
+      updated_at = EXCLUDED.updated_at;
+  `;
+  return goals;
+}
+
+export async function getManagerSuggestions(workspace: string) {
+  if (!hasDatabase) return [];
+  try {
+    const { rows } = await sql`SELECT * FROM manager_suggestions WHERE workspace = ${workspace} ORDER BY created_at DESC LIMIT 50;`;
+    return rows;
+  } catch { return []; }
+}
+
+export async function insertManagerSuggestion(suggestion: any) {
+  if (!hasDatabase) return null;
+  await sql`
+    INSERT INTO manager_suggestions (id, workspace, message, from_name, priority, created_at)
+    VALUES (${suggestion.id}, ${suggestion.workspace}, ${suggestion.message}, ${suggestion.from_name || 'Vandir'}, ${suggestion.priority || 'normal'}, ${Date.now()});
+  `;
+  return suggestion;
+}
+
+export async function markSuggestionRead(id: string) {
+  if (!hasDatabase) return null;
+  await sql`UPDATE manager_suggestions SET read_at = ${Date.now()} WHERE id = ${id};`;
+  return { id };
+}
