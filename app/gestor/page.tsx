@@ -19,8 +19,8 @@ const WORKSPACE = 'lottus';
 function ProgressBar({ value, max, color }: { value: number; max: number; color: string }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
   return (
-    <div style={{ background: '#f1f5f9', borderRadius: 8, height: 10, overflow: 'hidden', marginTop: 4 }}>
-      <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 8, transition: 'width 0.5s' }} />
+    <div style={{ background: '#f1f5f9', borderRadius: 8, height: 6, overflow: 'hidden', marginTop: 4 }}>
+      <div style={{ width: `${pct}%`, height: '100%', background: `linear-gradient(90deg, ${color}, ${color}cc)`, borderRadius: 8, transition: 'width 0.6s cubic-bezier(0.34,1.56,0.64,1)', boxShadow: `0 0 6px ${color}44` }} />
     </div>
   );
 }
@@ -134,31 +134,47 @@ export default function GestorPage() {
   const unreadSuggestions = suggestions.filter((s: any) => !s.read_at).length;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#f0f4f8', fontFamily: 'Inter, system-ui, sans-serif' }}>
       <style>{mobileStyle}</style>
-      {/* Header */}
-      <div className="gestor-header" style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #0066ff 100%)', color: '#fff', padding: '20px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5 }}>📊 Painel do Gestor</div>
-          <div style={{ fontSize: 13, opacity: 0.85, marginTop: 2 }}>getLOG/Lottustech — Monitoramento de Prospecção</div>
+      {/* Topbar clean */}
+      <div className="gestor-header" style={{ background: '#fff', borderBottom: '1px solid #e8edf2', padding: '0 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60, position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #0066ff, #0044cc)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ color: '#fff', fontSize: 16 }}>📊</span>
+            </div>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', lineHeight: 1.2 }}>Painel do Gestor</div>
+              <div style={{ fontSize: 11, color: '#64748b', lineHeight: 1.2 }}>getLOG/Lottustech</div>
+            </div>
+          </div>
+          <div style={{ width: 1, height: 28, background: '#e2e8f0' }} />
+          <span style={{ fontSize: 12, color: '#94a3b8' }}>Monitoramento de Prospecção</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ fontSize: 13, opacity: 0.85 }}>Olá, <strong>Vandir</strong> 👋</div>
-          <button onClick={load} style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13 }}>
+          <div style={{ fontSize: 13, color: '#475569' }}>Olá, <strong style={{ color: '#1e293b' }}>Vandir</strong> 👋</div>
+          <button onClick={load} style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontWeight: 500, display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = '#e2e8f0'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#f1f5f9'; }}>
             🔄 Atualizar
           </button>
         </div>
       </div>
 
       {toast && (
-        <div style={{ position: 'fixed', top: 20, right: 20, background: '#16a34a', color: '#fff', padding: '10px 20px', borderRadius: 10, zIndex: 9999, fontSize: 14, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
-          {toast}
+        <div style={{ position: 'fixed', top: 20, right: 20, background: '#fff', color: '#16a34a', padding: '12px 20px', borderRadius: 12, zIndex: 9999, fontSize: 13, fontWeight: 600, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', border: '1px solid #bbf7d0', display: 'flex', alignItems: 'center', gap: 8, animation: 'slideIn 0.2s ease' }}>
+          <span style={{ fontSize: 18 }}>✅</span> {toast.replace('✅ ', '')}
+          <style>{`@keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }`}</style>
         </div>
       )}
 
       <div className="gestor-content" style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 20px' }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: 60, color: '#64748b' }}>Carregando dados...</div>
+          <div style={{ textAlign: 'center', padding: 60 }}>
+            <div style={{ width: 40, height: 40, borderRadius: '50%', border: '3px solid #e2e8f0', borderTopColor: '#0066ff', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
+            <div style={{ color: '#64748b', fontSize: 14 }}>Carregando dados...</div>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          </div>
         ) : (
           <>
             {/* Cards de hoje — clicáveis por canal */}
@@ -175,22 +191,23 @@ export default function GestorPage() {
                 return (
                   <div key={c.label}
                     onClick={() => c.value > 0 && setDayModal({ date: todayKey, channel: c.channel, channelLabel: c.channelLabel, leads: filteredLeads })}
-                    style={{ background: '#fff', borderRadius: 14, padding: '18px 20px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', border: `1px solid ${c.color}22`, cursor: c.value > 0 ? 'pointer' : 'default', transition: 'transform 0.1s, box-shadow 0.1s' }}
-                    onMouseEnter={e => { if (c.value > 0) { (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLElement).style.boxShadow = `0 4px 16px ${c.color}33`; } }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 4px rgba(0,0,0,0.07)'; }}
+                    style={{ background: '#fff', borderRadius: 14, padding: '20px 20px 16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: `1px solid ${c.color}18`, cursor: c.value > 0 ? 'pointer' : 'default', transition: 'all 0.18s', position: 'relative', overflow: 'hidden' }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 24px ${c.color}28`; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'; }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <span style={{ fontSize: 13, color: '#64748b' }}>{c.icon} {c.label}</span>
-                      <span style={{ fontSize: 11, color: '#94a3b8' }}>Meta: {c.goal}</span>
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 4, background: `linear-gradient(90deg, ${c.color}, ${c.color}99)`, borderRadius: '14px 14px 0 0' }} />
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 10, background: `${c.color}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{c.icon}</div>
+                      <span style={{ fontSize: 11, color: '#fff', background: c.color, borderRadius: 20, padding: '2px 8px', fontWeight: 600 }}>Meta: {c.goal}</span>
                     </div>
-                    <div style={{ fontSize: 32, fontWeight: 700, color: c.color }}>{c.value}</div>
+                    <div style={{ fontSize: 36, fontWeight: 800, color: c.color, letterSpacing: '-0.04em', lineHeight: 1 }}>{c.value}</div>
+                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 4, marginBottom: 10 }}>{c.label}</div>
                     <ProgressBar value={c.value} max={c.goal} color={c.color} />
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                      <span style={{ fontSize: 11, color: '#94a3b8' }}>
-                        {c.goal > 0 ? `${Math.round((c.value / c.goal) * 100)}% da meta` : '—'}
-                        {c.value >= c.goal && c.goal > 0 && <span style={{ color: '#16a34a', marginLeft: 6 }}>✅</span>}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                      <span style={{ fontSize: 11, color: c.value >= c.goal && c.goal > 0 ? c.color : '#94a3b8', fontWeight: c.value >= c.goal ? 700 : 400 }}>
+                        {c.goal > 0 ? `${Math.round((c.value / c.goal) * 100)}%` : '—'}{c.value >= c.goal && c.goal > 0 ? ' ✅ Meta!' : ' da meta'}
                       </span>
-                      {c.value > 0 && <span style={{ fontSize: 10, color: c.color, fontWeight: 600 }}>Ver leads →</span>}
+                      {c.value > 0 && <span style={{ fontSize: 10, color: c.color, fontWeight: 700 }}>Ver leads →</span>}
                     </div>
                   </div>
                 );
@@ -254,7 +271,7 @@ export default function GestorPage() {
             {/* Metas + Histórico */}
             <div className="gestor-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 20, marginBottom: 24 }}>
               {/* Metas */}
-              <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
+              <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e8edf2' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                   <span style={{ fontWeight: 600, fontSize: 15 }}>🎯 Metas Diárias</span>
                   <button onClick={() => setEditGoals(!editGoals)} style={{ background: editGoals ? '#fee2e2' : '#eff6ff', color: editGoals ? '#dc2626' : '#1a56db', border: 'none', borderRadius: 8, padding: '4px 12px', cursor: 'pointer', fontSize: 12 }}>
@@ -298,7 +315,7 @@ export default function GestorPage() {
               </div>
 
               {/* Histórico por dia */}
-              <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
+              <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e8edf2' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                   <span style={{ fontWeight: 600, fontSize: 15 }}>📅 Histórico de Prospecção</span>
                   <select value={period} onChange={e => setPeriod(parseInt(e.target.value))}
@@ -447,7 +464,7 @@ export default function GestorPage() {
             {/* Sugestões do Gestor */}
             <div className="gestor-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
               {/* Enviar sugestão */}
-              <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
+              <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e8edf2' }}>
                 <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 14 }}>💡 Enviar Sugestão / Orientação para Danilo</div>
                 <textarea
                   value={newMsg}
@@ -471,7 +488,7 @@ export default function GestorPage() {
               </div>
 
               {/* Histórico de sugestões */}
-              <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
+              <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e8edf2' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
                   <span style={{ fontWeight: 600, fontSize: 15 }}>
                     📬 Sugestões Enviadas
@@ -510,28 +527,35 @@ export default function GestorPage() {
             </div>
 
             {/* Resumo do período */}
-            <div style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #0066ff 100%)', borderRadius: 14, padding: '20px 24px', marginTop: 20, color: '#fff' }}>
-              <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 14 }}>📊 Resumo dos últimos {period} dias</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16 }}>
+            <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px', marginTop: 20, border: '1px solid #e8edf2', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18 }}>
+                <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #0066ff, #0044cc)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>📊</div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>Resumo dos últimos {period} dias</div>
+                  <div style={{ fontSize: 12, color: '#64748b' }}>Consolidado de atividades de prospecção</div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12 }}>
                 {[
-                  { label: 'Dias com atividade', value: stats.days?.length || 0, icon: '📅' },
-                  { label: 'Total WhatsApp', value: stats.totals?.whatsapp || 0, icon: '💬' },
-                  { label: 'Total E-mails', value: stats.totals?.email || 0, icon: '✉' },
-                  { label: 'Total Ligações', value: stats.totals?.call || 0, icon: '📞' },
-                  { label: 'Total LinkedIn', value: stats.totals?.linkedin || 0, icon: '💼' },
-                  { label: 'Total Prospecções', value: stats.totals?.total || 0, icon: '🎯' },
-                  { label: 'Média diária', value: stats.days?.length > 0 ? Math.round((stats.totals?.total || 0) / stats.days.length) : 0, icon: '📈' },
+                  { label: 'Dias com atividade', value: stats.days?.length || 0, icon: '📅', color: '#0066ff' },
+                  { label: 'Total WhatsApp', value: stats.totals?.whatsapp || 0, icon: '💬', color: '#16a34a' },
+                  { label: 'Total E-mails', value: stats.totals?.email || 0, icon: '✉', color: '#1a56db' },
+                  { label: 'Total Ligações', value: stats.totals?.call || 0, icon: '📞', color: '#ea580c' },
+                  { label: 'Total LinkedIn', value: stats.totals?.linkedin || 0, icon: '💼', color: '#0a66c2' },
+                  { label: 'Total Prospecções', value: stats.totals?.total || 0, icon: '🎯', color: '#7c3aed' },
+                  { label: 'Média diária', value: stats.days?.length > 0 ? Math.round((stats.totals?.total || 0) / stats.days.length) : 0, icon: '📈', color: '#0891b2' },
                 ].map(c => (
-                  <div key={c.label} style={{ background: 'rgba(255,255,255,0.12)', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 22 }}>{c.icon}</div>
-                    <div style={{ fontSize: 26, fontWeight: 700, marginTop: 4 }}>{c.value}</div>
-                    <div style={{ fontSize: 11, opacity: 0.8, marginTop: 2 }}>{c.label}</div>
+                  <div key={c.label} style={{ background: `${c.color}08`, borderRadius: 12, padding: '14px 16px', border: `1px solid ${c.color}18`, textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: c.color, borderRadius: '12px 12px 0 0', opacity: 0.6 }} />
+                    <div style={{ fontSize: 22, marginBottom: 4 }}>{c.icon}</div>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: c.color, letterSpacing: '-0.04em', lineHeight: 1 }}>{c.value}</div>
+                    <div style={{ fontSize: 11, color: '#64748b', marginTop: 4, lineHeight: 1.3 }}>{c.label}</div>
                   </div>
                 ))}
               </div>
             </div>
           {/* Seção: Lista Completa de Leads */}
-          <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px', marginTop: 20, border: '1px solid #e2e8f0' }}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px', marginTop: 20, border: '1px solid #e8edf2', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
               <span>👥 Todos os Leads ({leads.length})</span>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -597,8 +621,8 @@ export default function GestorPage() {
 
           {/* Modal de comentário do gestor */}
           {commentLead && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setCommentLead(null)}>
-              <div style={{ background: '#fff', borderRadius: 14, padding: 24, width: '100%', maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setCommentLead(null)}>
+              <div style={{ background: '#fff', borderRadius: 16, padding: 24, width: '100%', maxWidth: 480, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', border: '1px solid #e8edf2' }} onClick={e => e.stopPropagation()}>
                 <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>✏️ Comentário do Gestor</div>
                 <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>{commentLead.name} — {commentLead.company}</div>
                 <textarea
@@ -633,7 +657,7 @@ export default function GestorPage() {
           )}
 
           {/* Seção: Cadastrar Lead Pendente */}
-          <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px', marginTop: 20, border: '1px solid #e2e8f0' }}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px', marginTop: 20, border: '1px solid #e8edf2', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>➕ Cadastrar Lead para Prospecção Futura</div>
             <div style={{ fontSize: 12, color: '#64748b', marginBottom: 16 }}>Vandir pode adicionar leads que ficarão na fila para qualquer usuário prospectar futuramente.</div>
 
@@ -688,7 +712,7 @@ export default function GestorPage() {
           </div>
 
           {/* Seção: LinkedIn Prospecting */}
-          <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px', marginTop: 20, border: '1px solid #e2e8f0' }}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px', marginTop: 20, border: '1px solid #e8edf2', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
               <div style={{ fontWeight: 700, fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
                 💼 Prospecção LinkedIn
@@ -756,8 +780,8 @@ export default function GestorPage() {
 
           {/* Modal de sugestão de mensagem LinkedIn */}
           {liMsgLead && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setLiMsgLead(null)}>
-              <div style={{ background: '#fff', borderRadius: 14, padding: 24, width: '100%', maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.5)', backdropFilter: 'blur(4px)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }} onClick={() => setLiMsgLead(null)}>
+              <div style={{ background: '#fff', borderRadius: 16, padding: 24, width: '100%', maxWidth: 520, boxShadow: '0 20px 60px rgba(0,0,0,0.2)', border: '1px solid #e8edf2' }} onClick={e => e.stopPropagation()}>
                 <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 4 }}>✉ Sugestão de Mensagem LinkedIn</div>
                 <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12 }}>{liMsgLead.name} — {liMsgLead.company}</div>
                 <textarea
@@ -778,7 +802,7 @@ export default function GestorPage() {
           )}
 
           {/* Seção: Leads Prioritários */}
-          <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px', marginTop: 20, border: '1px solid #e2e8f0' }}>
+          <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px', marginTop: 20, border: '1px solid #e8edf2', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
               🎯 Marcar Lead Prioritário
               <span style={{ fontSize: 12, color: '#64748b', fontWeight: 400 }}>— Vandir pode indicar leads que o Danilo deve contatar hoje</span>
