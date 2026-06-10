@@ -329,6 +329,15 @@ export default function CRM() {
   // Enviar e-mail via SMTP
   const sendEmail = async () => {
     if (!emailModal?.email) return;
+    // Verificar se já foi enviado e-mail hoje para este lead
+    const todayCheck = new Date().toISOString().slice(0, 10);
+    const timelineCheck = JSON.parse(emailModal.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+    const emailHoje = timelineCheck.find((ev: any) => ev.type === 'email' && ev.ts && new Date(ev.ts).toISOString().slice(0, 10) === todayCheck);
+    if (emailHoje) {
+      const horaEnvio = new Date(emailHoje.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      showToast(`⚠️ E-mail já enviado hoje às ${horaEnvio} para ${emailModal.name}. Aguarde até amanhã para enviar novamente.`);
+      return;
+    }
     setSendingEmail(true);
     try {
       const r = await fetch('/api/send-email', {
@@ -1089,6 +1098,24 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
               <button className="modal-close" onClick={() => setEmailModal(null)}>×</button>
             </div>
             <div className="modal-body">
+              {/* Aviso de e-mail já enviado hoje */}
+              {(() => {
+                const todayStr2 = new Date().toISOString().slice(0, 10);
+                const tl2 = JSON.parse(emailModal.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+                const ev2 = tl2.find((e: any) => e.type === 'email' && e.ts && new Date(e.ts).toISOString().slice(0, 10) === todayStr2);
+                if (!ev2) return null;
+                const hora2 = new Date(ev2.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                return (
+                  <div style={{ background: '#fef9c3', border: '1px solid #fde047', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 13, color: '#854d0e', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 18 }}>⚠️</span>
+                    <div>
+                      <strong>E-mail já enviado hoje às {hora2}</strong><br/>
+                      <span style={{ fontSize: 12 }}>Assunto: {ev2.label?.replace('E-mail enviado: ', '') || '—'}</span><br/>
+                      <span style={{ fontSize: 12, color: '#92400e' }}>Enviar outro e-mail hoje pode ser considerado spam. Aguarde até amanhã.</span>
+                    </div>
+                  </div>
+                );
+              })()}
               {emailModal.email ? (
                 <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14 }}>Para: <strong>{emailModal.name}</strong> &lt;{emailModal.email}&gt;</div>
               ) : (
