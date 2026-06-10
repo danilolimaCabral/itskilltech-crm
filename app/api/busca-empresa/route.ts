@@ -45,14 +45,14 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Digite pelo menos 3 letras' }, { status: 400 })
       }
 
-      // Busca real via CNPJ.já search endpoint
+      // Busca real via CNPJ.já usando endpoint /office com filtro por nome
       const params = new URLSearchParams({
-        company: nome,
+        'company.name.in': nome,
         limit: '10',
-        status: 'ATIVA'
+        'status.id': 'ATIVA'
       })
 
-      const searchRes = await fetch(`${BASE_URL}/search?${params}`, {
+      const searchRes = await fetch(`${BASE_URL}/office?${params}`, {
         headers: {
           'Authorization': CNPJA_KEY,
           'Accept': 'application/json'
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
 
       if (searchRes.ok) {
         const data = await searchRes.json()
-        const offices = data.offices || data.results || []
+        const offices = data.records || data.offices || data.results || []
 
         if (offices.length === 0) {
           return NextResponse.json({
@@ -81,15 +81,21 @@ export async function GET(request: NextRequest) {
 
           return {
             cnpj: o.taxId || o.cnpj || '',
-            razao_social: company.name || o.name || '',
+            razao_social: company.name || o.alias || o.name || '',
             nome_fantasia: o.alias || company.name || '',
             situacao: o.status?.text || 'Ativa',
             atividade_principal: o.mainActivity?.text || '',
+            logradouro: o.address?.street || '',
+            numero: o.address?.number || '',
+            bairro: o.address?.district || '',
             municipio: o.address?.city || '',
             uf: o.address?.state || '',
+            cep: o.address?.zip || '',
             email: emails[0]?.address || '',
             telefone: telFormatado,
             porte: company.size?.text || '',
+            natureza_juridica: company.nature?.text || '',
+            capital_social: company.equity || 0,
             data_inicio_atividade: o.founded || '',
             socios: (company.members || []).slice(0, 3).map((m: any) => ({
               nome: m.person?.name || m.name || '',
