@@ -1187,19 +1187,40 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
       {/* Modal de Ligação */}
       {callModal && (
         <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) setCallModal(null); }}>
-          <div className="modal" style={{ maxWidth: 420 }}>
+          <div className="modal" style={{ maxWidth: 460 }}>
             <div className="modal-header">
               <div className="modal-title">📞 Registrar Ligação</div>
               <button className="modal-close" onClick={() => setCallModal(null)}>×</button>
             </div>
             <div className="modal-body">
-              <div style={{ fontWeight: 600, marginBottom: 4 }}>{callModal.name}</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>{callModal.company} · {callModal.role}</div>
-              {(callModal.phone || callModal.whatsapp) && (
-                <a href={`tel:${cleanPhone(callModal.phone || callModal.whatsapp || '')}`} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginBottom: 16, textDecoration: 'none' }}>
-                  <Icon d={ICONS.phone} /> Ligar: {callModal.phone || callModal.whatsapp}
-                </a>
+              <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 2 }}>{callModal.name}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 14 }}>{callModal.company} · {callModal.role}</div>
+
+              {/* Bloco de discagem */}
+              {(callModal.phone || callModal.whatsapp) ? (
+                <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#0369a1', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>📱 Discar via App BR Fone</div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+                    <div style={{ flex: 1, background: 'white', border: '1px solid #e0f2fe', borderRadius: 8, padding: '8px 12px', fontWeight: 700, fontSize: 15, letterSpacing: 1 }}>
+                      {callModal.phone || callModal.whatsapp}
+                    </div>
+                    <button onClick={() => { navigator.clipboard.writeText(cleanPhone(callModal.phone || callModal.whatsapp || '')); showToast('Número copiado!'); }} style={{ background: 'white', border: '1px solid #bae6fd', borderRadius: 8, padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: '#0369a1' }} title="Copiar número">
+                      📋
+                    </button>
+                  </div>
+                  <a href={`tel:${cleanPhone(callModal.phone || callModal.whatsapp || '')}`} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', textDecoration: 'none', fontSize: 15, padding: '12px 0' }}>
+                    <Icon d={ICONS.phone} /> Ligar agora — {callModal.phone || callModal.whatsapp}
+                  </a>
+                  <div style={{ fontSize: 11, color: '#0369a1', marginTop: 8, textAlign: 'center' }}>
+                    Abre o app BR Fone ou discador do celular com o número preenchido
+                  </div>
+                </div>
+              ) : (
+                <div style={{ background: '#fef9c3', border: '1px solid #fde047', borderRadius: 10, padding: '12px 14px', marginBottom: 16, fontSize: 13, color: '#854d0e' }}>
+                  ⚠️ Nenhum telefone cadastrado para este lead. Adicione um número na ficha do lead.
+                </div>
               )}
+
               <div className="field">
                 <label className="field-label">Resultado da ligação *</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1217,8 +1238,11 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                 </div>
               </div>
               <div className="field" style={{ marginTop: 12 }}>
-                <label className="field-label">Anotações (opcional)</label>
-                <textarea className="field-textarea" style={{ minHeight: 70 }} value={callNotes} onChange={e => setCallNotes(e.target.value)} placeholder="Ex: Vai apresentar para o board em 2 semanas..." />
+                <label className="field-label">📝 Resumo / Transcrição da conversa</label>
+                <textarea className="field-textarea" style={{ minHeight: 100 }} value={callNotes} onChange={e => setCallNotes(e.target.value)} placeholder="Descreva o que foi conversado...&#10;Ex: Danilo apresentou o TMS, cliente tem interesse em ver demo. Tem 12 caminhões, usa sistema legado. Próximo passo: enviar proposta até sexta." />
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                  💡 Dica: após a ligação, cole aqui o resumo da conversa. Fica salvo no histórico do lead.
+                </div>
               </div>
               {/* Opções pós-ligação */}
               <div style={{ marginTop: 14, padding: '12px 14px', background: 'var(--surface-2, #f9fafb)', borderRadius: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
