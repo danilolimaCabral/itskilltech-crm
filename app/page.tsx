@@ -1240,7 +1240,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
 
             {/* Modal WhatsApp */}
       {whatsModal && (
-        <div className="modal-overlay" onClick={() => setWhatsModal(null)}>
+        <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) setWhatsModal(null); }}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
             <div className="modal-header">
               <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
