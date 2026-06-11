@@ -583,12 +583,12 @@ export default function CRM() {
     }).length,
   };
 
-  // Contador de prospecção de hoje por canal
-  const todayStr = new Date().toISOString().slice(0, 10);
+  // Contador de prospecção de hoje por canal (usando fuso de Brasília)
+  const todayStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
   const todayProspEvents = leads.flatMap(l => {
     try {
       const tl = JSON.parse(l.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
-      return tl.filter((t: any) => t.ts && new Date(t.ts).toISOString().slice(0, 10) === todayStr && ['whatsapp','email','call','linkedin'].includes(t.type));
+      return tl.filter((t: any) => t.ts && new Date(t.ts).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) === todayStr && ['whatsapp','email','call','linkedin'].includes(t.type));
     } catch { return []; }
   });
   const todayWhats = todayProspEvents.filter((e: any) => e.type === 'whatsapp').length;
