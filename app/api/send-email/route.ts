@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
-import { GETLOG_IMAGES_B64 } from '@/lib/getlog-images'
+// URLs das imagens hospedadas no próprio domínio (public/getlog/)
+const BASE_URL = process.env.NEXT_PUBLIC_URL || 'https://itskilltech-crm.vercel.app'
+const GETLOG_IMAGE_URLS = [
+  `${BASE_URL}/getlog/post1.jpg`,
+  `${BASE_URL}/getlog/post2.jpg`,
+  `${BASE_URL}/getlog/post3.jpg`,
+  `${BASE_URL}/getlog/post4.jpg`,
+  `${BASE_URL}/getlog/post5.jpg`,
+  `${BASE_URL}/getlog/post6.jpg`,
+]
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -85,18 +94,18 @@ function getAttachmentIcon(url: string): string {
   return '📎'
 }
 
-// Gera o bloco HTML de imagens inline do Getlog usando base64 (sem dependência de URL externa)
+// Gera o bloco HTML de imagens inline do Getlog usando URLs do próprio domínio
 function buildInlineImagesHtml(senderColor: string): string {
-  const imgs = GETLOG_IMAGES_B64
+  const imgs = GETLOG_IMAGE_URLS
   const rows = []
   for (let i = 0; i < imgs.length; i += 2) {
     const pair = imgs.slice(i, i + 2)
     rows.push(`
     <tr>
-      ${pair.map(b64 => `
+      ${pair.map(url => `
       <td width="50%" style="padding:4px;">
         <a href="https://www.gettms.com.br" target="_blank" style="display:block;">
-          <img src="${b64}" alt="Getlog" width="100%" style="display:block;border-radius:8px;max-width:280px;" />
+          <img src="${url}" alt="Getlog" width="100%" style="display:block;border-radius:8px;max-width:280px;" />
         </a>
       </td>`).join('')}
     </tr>`)

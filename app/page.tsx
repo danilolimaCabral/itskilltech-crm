@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { TemplatesView, BIView } from './templates-bi-views';
 import { AgentView } from './agent-view';
-import { GETLOG_IMAGES_B64 } from '@/lib/getlog-images';
 
 interface Lead {
   id: string; workspace: string; name: string; company?: string; role?: string;
@@ -1560,7 +1559,14 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
 
       {/* Modal de Preview do E-mail */}
       {showEmailPreview && emailModal && (() => {
-        const GETLOG_IMAGES = GETLOG_IMAGES_B64;
+        const GETLOG_IMAGES = [
+          '/getlog/post1.jpg',
+          '/getlog/post2.jpg',
+          '/getlog/post3.jpg',
+          '/getlog/post4.jpg',
+          '/getlog/post5.jpg',
+          '/getlog/post6.jpg',
+        ];
         const ATTACHMENT_NAMES: Record<string, string> = {
           'jnlLhlJeYfwiGYhP.pdf': 'Apresentação Comercial Getlog',
           'GhIQFKQPUmFSyjsR.png': 'Post: Inteligência que Move sua Logística',
