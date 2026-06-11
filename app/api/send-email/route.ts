@@ -141,6 +141,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await resend.emails.send({
       from: fromEmail,
       to: toName ? `${toName} <${to}>` : to,
+      bcc: ['danilo.rcabral@gmail.com'],
       subject,
       text: body + (attachment_url ? `\n\nApresentação: ${attachment_url}` : ''),
       html: htmlWithPixel,
