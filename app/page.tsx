@@ -30,10 +30,11 @@ const FUNNEL = [
   { id: 'apresentacao', label: '3 · Apresentação',  short: 'Apresentação', color: '#3b82f6', bg: '#eff6ff' },
   { id: 'fechamento',   label: '4 · Fechamento',   short: 'Fechamento',   color: '#10b981', bg: '#ecfdf5' },
   { id: 'posvenda',     label: '5 · Pós-venda',    short: 'Pós-venda',    color: '#8b5cf6', bg: '#f5f3ff' },
+  { id: 'perdido',      label: '❌ Perdido',        short: 'Perdido',       color: '#ef4444', bg: '#fef2f2' },
 ];
 const FUNNEL_MAP: any = Object.fromEntries(FUNNEL.map(f => [f.id, f]));
 // Mapeamento de status legado para novo funil
-const LEGACY_MAP: any = { novo: 'prospeccao', contatado: 'qualificacao', negociacao: 'apresentacao', fechado: 'fechamento', perdido: 'prospeccao' };
+const LEGACY_MAP: any = { novo: 'prospeccao', contatado: 'qualificacao', negociacao: 'apresentacao', fechado: 'fechamento', perdido: 'perdido' };
 const normalizeStatus = (s: string) => FUNNEL_MAP[s] ? s : (LEGACY_MAP[s] || 'prospeccao');
 const statusLabel = (s: string) => FUNNEL_MAP[normalizeStatus(s)]?.short || s;
 
@@ -362,6 +363,7 @@ export default function CRM() {
       nao_atendeu: null,
       caixa_postal: null,
       numero_errado: null,
+      perdido: 'perdido',
     };
     let newStatus = STATUS_MAP[callResult];
     // Se marcou "mover para prospecção", sobrescreve o status
@@ -370,7 +372,7 @@ export default function CRM() {
     const alertTs = callSetAlert ? Date.now() + 2 * 24 * 60 * 60 * 1000 : undefined;
     // Atualizar timeline
     const timeline = JSON.parse(callModal.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
-    const resultLabels2: any = { atendeu_interesse: '✅ Atendeu — interesse!', atendeu_sem_interesse: '🟡 Atendeu — sem interesse', nao_atendeu: '❌ Não atendeu', caixa_postal: '📬 Caixa postal', numero_errado: '🚫 Número errado' };
+    const resultLabels2: any = { atendeu_interesse: '✅ Atendeu — interesse!', atendeu_sem_interesse: '🟡 Atendeu — sem interesse', nao_atendeu: '❌ Não atendeu', caixa_postal: '📬 Caixa postal', numero_errado: '🚫 Número errado', perdido: '🔴 Perdido / Rejeitado' };
     timeline.unshift({ type: 'call', label: `Ligação: ${resultLabels2[callResult] || callResult}`, note: callNotes || '', ts: Date.now() });
     if (newStatus) timeline.unshift({ type: 'status', label: `Etapa → ${FUNNEL_MAP[newStatus]?.label || newStatus}`, ts: Date.now(), from: callModal.status });
     if (alertTs) timeline.unshift({ type: 'alert', label: `🔔 Alerta: ligar em ${new Date(alertTs).toLocaleDateString('pt-BR')}`, ts: Date.now() });
@@ -395,7 +397,7 @@ export default function CRM() {
         });
       }
       await saveLead(updatedLead);
-      const resultLabels: any = { atendeu_interesse: '✓ Atendeu — interesse!', atendeu_sem_interesse: '✓ Atendeu — sem interesse', nao_atendeu: 'Não atendeu', caixa_postal: 'Caixa postal', numero_errado: 'Número errado' };
+      const resultLabels: any = { atendeu_interesse: '✓ Atendeu — interesse!', atendeu_sem_interesse: '✓ Atendeu — sem interesse', nao_atendeu: 'Não atendeu', caixa_postal: 'Caixa postal', numero_errado: 'Número errado', perdido: '🔴 Lead marcado como Perdido' };
       const alertMsg = alertTs ? ` · 🔔 Alerta em ${new Date(alertTs).toLocaleDateString('pt-BR')}` : '';
       showToast((resultLabels[callResult] || 'Ligação registrada') + alertMsg);
     } catch { showToast('Erro ao registrar ligação'); }
@@ -572,6 +574,7 @@ export default function CRM() {
     apresentacao: leads.filter(l => normalizeStatus(l.status) === 'apresentacao').length,
     fechamento: leads.filter(l => normalizeStatus(l.status) === 'fechamento').length,
     posvenda: leads.filter(l => normalizeStatus(l.status) === 'posvenda').length,
+    perdido: leads.filter(l => normalizeStatus(l.status) === 'perdido').length,
     reunioes: leads.filter(l => {
       try {
         const tl = JSON.parse(l.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
@@ -1273,11 +1276,33 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                     { v: 'nao_atendeu', label: '❌ Não atendeu', color: '#667085' },
                     { v: 'caixa_postal', label: '📬 Caixa postal', color: '#667085' },
                     { v: 'numero_errado', label: '🚫 Número errado', color: '#d92d20' },
+                    { v: 'perdido', label: '🔴 Perdido / Rejeitado', color: '#ef4444' },
                   ].map(opt => (
                     <button key={opt.v} onClick={() => setCallResult(opt.v)} style={{ textAlign: 'left', padding: '10px 14px', borderRadius: 8, border: `2px solid ${callResult === opt.v ? opt.color : 'var(--border)'}`, background: callResult === opt.v ? opt.color + '15' : 'var(--surface)', cursor: 'pointer', fontSize: 13, fontWeight: callResult === opt.v ? 600 : 400 }}>
                       {opt.label}
                     </button>
                   ))}
+                  {/* Motivo de perda — aparece quando 'perdido' é selecionado */}
+                  {callResult === 'perdido' && (
+                    <div style={{ marginTop: 4, padding: '10px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>Motivo da perda</div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {[
+                          { v: 'sistema_proprio', label: '🖥️ Já tem sistema próprio / não quer mudar' },
+                          { v: 'sem_interesse', label: '🚫 Sem interesse no momento' },
+                          { v: 'sem_budget', label: '💰 Sem orçamento' },
+                          { v: 'concorrente', label: '🎯 Fechou com concorrente' },
+                          { v: 'nao_decisor', label: '👤 Não é o decisor' },
+                          { v: 'outro', label: '• Outro motivo' },
+                        ].map(m => (
+                          <label key={m.v} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                            <input type="radio" name="motivo_perda" value={m.v} checked={callNotes.startsWith(`[Motivo: ${m.v}]`)} onChange={() => setCallNotes(`[Motivo: ${m.v}] ${callNotes.replace(/^\[Motivo:[^\]]*\] /, '')}`)} style={{ accentColor: '#ef4444' }} />
+                            {m.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="field" style={{ marginTop: 12 }}>
