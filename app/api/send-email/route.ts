@@ -25,7 +25,7 @@ interface WorkspaceSender {
 
 const WORKSPACE_SENDERS: Record<string, WorkspaceSender> = {
   lottus: {
-    email: 'crm@grandy.ia.br',
+    email: 'crm@getlog.com.br',
     name: 'getLOG/Lottustech',
     displayName: 'Danilo Cabral',
     contactEmail: 'danilo@lottustech.com.br',
@@ -34,7 +34,7 @@ const WORKSPACE_SENDERS: Record<string, WorkspaceSender> = {
     colorLight: '#15803d',
   },
   iota: {
-    email: 'crm@grandy.ia.br',
+    email: 'crm@getlog.com.br',
     name: 'IOTA',
     displayName: 'Danilo Cabral',
     contactEmail: 'danilo@iota.com.br',
@@ -43,7 +43,7 @@ const WORKSPACE_SENDERS: Record<string, WorkspaceSender> = {
     colorLight: '#1e40af',
   },
   splice: {
-    email: 'crm@grandy.ia.br',
+    email: 'crm@getlog.com.br',
     name: 'Splice',
     displayName: 'Danilo Cabral',
     contactEmail: 'danilo@lottustech.com.br',
@@ -52,7 +52,7 @@ const WORKSPACE_SENDERS: Record<string, WorkspaceSender> = {
     colorLight: '#c2410c',
   },
   connect: {
-    email: 'crm@grandy.ia.br',
+    email: 'crm@getlog.com.br',
     name: 'Connectfy',
     displayName: 'Danilo Cabral',
     contactEmail: 'danilo@lottustech.com.br',
@@ -63,7 +63,7 @@ const WORKSPACE_SENDERS: Record<string, WorkspaceSender> = {
 }
 
 const DEFAULT_SENDER: WorkspaceSender = {
-  email: 'crm@grandy.ia.br',
+  email: 'crm@getlog.com.br',
   name: 'getLOG/Lottustech',
   displayName: 'Danilo Cabral',
   contactEmail: 'danilo@lottustech.com.br',

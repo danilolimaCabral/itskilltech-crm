@@ -39,9 +39,9 @@ const CNAE_MAP: Record<string, string[]> = {
 
 // ── Senders por workspace ─────────────────────────────────────────────────────
 const SENDERS: Record<string, any> = {
-  lottus: { email: 'crm@grandy.ia.br', name: 'getLOG/Lottustech', displayName: 'Danilo Cabral', contactEmail: 'danilo@lottustech.com.br', phone: '(41) 99949-9815', color: '#0066ff', colorLight: '#0052cc' },
-  iota:   { email: 'crm@grandy.ia.br', name: 'IOTA', displayName: 'Danilo Cabral', contactEmail: 'danilo@iota.com.br', phone: '(41) 99949-9815', color: '#6938ef', colorLight: '#5b21b6' },
-  splice: { email: 'crm@grandy.ia.br', name: 'Splice', displayName: 'Danilo Cabral', contactEmail: 'danilo@splice.com.br', phone: '(41) 99949-9815', color: '#079455', colorLight: '#15803d' },
+  lottus: { email: 'crm@getlog.com.br', name: 'getLOG/Lottustech', displayName: 'Danilo Cabral', contactEmail: 'danilo@lottustech.com.br', phone: '(41) 99949-9815', color: '#0066ff', colorLight: '#0052cc' },
+  iota:   { email: 'crm@getlog.com.br', name: 'IOTA', displayName: 'Danilo Cabral', contactEmail: 'danilo@iota.com.br', phone: '(41) 99949-9815', color: '#6938ef', colorLight: '#5b21b6' },
+  splice: { email: 'crm@getlog.com.br', name: 'Splice', displayName: 'Danilo Cabral', contactEmail: 'danilo@splice.com.br', phone: '(41) 99949-9815', color: '#079455', colorLight: '#15803d' },
 };
 const DEFAULT_SENDER = SENDERS.lottus;
 
