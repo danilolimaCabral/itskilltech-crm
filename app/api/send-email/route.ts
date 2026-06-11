@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
-import { GETLOG_IMAGES_B64 } from './getlog-images'
+import { GETLOG_IMAGES_B64 } from '@/lib/getlog-images'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { TemplatesView, BIView } from './templates-bi-views';
 import { AgentView } from './agent-view';
+import { GETLOG_IMAGES_B64 } from '@/lib/getlog-images';
 
 interface Lead {
   id: string; workspace: string; name: string; company?: string; role?: string;
@@ -1559,14 +1560,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
 
       {/* Modal de Preview do E-mail */}
       {showEmailPreview && emailModal && (() => {
-        const GETLOG_IMAGES = [
-          'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/GhIQFKQPUmFSyjsR.png',
-          'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/FmjALsVbrVJvwOsK.png',
-          'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/OtyLGYHZqqUEpeJn.png',
-          'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/GddaxubzZmTXNJZZ.png',
-          'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/etOQbwNpmSHPnqTW.png',
-          'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/IQhCtpbryNiKvpbi.png',
-        ];
+        const GETLOG_IMAGES = GETLOG_IMAGES_B64;
         const ATTACHMENT_NAMES: Record<string, string> = {
           'jnlLhlJeYfwiGYhP.pdf': 'Apresentação Comercial Getlog',
           'GhIQFKQPUmFSyjsR.png': 'Post: Inteligência que Move sua Logística',
