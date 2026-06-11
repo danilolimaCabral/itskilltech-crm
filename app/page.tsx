@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { TemplatesView, BIView } from './templates-bi-views';
 import { AgentView } from './agent-view';
 
@@ -100,6 +100,9 @@ export default function CRM() {
   const [emailSubject, setEmailSubject] = useState('');
   const [emailBody, setEmailBody] = useState('');
   const [emailAttachmentUrl, setEmailAttachmentUrl] = useState('');
+  const [emailAttachFile, setEmailAttachFile] = useState<{ name: string; base64: string; mimeType: string } | null>(null);
+  const emailFileInputRef = useRef<HTMLInputElement>(null);
+  const [emailInlineImages, setEmailInlineImages] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailSentInfo, setEmailSentInfo] = useState<{id: string, to: string} | null>(null);
   // Templates
@@ -423,7 +426,7 @@ export default function CRM() {
       const r = await fetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: emailModal.email, toName: emailModal.name, subject: emailSubject, body: emailBody, workspaceSlug: workspace, fromName: ws?.name, leadId: emailModal.id, attachment_url: emailAttachmentUrl || undefined }),
+        body: JSON.stringify({ to: emailModal.email, toName: emailModal.name, subject: emailSubject, body: emailBody, workspaceSlug: workspace, fromName: ws?.name, leadId: emailModal.id, attachment_url: emailAttachmentUrl || undefined, attachment_file: emailAttachFile || undefined, inline_images: emailInlineImages || undefined }),
       });
       const j = await r.json();
       if (j.success) {
@@ -433,11 +436,11 @@ export default function CRM() {
         const STATUS_ADVANCE: any = { prospeccao: 'qualificacao', novo: 'qualificacao', contatado: 'qualificacao', qualificacao: 'apresentacao', apresentacao: 'fechamento', fechamento: 'posvenda' };
         const nextStatus = STATUS_ADVANCE[normalizeStatus(emailModal.status)] || normalizeStatus(emailModal.status);
         const timeline = JSON.parse(emailModal.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
-        timeline.unshift({ type: 'email', label: `E-mail enviado: ${emailSubject}${emailAttachmentUrl ? ' (com apresentação)' : ''}`, ts: Date.now(), resend_id: j.id || null });
+        timeline.unshift({ type: 'email', label: `E-mail enviado: ${emailSubject}${emailInlineImages ? ' (🖼 com imagens Getlog)' : emailAttachFile ? ` (📎 ${emailAttachFile.name})` : emailAttachmentUrl ? ' (com apresentação)' : ''}`, ts: Date.now(), resend_id: j.id || null });
         if (nextStatus !== normalizeStatus(emailModal.status)) timeline.unshift({ type: 'status', label: `Etapa → ${FUNNEL_MAP[nextStatus]?.label || nextStatus}`, ts: Date.now() });
         const notesClean = (emailModal.notes || '').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
         await saveLead({ ...emailModal, status: nextStatus, updated_at: Date.now(), notes: notesClean + `\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]` });
-        setEmailModal(null); setEmailSubject(''); setEmailBody(''); setEmailAttachmentUrl('');
+        setEmailModal(null); setEmailSubject(''); setEmailBody(''); setEmailAttachmentUrl(''); setEmailAttachFile(null); setEmailInlineImages(false);
       } else {
         showToast('Erro: ' + (j.error || 'falha no envio'));
       }
@@ -1421,8 +1424,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                 </div>
               )}
               {/* Seletor de templates */}
-              {templates.filter(t => t.type === 'email').length > 0 && (
-                <div className="field">
+              <div className="field">
                   <label className="field-label">Template</label>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <button
@@ -1432,9 +1434,24 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                         const wsName = ws?.name || 'getLOG/Lottustech';
                         setEmailSubject(`Apresentação ${wsName} — Solução TMS para ${emailModal.company || 'sua empresa'}`);
                         setEmailBody(`${getSaudacao()}, ${emailModal.name.split(' ')[0]}!\n\nTudo bem?\n\nMeu nome é Danilo Cabral, da ${wsName}. Percebo que a ${emailModal.company || 'sua empresa'} busca constantemente otimizar a operação logística e reduzir custos com frete.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas. Que tal explorar como podemos gerar resultados semelhantes para a ${emailModal.company || 'sua empresa'}?\n\nMe diga qual o melhor horário para um bate-papo de 15 minutos.\n\nAtenciosamente,\nDanilo Cabral\nGerente Comercial | ${wsName}\ndanilo@lottustech.com.br | (41) 99949-9815\nwww.gettms.com.br | www.lottustech.com.br`);
+                        setEmailInlineImages(false);
+                        setEmailAttachmentUrl('');
                       }}
                     >
                       📝 Padrão
+                    </button>
+                    <button
+                      className="btn btn-sm"
+                      style={{ fontSize: 11, background: emailInlineImages ? '#16a34a' : 'var(--surface-2)', color: emailInlineImages ? '#fff' : 'var(--text)', border: `1.5px solid ${emailInlineImages ? '#16a34a' : 'var(--border)'}`, fontWeight: emailInlineImages ? 700 : 400 }}
+                      onClick={() => {
+                        const wsName = ws?.name || 'getLOG/Lottustech';
+                        setEmailSubject(`Conheça o Getlog — Inteligência Logística para ${emailModal.company || 'sua empresa'}`);
+                        setEmailBody(`${getSaudacao()}, ${emailModal.name.split(' ')[0]}!\n\nTudo bem?\n\nMeu nome é Danilo Cabral, da ${wsName}. Trabalho com empresas do setor logístico que buscam reduzir custos com frete e ter mais controle sobre a operação.\n\nO Getlog é nossa plataforma de TMS e auditoria de fretes que já ajudou embarcadores a economizar até 20% nos custos de transporte, com visibilidade total em tempo real.\n\nPreparei alguns materiais visuais abaixo para você conhecer melhor o que fazemos. Que tal conversarmos 15 minutos para ver como podemos ajudar a ${emailModal.company || 'sua empresa'}?\n\nAtenciosamente,\nDanilo Cabral\nGerente Comercial | ${wsName}\ndanilo@lottustech.com.br | (41) 99949-9815`);
+                        setEmailInlineImages(true);
+                        setEmailAttachmentUrl('https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/jnlLhlJeYfwiGYhP.pdf');
+                      }}
+                    >
+                      🖼 Com Imagens Getlog
                     </button>
                     {templates.filter(t => t.type === 'email').map(tpl => (
                       <button
@@ -1462,12 +1479,6 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                     ))}
                   </div>
                 </div>
-              )}
-              {templates.filter(t => t.type === 'email').length === 0 && (
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '8px 12px', marginBottom: 12 }}>
-                  ⚠️ Nenhum template de e-mail criado. Vá em <strong>Templates</strong> no menu lateral para criar templates personalizados.
-                </div>
-              )}
               <div className="field">
                 <label className="field-label">Assunto</label>
                 <input className="field-input" value={emailSubject} onChange={e => setEmailSubject(e.target.value)} />
@@ -1476,16 +1487,55 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                 <label className="field-label">Mensagem</label>
                 <textarea className="field-textarea" style={{ minHeight: 200 }} value={emailBody} onChange={e => setEmailBody(e.target.value)} />
               </div>
-              {/* Campo de anexo / apresentação */}
+              {/* Indicador de imagens inline ativas */}
+              {emailInlineImages && (
+                <div style={{ marginBottom: 8, padding: '8px 12px', background: '#f0fdf4', border: '1.5px solid #16a34a', borderRadius: 8, fontSize: 12, color: '#15803d', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  🖼 As imagens do Getlog serão exibidas <strong>no corpo do e-mail</strong> (template ativo)
+                  <button style={{ marginLeft: 'auto', fontSize: 11, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => setEmailInlineImages(false)}>Desativar</button>
+                </div>
+              )}
+              {/* Biblioteca de Anexos Getlog */}
               <div className="field">
-                <label className="field-label">📎 Apresentação / Anexo (URL pública)</label>
-                <input className="field-input" value={emailAttachmentUrl} onChange={e => setEmailAttachmentUrl(e.target.value)} placeholder="https://drive.google.com/... ou link do arquivo" />
-                {emailAttachmentUrl && (
-                  <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#16a34a' }}>
-                    <span>✅ Apresentação será incluída no e-mail como botão</span>
-                    <button style={{ fontSize: 11, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => setEmailAttachmentUrl('')}>Remover</button>
-                  </div>
-                )}
+                <label className="field-label">📎 Materiais Adicionais (botões no e-mail)</label>
+                {(() => {
+                  const GETLOG_ATTACHMENTS = [
+                    { id: 'pdf', name: '📄 Apresentação Comercial Getlog (PDF)', url: 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/jnlLhlJeYfwiGYhP.pdf', type: 'pdf' },
+                    { id: 'post1', name: '🖼 Post: Inteligência que Move sua Logística', url: 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/GhIQFKQPUmFSyjsR.png', type: 'img' },
+                    { id: 'post2', name: '🖼 Post: Auditoria de Fretes Inteligente', url: 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/FmjALsVbrVJvwOsK.png', type: 'img' },
+                    { id: 'post3', name: '🖼 Post: Controle Total da Operação Logística', url: 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/OtyLGYHZqqUEpeJn.png', type: 'img' },
+                    { id: 'post4', name: '🖼 Post: Mais que um TMS — Plataforma Completa', url: 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/GddaxubzZmTXNJZZ.png', type: 'img' },
+                    { id: 'post5', name: '🖼 Post: Resultados que sua Logística pode Alcançar', url: 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/etOQbwNpmSHPnqTW.png', type: 'img' },
+                    { id: 'post6', name: '🖼 Post: Ferramentas de Auditoria para Embarcadores', url: 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/IQhCtpbryNiKvpbi.png', type: 'img' },
+                  ];
+                  const selectedUrls: string[] = emailAttachmentUrl ? emailAttachmentUrl.split('|||') : [];
+                  const toggleAttachment = (url: string) => {
+                    const current = emailAttachmentUrl ? emailAttachmentUrl.split('|||') : [];
+                    const exists = current.includes(url);
+                    const updated = exists ? current.filter(u => u !== url) : [...current, url];
+                    setEmailAttachmentUrl(updated.join('|||'));
+                  };
+                  return (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {GETLOG_ATTACHMENTS.map(att => {
+                        const isSelected = selectedUrls.includes(att.url);
+                        return (
+                          <div key={att.id} onClick={() => toggleAttachment(att.url)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${isSelected ? '#16a34a' : 'var(--border)'}`, background: isSelected ? '#f0fdf4' : 'var(--surface-2)', cursor: 'pointer', transition: 'all 0.15s', fontSize: 13 }}>
+                            <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${isSelected ? '#16a34a' : '#d1d5db'}`, background: isSelected ? '#16a34a' : 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              {isSelected && <span style={{ color: 'white', fontSize: 11, fontWeight: 700 }}>✓</span>}
+                            </div>
+                            <span style={{ color: isSelected ? '#15803d' : 'var(--text)', fontWeight: isSelected ? 600 : 400 }}>{att.name}</span>
+                          </div>
+                        );
+                      })}
+                      {selectedUrls.length > 0 && (
+                        <div style={{ marginTop: 4, fontSize: 12, color: '#16a34a', fontWeight: 600 }}>
+                          ✅ {selectedUrls.length} arquivo(s) selecionado(s) — serão incluídos no e-mail como botões de acesso
+                          <button style={{ marginLeft: 10, fontSize: 11, color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer' }} onClick={() => setEmailAttachmentUrl('')}>Limpar seleção</button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
             <div className="modal-footer">

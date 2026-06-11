@@ -62,9 +62,78 @@ const DEFAULT_SENDER: WorkspaceSender = {
   colorLight: '#15803d',
 }
 
+// Nomes amigáveis para os materiais Getlog
+const ATTACHMENT_NAMES: Record<string, string> = {
+  'jnlLhlJeYfwiGYhP.pdf': 'Apresentação Comercial Getlog',
+  'GhIQFKQPUmFSyjsR.png': 'Post: Inteligência que Move sua Logística',
+  'FmjALsVbrVJvwOsK.png': 'Post: Auditoria de Fretes Inteligente',
+  'OtyLGYHZqqUEpeJn.png': 'Post: Controle Total da Operação Logística',
+  'GddaxubzZmTXNJZZ.png': 'Post: Mais que um TMS — Plataforma Completa',
+  'etOQbwNpmSHPnqTW.png': 'Post: Resultados que sua Logística pode Alcançar',
+  'IQhCtpbryNiKvpbi.png': 'Post: Ferramentas de Auditoria para Embarcadores',
+}
+
+// URLs das imagens Getlog para uso inline
+const GETLOG_IMAGE_URLS = [
+  'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/GhIQFKQPUmFSyjsR.png',
+  'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/FmjALsVbrVJvwOsK.png',
+  'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/OtyLGYHZqqUEpeJn.png',
+  'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/GddaxubzZmTXNJZZ.png',
+  'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/etOQbwNpmSHPnqTW.png',
+  'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/IQhCtpbryNiKvpbi.png',
+]
+
+function getAttachmentName(url: string): string {
+  const filename = url.split('/').pop() || ''
+  return ATTACHMENT_NAMES[filename] || filename
+}
+
+function getAttachmentIcon(url: string): string {
+  if (url.endsWith('.pdf')) return '📄'
+  if (url.match(/\.(png|jpg|jpeg|gif|webp)$/i)) return '🖼'
+  return '📎'
+}
+
+// Gera o bloco HTML de imagens inline do Getlog para inserir no corpo do e-mail
+function buildInlineImagesHtml(imageUrls: string[], senderColor: string): string {
+  return `
+<div style="margin-top:28px;border-top:1px solid #e5e7eb;padding-top:24px;">
+  <div style="font-size:13px;font-weight:700;color:${senderColor};margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px;">📸 Conheça o Getlog</div>
+  <table cellpadding="0" cellspacing="0" border="0" width="100%">
+    <tr>
+      ${imageUrls.slice(0, 2).map(url => `
+      <td width="50%" style="padding:4px;">
+        <a href="https://www.gettms.com.br" target="_blank" style="display:block;">
+          <img src="${url}" alt="${getAttachmentName(url)}" width="100%" style="display:block;border-radius:8px;max-width:280px;" />
+        </a>
+      </td>`).join('')}
+    </tr>
+    ${imageUrls.length > 2 ? `<tr>
+      ${imageUrls.slice(2, 4).map(url => `
+      <td width="50%" style="padding:4px;">
+        <a href="https://www.gettms.com.br" target="_blank" style="display:block;">
+          <img src="${url}" alt="${getAttachmentName(url)}" width="100%" style="display:block;border-radius:8px;max-width:280px;" />
+        </a>
+      </td>`).join('')}
+    </tr>` : ''}
+    ${imageUrls.length > 4 ? `<tr>
+      ${imageUrls.slice(4, 6).map(url => `
+      <td width="50%" style="padding:4px;">
+        <a href="https://www.gettms.com.br" target="_blank" style="display:block;">
+          <img src="${url}" alt="${getAttachmentName(url)}" width="100%" style="display:block;border-radius:8px;max-width:280px;" />
+        </a>
+      </td>`).join('')}
+    </tr>` : ''}
+  </table>
+  <div style="margin-top:14px;text-align:center;">
+    <a href="https://www.gettms.com.br" target="_blank" style="display:inline-block;padding:11px 28px;background:${senderColor};color:#fff;border-radius:7px;text-decoration:none;font-size:14px;font-weight:700;">🌐 Acesse www.gettms.com.br</a>
+  </div>
+</div>`
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { to, toName, subject, body, workspaceSlug, leadId, attachment_url } = await req.json()
+    const { to, toName, subject, body, workspaceSlug, leadId, attachment_url, attachment_file, inline_images } = await req.json()
 
     if (!to || !subject || !body) {
       return NextResponse.json({ error: 'Campos obrigatórios: to, subject, body' }, { status: 400 })
@@ -79,6 +148,37 @@ export async function POST(req: NextRequest) {
 
     const sender = workspaceSlug ? (WORKSPACE_SENDERS[workspaceSlug] || DEFAULT_SENDER) : DEFAULT_SENDER
     const fromEmail = `${sender.displayName} | ${sender.name} <${sender.email}>`
+
+    // Suporte a múltiplos anexos separados por |||
+    const attachmentUrls: string[] = attachment_url
+      ? attachment_url.split('|||').filter(Boolean)
+      : []
+
+    // Gerar botões de acesso para cada material selecionado (PDFs e outros não-imagens)
+    const nonImageAttachments = attachmentUrls.filter(u => !u.match(/\.(png|jpg|jpeg|gif|webp)$/i))
+    const attachmentButtonsHtml = nonImageAttachments.length > 0
+      ? `<div style="margin-top:20px;padding:16px;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;">
+          <div style="font-size:13px;font-weight:700;color:#15803d;margin-bottom:10px;">📎 Material em anexo</div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            ${nonImageAttachments.map(url => `
+              <a href="${url}" target="_blank" style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:white;border:1px solid #d1fae5;border-radius:7px;text-decoration:none;color:#15803d;font-size:13px;font-weight:600;">
+                <span>${getAttachmentIcon(url)}</span>
+                <span>${getAttachmentName(url)}</span>
+              </a>
+            `).join('')}
+          </div>
+        </div>`
+      : ''
+
+    // Texto plano para os anexos
+    const attachmentText = attachmentUrls.length > 0
+      ? '\n\nMateriais:\n' + attachmentUrls.map(url => `- ${getAttachmentName(url)}: ${url}`).join('\n')
+      : ''
+
+    // Imagens inline no corpo (quando inline_images=true ou body contém [INLINE_IMAGES])
+    const useInlineImages = inline_images === true || body.includes('[INLINE_IMAGES]')
+    const bodyClean = body.replace('[INLINE_IMAGES]', '').trim()
+    const inlineImagesHtml = useInlineImages ? buildInlineImagesHtml(GETLOG_IMAGE_URLS, sender.color) : ''
 
     const htmlBody = `<!DOCTYPE html>
 <html>
@@ -110,8 +210,9 @@ export async function POST(req: NextRequest) {
         <div class="header-company">${sender.name}</div>
       </div>
       <div class="content">
-        ${body.split('\n').map((line: string) => line.trim() ? `<p>${line}</p>` : '<br>').join('')}
-        ${attachment_url ? `<div style="margin-top:20px;padding:16px;background:#f0f9ff;border-radius:8px;border:1px solid #bae6fd;"><div style="font-size:13px;font-weight:600;color:#0369a1;margin-bottom:10px;">&#128206; Apresenta&#231;&#227;o / Material</div><a href="${attachment_url}" style="display:inline-block;padding:10px 20px;background:${sender.color};color:#fff;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">&#128196; Abrir apresenta&#231;&#227;o</a></div>` : ''}
+        ${bodyClean.split('\n').map((line: string) => line.trim() ? `<p>${line}</p>` : '<br>').join('')}
+        ${attachmentButtonsHtml}
+        ${inlineImagesHtml}
         <div class="signature">
           <div class="sig-name">${sender.displayName}</div>
           <div class="sig-title">${sender.name}</div>
@@ -138,13 +239,23 @@ export async function POST(req: NextRequest) {
       : ''
     const htmlWithPixel = htmlBody.replace('</body>', `${trackPixel}</body>`)
 
+    // Suporte a arquivo base64 enviado diretamente
+    const resendAttachments: Array<{ filename: string; content: string }> = []
+    if (attachment_file?.base64 && attachment_file?.name) {
+      resendAttachments.push({
+        filename: attachment_file.name,
+        content: attachment_file.base64,
+      })
+    }
+
     const { data, error } = await resend.emails.send({
       from: fromEmail,
       to: toName ? `${toName} <${to}>` : to,
       bcc: ['danilo.rcabral@gmail.com'],
       subject,
-      text: body + (attachment_url ? `\n\nApresentação: ${attachment_url}` : ''),
+      text: bodyClean + attachmentText,
       html: htmlWithPixel,
+      ...(resendAttachments.length > 0 ? { attachments: resendAttachments } : {}),
     })
 
     if (error) {
