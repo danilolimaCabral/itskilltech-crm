@@ -3,11 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>📞 Telefone — CRM Lottus Tech</title>
+  <title>📞 Telefone — CRM getLOG</title>
   <link rel="stylesheet" href="phone.min.css">
   <link rel="stylesheet" href="phone.dark.css" id="phone-theme">
   <style>
-    body { margin: 0; background: #0f172a; font-family: 'Inter', sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #0f172a; font-family: 'Inter', -apple-system, sans-serif; }
+
     #top-bar {
       background: #1e293b;
       border-bottom: 1px solid #334155;
@@ -16,118 +18,458 @@
       align-items: center;
       gap: 12px;
     }
-    #top-bar a {
-      color: #94a3b8;
-      text-decoration: none;
-      font-size: 13px;
-    }
+    #top-bar a { color: #94a3b8; text-decoration: none; font-size: 13px; }
     #top-bar a:hover { color: #fff; }
-    #top-bar .title {
-      color: #fff;
-      font-size: 14px;
-      font-weight: 600;
-    }
+    #top-bar .title { color: #fff; font-size: 14px; font-weight: 600; flex: 1; }
+
     #status-bar {
       background: #0f172a;
       padding: 8px 16px;
       font-size: 12px;
       color: #64748b;
       border-bottom: 1px solid #1e293b;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
-    #status-bar .status-dot {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #ef4444;
-      margin-right: 6px;
-      vertical-align: middle;
+    .status-dot {
+      display: inline-block; width: 8px; height: 8px;
+      border-radius: 50%; background: #ef4444; flex-shrink: 0;
     }
-    #status-bar .status-dot.connected { background: #22c55e; }
-    #notice-bar {
-      background: #fef3c7;
-      border: 1px solid #fbbf24;
-      color: #92400e;
+    .status-dot.connected { background: #22c55e; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+    /* Painel de gravação/transcrição */
+    #recording-panel {
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      padding: 10px 16px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    #recording-panel.active { display: flex; }
+    .rec-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #ef4444; animation: blink 1s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    .rec-label { color: #fca5a5; font-size: 12px; font-weight: 600; }
+    .rec-timer { color: #94a3b8; font-size: 12px; font-family: monospace; }
+    .rec-channels { color: #64748b; font-size: 11px; }
+
+    /* Painel de transcrição */
+    #transcription-panel {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      margin: 12px 16px;
+      border-radius: 10px;
+      overflow: hidden;
+      display: none;
+    }
+    #transcription-panel.visible { display: block; }
+    #transcription-header {
+      background: #1e293b;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    #transcription-header h3 { color: #e2e8f0; font-size: 13px; margin: 0; }
+    #transcription-status { font-size: 11px; color: #64748b; }
+    #transcription-body { padding: 14px; }
+    #transcription-text {
+      color: #cbd5e1; font-size: 13px; line-height: 1.6;
+      white-space: pre-wrap; min-height: 60px;
+    }
+    #transcription-text.loading { color: #64748b; font-style: italic; }
+
+    #transcription-actions {
+      padding: 10px 14px;
+      border-top: 1px solid #1e293b;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .btn-action {
+      padding: 6px 14px; border-radius: 6px; border: none;
+      font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s;
+    }
+    .btn-save { background: #16a34a; color: #fff; }
+    .btn-save:hover { background: #15803d; }
+    .btn-copy { background: #334155; color: #e2e8f0; }
+    .btn-copy:hover { background: #475569; }
+    .btn-discard { background: transparent; color: #64748b; border: 1px solid #334155; }
+    .btn-discard:hover { color: #e2e8f0; border-color: #475569; }
+
+    /* Lead selecionado */
+    #lead-selector {
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
       padding: 8px 16px;
-      font-size: 12px;
-      text-align: center;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
-    #notice-bar.hidden { display: none; }
+    #lead-selector label { color: #94a3b8; font-size: 12px; white-space: nowrap; }
+    #lead-select {
+      flex: 1; background: #0f172a; border: 1px solid #334155;
+      color: #e2e8f0; font-size: 12px; padding: 4px 8px; border-radius: 6px;
+    }
+    #lead-select:focus { outline: none; border-color: #3b82f6; }
+
+    /* Notificação toast */
+    #toast {
+      position: fixed; bottom: 20px; right: 20px;
+      background: #16a34a; color: #fff;
+      padding: 10px 18px; border-radius: 8px;
+      font-size: 13px; font-weight: 600;
+      box-shadow: 0 4px 20px rgba(0,0,0,.4);
+      transform: translateY(80px); opacity: 0;
+      transition: all .3s; z-index: 9999;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+    #toast.error { background: #dc2626; }
   </style>
 </head>
 <body>
 
+<!-- Barra superior -->
 <div id="top-bar">
   <a href="/">← Voltar ao CRM</a>
   <span style="color:#334155">|</span>
-  <span class="title">📞 Softphone WebRTC — BrDid (41) 3798-8945</span>
+  <span class="title">📞 Softphone — BrDid (41) 3798-8945</span>
+  <span style="font-size:11px;color:#475569;">OpenSIPS · porta 5060</span>
 </div>
 
-<div id="notice-bar">
-  ⚠️ <strong>Aguardando liberação do WebSocket pelo BrDid</strong> — Ticket #703854 aberto.
-  Quando o BrDid habilitar o WebSocket, o softphone conectará automaticamente com o número <strong>(41) 3798-8945</strong>.
-</div>
-
+<!-- Status de conexão -->
 <div id="status-bar">
   <span class="status-dot" id="conn-dot"></span>
-  <span id="conn-status">Desconectado — aguardando WebSocket do servidor SIP</span>
+  <span id="conn-status">Conectando ao servidor SIP...</span>
 </div>
 
-<!-- Browser Phone Container -->
+<!-- Seletor de lead -->
+<div id="lead-selector">
+  <label>🎯 Lead da ligação:</label>
+  <select id="lead-select">
+    <option value="">— Selecionar lead para salvar transcrição —</option>
+  </select>
+</div>
+
+<!-- Painel de gravação ativa -->
+<div id="recording-panel">
+  <span class="rec-dot"></span>
+  <span class="rec-label">● GRAVANDO</span>
+  <span class="rec-timer" id="rec-timer">00:00</span>
+  <span class="rec-channels">· máx. 2 canais simultâneos</span>
+</div>
+
+<!-- Container do softphone -->
 <div id="phone-container"></div>
 
-<!-- SIP.js library (required by Browser-Phone) -->
+<!-- Painel de transcrição -->
+<div id="transcription-panel">
+  <div id="transcription-header">
+    <h3>🎙️ Transcrição da Ligação</h3>
+    <span id="transcription-status">Processando...</span>
+  </div>
+  <div id="transcription-body">
+    <div id="transcription-text" class="loading">Transcrevendo áudio com IA (Whisper)...</div>
+  </div>
+  <div id="transcription-actions">
+    <button class="btn-action btn-save" onclick="saveTranscription()">💾 Salvar na Timeline do Lead</button>
+    <button class="btn-action btn-copy" onclick="copyTranscription()">📋 Copiar</button>
+    <button class="btn-action btn-discard" onclick="discardTranscription()">✕ Descartar</button>
+  </div>
+</div>
+
+<!-- Toast de notificação -->
+<div id="toast" id="toast"></div>
+
+<!-- SIP.js -->
 <script src="https://cdn.jsdelivr.net/npm/sip.js@0.21.2/lib/platform/web/simple-user/simple-user.min.js"></script>
 <script src="phone.min.js"></script>
 
 <script>
-  // Credenciais SIP do BrDid
-  const SIP_CONFIG = {
-    wssServer: "voz.sobreip.com.br",
-    WebSocketPort: "8089",
-    ServerPath: "/ws",
-    SipDomain: "voz.sobreip.com.br",
-    SipUsername: "4137988945",
-    SipPassword: "11jlr",
-    SipName: "Danilo Cabral",
-    ProfileName: "BrDid (41) 3798-8945",
-    WelcomeScreen: false,
-    AutoGainControl: true,
-    NoiseSuppression: true,
-    EchoCancellation: true,
-    Language: "pt-BR"
-  };
+// ============================================================
+// CONFIGURAÇÃO SIP — BrDid / OpenSIPS
+// Porta 5060 para autenticação (testada e confirmada 200 OK)
+// Porta 8089 para WebSocket (transporte do browser)
+// ============================================================
+const SIP_CONFIG = {
+  wssServer:        "voz.sobreip.com.br",
+  WebSocketPort:    "8089",
+  ServerPath:       "/ws",
+  SipDomain:        "voz.sobreip.com.br",
+  SipUsername:      "4137988945",
+  SipPassword:      "11jlr",
+  SipName:          "Danilo Cabral",
+  ProfileName:      "getLOG (41) 3798-8945",
+  WelcomeScreen:    false,
+  AutoGainControl:  true,
+  NoiseSuppression: true,
+  EchoCancellation: true,
+  Language:         "pt-BR",
+  // Porta de autenticação SIP (confirmada 200 OK)
+  SipPort:          "5060",
+  // Máx 2 canais simultâneos conforme informado pela BrDid
+  MaxSimultaneousCalls: 2
+};
 
-  // Tentar inicializar o Browser-Phone com as credenciais BrDid
+// ============================================================
+// GRAVAÇÃO DE ÁUDIO
+// ============================================================
+let mediaRecorder = null;
+let audioChunks = [];
+let recTimerInterval = null;
+let recSeconds = 0;
+let lastAudioBlob = null;
+let currentCallId = null;
+
+function startRecording(stream) {
+  try {
+    audioChunks = [];
+    recSeconds = 0;
+    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) audioChunks.push(e.data);
+    };
+
+    mediaRecorder.onstop = () => {
+      lastAudioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      clearInterval(recTimerInterval);
+      document.getElementById('recording-panel').classList.remove('active');
+      transcribeAudio(lastAudioBlob);
+    };
+
+    mediaRecorder.start(1000); // chunk a cada 1s
+
+    // Timer
+    document.getElementById('recording-panel').classList.add('active');
+    recTimerInterval = setInterval(() => {
+      recSeconds++;
+      const m = String(Math.floor(recSeconds / 60)).padStart(2, '0');
+      const s = String(recSeconds % 60).padStart(2, '0');
+      document.getElementById('rec-timer').textContent = `${m}:${s}`;
+    }, 1000);
+
+    console.log('[Gravação] Iniciada');
+  } catch (err) {
+    console.error('[Gravação] Erro:', err);
+  }
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+    console.log('[Gravação] Encerrada, iniciando transcrição...');
+  }
+}
+
+// ============================================================
+// TRANSCRIÇÃO VIA WHISPER (API do CRM)
+// ============================================================
+async function transcribeAudio(blob) {
+  const panel = document.getElementById('transcription-panel');
+  const textEl = document.getElementById('transcription-text');
+  const statusEl = document.getElementById('transcription-status');
+
+  panel.classList.add('visible');
+  textEl.className = 'loading';
+  textEl.textContent = 'Transcrevendo áudio com IA (Whisper)...';
+  statusEl.textContent = 'Processando...';
+
+  try {
+    const formData = new FormData();
+    formData.append('audio', blob, 'ligacao.webm');
+    formData.append('workspace', 'lottus');
+
+    const res = await fetch('/api/transcribe-call', {
+      method: 'POST',
+      body: formData
+    });
+
+    const data = await res.json();
+
+    if (data.text) {
+      textEl.className = '';
+      textEl.textContent = data.text;
+      statusEl.textContent = `✅ Transcrição concluída · ${data.duration || ''}`;
+    } else {
+      textEl.className = '';
+      textEl.textContent = data.error || 'Não foi possível transcrever o áudio.';
+      statusEl.textContent = '⚠️ Erro na transcrição';
+    }
+  } catch (err) {
+    textEl.className = '';
+    textEl.textContent = 'Erro ao conectar com a API de transcrição: ' + err.message;
+    statusEl.textContent = '❌ Erro';
+  }
+}
+
+// ============================================================
+// SALVAR TRANSCRIÇÃO NA TIMELINE DO LEAD
+// ============================================================
+async function saveTranscription() {
+  const leadId = document.getElementById('lead-select').value;
+  const text = document.getElementById('transcription-text').textContent;
+
+  if (!leadId) {
+    showToast('⚠️ Selecione um lead antes de salvar', 'error');
+    return;
+  }
+  if (!text || text.includes('Transcrevendo') || text.includes('Erro')) {
+    showToast('⚠️ Aguarde a transcrição ser concluída', 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/save-call-transcription', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        leadId,
+        workspace: 'lottus',
+        transcription: text,
+        duration: document.getElementById('rec-timer').textContent,
+        callId: currentCallId || `call-${Date.now()}`
+      })
+    });
+
+    const data = await res.json();
+    if (data.ok) {
+      showToast('✅ Transcrição salva na timeline do lead!');
+      discardTranscription();
+    } else {
+      showToast('❌ Erro ao salvar: ' + (data.error || 'desconhecido'), 'error');
+    }
+  } catch (err) {
+    showToast('❌ Erro: ' + err.message, 'error');
+  }
+}
+
+function copyTranscription() {
+  const text = document.getElementById('transcription-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('📋 Transcrição copiada!');
+  });
+}
+
+function discardTranscription() {
+  document.getElementById('transcription-panel').classList.remove('visible');
+  document.getElementById('transcription-text').textContent = '';
+  lastAudioBlob = null;
+}
+
+// ============================================================
+// CARREGAR LEADS NO SELETOR
+// ============================================================
+async function loadLeads() {
+  try {
+    const res = await fetch('/api/leads?workspace=lottus');
+    const data = await res.json();
+    const sel = document.getElementById('lead-select');
+    (data.leads || [])
+      .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+      .forEach(lead => {
+        const opt = document.createElement('option');
+        opt.value = lead.id;
+        opt.textContent = `${lead.name || '(sem nome)'} — ${lead.company || ''}`;
+        sel.appendChild(opt);
+      });
+  } catch (e) {
+    console.warn('Não foi possível carregar leads:', e);
+  }
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = type === 'error' ? 'error show' : 'show';
+  setTimeout(() => { t.className = ''; }, 3500);
+}
+
+// ============================================================
+// INICIALIZAR SOFTPHONE
+// ============================================================
+window.addEventListener('DOMContentLoaded', () => {
+  loadLeads();
+
+  // Salvar config no localStorage para o Browser-Phone
+  Object.entries(SIP_CONFIG).forEach(([k, v]) => {
+    localStorage.setItem(k, String(v));
+  });
+
+  // Inicializar Browser-Phone
   try {
     if (typeof StartPhone === 'function') {
       StartPhone(SIP_CONFIG);
-      document.getElementById('conn-status').textContent = 'Conectando ao servidor SIP do BrDid...';
+      document.getElementById('conn-status').textContent = 'Conectando ao servidor SIP (porta 5060)...';
     } else {
-      // Fallback: salvar no localStorage para o Browser-Phone usar
-      Object.entries(SIP_CONFIG).forEach(([k, v]) => {
-        localStorage.setItem(k, v);
-      });
-      document.getElementById('conn-status').textContent = 'Configuração salva — recarregando...';
-      setTimeout(() => location.reload(), 500);
+      document.getElementById('conn-status').textContent = 'Configuração SIP salva — recarregando...';
+      setTimeout(() => location.reload(), 600);
     }
-  } catch(e) {
-    console.error('Erro ao inicializar softphone:', e);
-    document.getElementById('conn-status').textContent = 'Erro ao conectar: ' + e.message;
+  } catch (e) {
+    console.error('[SIP] Erro ao inicializar:', e);
+    document.getElementById('conn-status').textContent = 'Erro ao inicializar: ' + e.message;
   }
+});
 
-  // Monitorar status da conexão
-  window.addEventListener('message', function(e) {
-    if (e.data && e.data.type === 'sip-connected') {
+// ============================================================
+// INTERCEPTAR EVENTOS DO BROWSER-PHONE
+// ============================================================
+window.addEventListener('message', function(e) {
+  if (!e.data) return;
+
+  switch (e.data.type) {
+    case 'sip-connected':
+    case 'phone-connected':
       document.getElementById('conn-dot').classList.add('connected');
-      document.getElementById('conn-status').textContent = 'Conectado — ramal ' + SIP_CONFIG.SipUsername;
-      document.getElementById('notice-bar').classList.add('hidden');
-    }
-    if (e.data && e.data.type === 'sip-disconnected') {
+      document.getElementById('conn-status').textContent =
+        `✅ Conectado — ramal ${SIP_CONFIG.SipUsername} · porta 5060`;
+      break;
+
+    case 'sip-disconnected':
+    case 'phone-disconnected':
       document.getElementById('conn-dot').classList.remove('connected');
       document.getElementById('conn-status').textContent = 'Desconectado do servidor SIP';
-    }
-  });
+      stopRecording();
+      break;
+
+    case 'call-started':
+    case 'call-answered':
+      currentCallId = e.data.callId || `call-${Date.now()}`;
+      // Capturar stream de áudio para gravação
+      if (e.data.stream) {
+        startRecording(e.data.stream);
+      } else {
+        // Tentar capturar via getUserMedia como fallback
+        navigator.mediaDevices.getUserMedia({ audio: true })
+          .then(stream => startRecording(stream))
+          .catch(err => console.warn('[Gravação] Não foi possível capturar áudio:', err));
+      }
+      break;
+
+    case 'call-ended':
+    case 'call-hangup':
+      stopRecording();
+      break;
+  }
+});
+
+// Interceptar chamadas via hook global do Browser-Phone
+const _origStartPhone = window.StartPhone;
+if (typeof _origStartPhone === 'function') {
+  window.StartPhone = function(config) {
+    _origStartPhone(config);
+  };
+}
 </script>
 
 </body>
