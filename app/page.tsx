@@ -3129,11 +3129,10 @@ function LeadModal({ lead, workspace, onClose, onSave, onDelete }: any) {
         <div className="modal-header"><div className="modal-title">{lead ? 'Editar lead' : 'Novo lead'}</div><button className="modal-close" onClick={onClose}>×</button></div>
         <div className="modal-body">
 
-          {/* Busca automática por CNPJ ou nome */}
-          {!lead && (
-            <div style={{ background: '#f0f7ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#1d4ed8', marginBottom: 4 }}>🔍 Buscar empresa por CNPJ ou Nome — preenchimento automático</div>
-              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>Digite o CNPJ (14 dígitos) <strong>ou o nome da empresa</strong> e pressione Enter para preencher os dados automaticamente</div>
+          {/* Busca automática por CNPJ ou nome — disponível tanto no cadastro quanto na edição */}
+          <div style={{ background: '#f0f7ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '12px 14px', marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#1d4ed8', marginBottom: 4 }}>🔍 {lead ? 'Atualizar dados da empresa via CNPJ ou Nome' : 'Buscar empresa por CNPJ ou Nome — preenchimento automático'}</div>
+              <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>{lead ? 'Digite o CNPJ ou nome para atualizar os dados automaticamente' : 'Digite o CNPJ (14 dígitos) '}<strong>{lead ? '' : 'ou o nome da empresa'}</strong>{lead ? '' : ' e pressione Enter para preencher os dados automaticamente'}</div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input
                   className="field-input"
@@ -3165,8 +3164,7 @@ function LeadModal({ lead, workspace, onClose, onSave, onDelete }: any) {
                   ✅ Dados preenchidos: {empresaData.razao_social} ({empresaData.municipio}/{empresaData.uf})
                 </div>
               )}
-            </div>
-          )}
+          </div>
 
           <div className="field-row">
             <div className="field"><label className="field-label">Nome *</label><input className="field-input" value={f.name || ''} onChange={e => set('name', e.target.value)} /></div>
