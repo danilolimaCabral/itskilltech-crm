@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
+import { GETLOG_IMAGES_B64 } from './getlog-images'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -73,16 +74,6 @@ const ATTACHMENT_NAMES: Record<string, string> = {
   'IQhCtpbryNiKvpbi.png': 'Post: Ferramentas de Auditoria para Embarcadores',
 }
 
-// URLs das imagens Getlog para uso inline
-const GETLOG_IMAGE_URLS = [
-  'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/GhIQFKQPUmFSyjsR.png',
-  'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/FmjALsVbrVJvwOsK.png',
-  'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/OtyLGYHZqqUEpeJn.png',
-  'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/GddaxubzZmTXNJZZ.png',
-  'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/etOQbwNpmSHPnqTW.png',
-  'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/IQhCtpbryNiKvpbi.png',
-]
-
 function getAttachmentName(url: string): string {
   const filename = url.split('/').pop() || ''
   return ATTACHMENT_NAMES[filename] || filename
@@ -94,36 +85,27 @@ function getAttachmentIcon(url: string): string {
   return '📎'
 }
 
-// Gera o bloco HTML de imagens inline do Getlog para inserir no corpo do e-mail
-function buildInlineImagesHtml(imageUrls: string[], senderColor: string): string {
+// Gera o bloco HTML de imagens inline do Getlog usando base64 (sem dependência de URL externa)
+function buildInlineImagesHtml(senderColor: string): string {
+  const imgs = GETLOG_IMAGES_B64
+  const rows = []
+  for (let i = 0; i < imgs.length; i += 2) {
+    const pair = imgs.slice(i, i + 2)
+    rows.push(`
+    <tr>
+      ${pair.map(b64 => `
+      <td width="50%" style="padding:4px;">
+        <a href="https://www.gettms.com.br" target="_blank" style="display:block;">
+          <img src="${b64}" alt="Getlog" width="100%" style="display:block;border-radius:8px;max-width:280px;" />
+        </a>
+      </td>`).join('')}
+    </tr>`)
+  }
   return `
 <div style="margin-top:28px;border-top:1px solid #e5e7eb;padding-top:24px;">
   <div style="font-size:13px;font-weight:700;color:${senderColor};margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px;">📸 Conheça o Getlog</div>
   <table cellpadding="0" cellspacing="0" border="0" width="100%">
-    <tr>
-      ${imageUrls.slice(0, 2).map(url => `
-      <td width="50%" style="padding:4px;">
-        <a href="https://www.gettms.com.br" target="_blank" style="display:block;">
-          <img src="${url}" alt="${getAttachmentName(url)}" width="100%" style="display:block;border-radius:8px;max-width:280px;" />
-        </a>
-      </td>`).join('')}
-    </tr>
-    ${imageUrls.length > 2 ? `<tr>
-      ${imageUrls.slice(2, 4).map(url => `
-      <td width="50%" style="padding:4px;">
-        <a href="https://www.gettms.com.br" target="_blank" style="display:block;">
-          <img src="${url}" alt="${getAttachmentName(url)}" width="100%" style="display:block;border-radius:8px;max-width:280px;" />
-        </a>
-      </td>`).join('')}
-    </tr>` : ''}
-    ${imageUrls.length > 4 ? `<tr>
-      ${imageUrls.slice(4, 6).map(url => `
-      <td width="50%" style="padding:4px;">
-        <a href="https://www.gettms.com.br" target="_blank" style="display:block;">
-          <img src="${url}" alt="${getAttachmentName(url)}" width="100%" style="display:block;border-radius:8px;max-width:280px;" />
-        </a>
-      </td>`).join('')}
-    </tr>` : ''}
+    ${rows.join('')}
   </table>
   <div style="margin-top:14px;text-align:center;">
     <a href="https://www.gettms.com.br" target="_blank" style="display:inline-block;padding:11px 28px;background:${senderColor};color:#fff;border-radius:7px;text-decoration:none;font-size:14px;font-weight:700;">🌐 Acesse www.gettms.com.br</a>
@@ -178,7 +160,7 @@ export async function POST(req: NextRequest) {
     // Imagens inline no corpo (quando inline_images=true ou body contém [INLINE_IMAGES])
     const useInlineImages = inline_images === true || body.includes('[INLINE_IMAGES]')
     const bodyClean = body.replace('[INLINE_IMAGES]', '').trim()
-    const inlineImagesHtml = useInlineImages ? buildInlineImagesHtml(GETLOG_IMAGE_URLS, sender.color) : ''
+    const inlineImagesHtml = useInlineImages ? buildInlineImagesHtml(sender.color) : ''
 
     const htmlBody = `<!DOCTYPE html>
 <html>
