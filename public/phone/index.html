@@ -373,14 +373,80 @@ window.addEventListener('message', function(e) {
 // ============================================================
 document.addEventListener('DOMContentLoaded', () => {
   loadLeads();
-  // Atualizar status após 2s
-  setTimeout(() => {
+
+  // Ler parâmetros da URL: ?call=NUMERO&lead=ID&name=NOME
+  const params = new URLSearchParams(window.location.search);
+  const callNumber = params.get('call');
+  const leadId = params.get('lead');
+  const leadName = params.get('name');
+
+  // Pré-selecionar o lead no dropdown se vier da URL
+  if (leadId) {
+    // Aguardar os leads carregarem e selecionar
+    setTimeout(() => {
+      const sel = document.getElementById('lead-select');
+      if (sel) sel.value = leadId;
+    }, 1500);
+  }
+
+  // Mostrar número sendo discado na barra de status
+  if (callNumber) {
     const statusEl = document.getElementById('conn-status');
-    if (statusEl.textContent === 'Inicializando softphone...') {
-      statusEl.textContent = 'Aguardando conexão SIP...';
-    }
-  }, 2000);
+    statusEl.textContent = `📞 Discando para ${leadName || callNumber}...`;
+
+    // Aguardar o Browser-Phone carregar e então discar
+    let attempts = 0;
+    const tryDial = setInterval(() => {
+      attempts++;
+      // Browser-Phone expõe DialByLine ou MakeCall globalmente
+      if (typeof MakeCall === 'function') {
+        clearInterval(tryDial);
+        try {
+          MakeCall(callNumber);
+          statusEl.textContent = `📞 Ligando para ${leadName || callNumber}...`;
+        } catch(e) {
+          console.warn('[AutoDial] Erro ao discar:', e);
+          // Fallback: preencher o campo de número e clicar em discar
+          autoFillDialer(callNumber);
+        }
+      } else if (typeof DialByLine === 'function') {
+        clearInterval(tryDial);
+        try {
+          DialByLine('1', callNumber);
+          statusEl.textContent = `📞 Ligando para ${leadName || callNumber}...`;
+        } catch(e) {
+          autoFillDialer(callNumber);
+        }
+      } else if (attempts > 30) {
+        // Timeout: preencher o campo manualmente
+        clearInterval(tryDial);
+        autoFillDialer(callNumber);
+      }
+    }, 500);
+  } else {
+    // Atualizar status após 2s
+    setTimeout(() => {
+      const statusEl = document.getElementById('conn-status');
+      if (statusEl.textContent === 'Inicializando softphone...') {
+        statusEl.textContent = 'Aguardando conexão SIP...';
+      }
+    }, 2000);
+  }
 });
+
+// Preencher o campo de discagem do Browser-Phone manualmente
+function autoFillDialer(number) {
+  // Tentar preencher o input de número do Browser-Phone
+  const inputs = document.querySelectorAll('input[type="tel"], input[placeholder*="number"], input[placeholder*="Number"], #dialNumber, .dialNumber');
+  inputs.forEach(inp => {
+    inp.value = number;
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    inp.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  // Mostrar número na barra de status
+  const statusEl = document.getElementById('conn-status');
+  if (statusEl) statusEl.textContent = `📞 Pronto para discar: ${number} — pressione Ligar`;
+}
 
 // ============================================================
 // TOAST

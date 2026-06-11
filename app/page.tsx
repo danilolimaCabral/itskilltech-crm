@@ -1118,7 +1118,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                   })()}
                   {/* Ações rápidas */}
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
-                    {(leadPanel.phone || leadPanel.whatsapp) && <a href={`tel:${cleanPhone(leadPanel.phone || leadPanel.whatsapp || '')}`} className="btn btn-sm" style={{ textDecoration: 'none' }}><Icon d={ICONS.phone} />Ligar</a>}
+                    {(leadPanel.phone || leadPanel.whatsapp) && <button className="btn btn-sm" onClick={() => { const num = cleanPhone(leadPanel.phone || leadPanel.whatsapp || ''); const name = encodeURIComponent(leadPanel.name || ''); const lid = encodeURIComponent(leadPanel.id || ''); window.open(`/phone/index.html?call=${num}&lead=${lid}&name=${name}`, 'softphone', 'width=480,height=700,resizable=yes'); }}><Icon d={ICONS.phone} />Ligar</button>}
                     {(leadPanel.whatsapp || leadPanel.phone) && <button className="btn btn-sm" style={{ background: '#25d366', color: '#fff', border: 'none' }} onClick={() => { const num = cleanPhone(leadPanel.whatsapp || leadPanel.phone || ''); if (num) window.open(`https://wa.me/${num}`, '_blank'); }}><Icon d={ICONS.whatsapp} />WhatsApp</button>}
                     {leadPanel.email && <button className="btn btn-sm" onClick={() => openEmailModal(leadPanel)}><Icon d={ICONS.email} />E-mail</button>}
                     <button className="btn btn-sm" onClick={() => { setCallModal(leadPanel); setCallResult(''); setCallNotes(`${getSaudacao()}, ${leadPanel.name.split(' ')[0]}! `); }}><Icon d={ICONS.phone} />Registrar ligação</button>
@@ -1232,7 +1232,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
               {/* Bloco de discagem */}
               {(callModal.phone || callModal.whatsapp) ? (
                 <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#0369a1', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>📱 Discar via App BR Fone</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#0369a1', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 10 }}>📞 Discar via Softphone CRM</div>
                   <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
                     <div style={{ flex: 1, background: 'white', border: '1px solid #e0f2fe', borderRadius: 8, padding: '8px 12px', fontWeight: 700, fontSize: 15, letterSpacing: 1 }}>
                       {callModal.phone || callModal.whatsapp}
@@ -1241,11 +1241,21 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                       📋
                     </button>
                   </div>
-                  <a href={`tel:${cleanPhone(callModal.phone || callModal.whatsapp || '')}`} className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', textDecoration: 'none', fontSize: 15, padding: '12px 0' }}>
+                  {/* Botão principal: abre softphone com número já discando */}
+                  <button
+                    className="btn btn-primary"
+                    style={{ width: '100%', justifyContent: 'center', fontSize: 15, padding: '12px 0' }}
+                    onClick={() => {
+                      const num = cleanPhone(callModal.phone || callModal.whatsapp || '');
+                      const name = encodeURIComponent(callModal.name || '');
+                      const lid = encodeURIComponent(callModal.id || '');
+                      window.open(`/phone/index.html?call=${num}&lead=${lid}&name=${name}`, 'softphone', 'width=480,height=700,resizable=yes');
+                    }}
+                  >
                     <Icon d={ICONS.phone} /> Ligar agora — {callModal.phone || callModal.whatsapp}
-                  </a>
+                  </button>
                   <div style={{ fontSize: 11, color: '#0369a1', marginTop: 8, textAlign: 'center' }}>
-                    Abre o app BR Fone ou discador do celular com o número preenchido
+                    Abre o softphone do CRM com o número já preenchido e discando
                   </div>
                 </div>
               ) : (
