@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { LINKEDIN_KNOWLEDGE } from '@/lib/linkedin-knowledge';
 
 export async function POST(req: NextRequest) {
   const {
@@ -69,7 +70,9 @@ ${customPrompt ? `INSTRUÇÃO ADICIONAL: ${customPrompt}` : ''}
 
 Retorne APENAS o texto da legenda, sem explicações, sem título, sem aspas. Pronto para copiar e colar.`;
 
-  const systemPrompt = `Você é um copywriter sênior B2B especializado em logística e tecnologia. Escreve posts de alta conversão para redes sociais. Seu texto parece escrito por um humano experiente do setor, nunca por uma IA.`;
+  const systemPrompt = platform === 'linkedin'
+    ? `Você é um copywriter sênior B2B especializado em logística e tecnologia. Escreve posts de alta conversão para o LinkedIn. Seu texto parece escrito por um humano experiente do setor, nunca por uma IA.\n\n${LINKEDIN_KNOWLEDGE}`
+    : `Você é um copywriter sênior B2B especializado em logística e tecnologia. Escreve posts de alta conversão para redes sociais. Seu texto parece escrito por um humano experiente do setor, nunca por uma IA.`;
 
   const userPrompt = platform === 'linkedin' ? linkedinInstructions : instagramInstructions;
 

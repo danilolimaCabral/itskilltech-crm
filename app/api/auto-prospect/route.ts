@@ -4,6 +4,7 @@ import {
   hasDatabase, initAgentTables, getAgentConfig, upsertAgentConfig,
   insertAgentRun, updateAgentRun, getAgentRuns, getLeadEmails, upsertLead,
 } from '@/lib/db';
+import { LINKEDIN_KNOWLEDGE } from '@/lib/linkedin-knowledge';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -211,7 +212,7 @@ async function generateEmail(lead: any, workspace: string, wsName: string, custo
       messages: [
         {
           role: 'system',
-          content: `Você é especialista em cold email B2B para vendas de TMS (sistema de gestão de transporte logístico). Crie e-mails curtos, diretos e personalizados em português brasileiro para a empresa ${wsName}. O remetente é Danilo Cabral.`,
+          content: `Você é especialista em cold email B2B para vendas de TMS (sistema de gestão de transporte logístico). Crie e-mails curtos, diretos e personalizados em português brasileiro para a empresa ${wsName}. O remetente é Danilo Cabral.\n\nBase de conhecimento de prospecção B2B:\n${LINKEDIN_KNOWLEDGE}`,
         },
         {
           role: 'user',

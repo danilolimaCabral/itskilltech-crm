@@ -1,20 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { LINKEDIN_KNOWLEDGE, LINKEDIN_PROSPECTING_SYSTEM } from '@/lib/linkedin-knowledge';
+
 export async function POST(req: NextRequest) {
   const { type, tone, objective, product, audience, workspace, workspaceName, count = 3 } = await req.json();
 
   const isEmail = type === 'email';
+  const isLinkedin = type === 'linkedin';
   const toneLabel = tone || 'profissional e direto';
   const objectiveLabel = objective || 'apresentar solução de TMS logístico';
   const productLabel = product || 'TMS — sistema de gestão de transporte';
   const audienceLabel = audience || 'decisores de logística e TI em empresas atacadistas';
   const workspaceLabel = workspaceName || workspace || 'getLOG/Lottustech';
 
-  const systemPrompt = isEmail
-    ? `Você é um especialista em copywriting B2B para vendas de software. Crie templates de e-mail de prospecção frios (cold email) em português brasileiro para a empresa ${workspaceLabel}.`
-    : `Você é um especialista em copywriting B2B para vendas de software. Crie templates de mensagem de WhatsApp para prospecção fria (cold outreach) em português brasileiro para a empresa ${workspaceLabel}. As mensagens devem ser curtas (máx 3 parágrafos), conversacionais e com CTA claro.`;
+  const systemPrompt = isLinkedin
+    ? `${LINKEDIN_PROSPECTING_SYSTEM}\n\n${LINKEDIN_KNOWLEDGE}`
+    : isEmail
+    ? `Você é um especialista em copywriting B2B para vendas de software e prospecção digital. Crie templates de e-mail de prospecção frios (cold email) em português brasileiro para a empresa ${workspaceLabel}.\n\nBase de conhecimento de prospecção:\n${LINKEDIN_KNOWLEDGE}`
+    : `Você é um especialista em copywriting B2B para vendas de software. Crie templates de mensagem de WhatsApp para prospecção fria (cold outreach) em português brasileiro para a empresa ${workspaceLabel}. As mensagens devem ser curtas (máx 3 parágrafos), conversacionais e com CTA claro.\n\nBase de conhecimento de prospecção:\n${LINKEDIN_KNOWLEDGE}`;
 
-  const userPrompt = isEmail
+  const userPrompt = isLinkedin
+    ? `Crie ${count} templates DIFERENTES de mensagem de prospecção no LinkedIn B2B com as seguintes características:
+- Tom: ${toneLabel}
+- Objetivo: ${objectiveLabel}
+- Produto/Serviço: ${productLabel}
+- Público-alvo: ${audienceLabel}
+- Empresa remetente: ${workspaceLabel}
+- Cada template deve ter: NOME (título curto), CORPO (mensagem completa, máx 300 caracteres para convite de conexão OU até 500 palavras para DM de follow-up)
+- Use variáveis como {{nome}}, {{empresa}}, {{cargo}} para personalização
+- Formatos variados: 1 convite de conexão (curto, personalizado), 1 DM após conexão aceita (valor primeiro), 1 follow-up com CTA
+- Aplique as técnicas do framework de 100 dias e prospecção B2B da base de conhecimento
+- Retorne APENAS JSON válido no formato: {"templates": [{"name": "...", "body": "..."}]}`
+    : isEmail
     ? `Crie ${count} templates DIFERENTES de cold email B2B com as seguintes características:
 - Tom: ${toneLabel}
 - Objetivo: ${objectiveLabel}
@@ -24,6 +41,7 @@ export async function POST(req: NextRequest) {
 - Cada template deve ter: NOME (título curto), ASSUNTO (subject line), CORPO (body completo)
 - Use variáveis como {{nome}}, {{empresa}}, {{cargo}} para personalização
 - Formatos variados: um mais curto (3 linhas), um com storytelling, um com prova social/dados
+- Aplique as técnicas de prospecção B2B da base de conhecimento
 - Retorne APENAS JSON válido no formato: {"templates": [{"name": "...", "subject": "...", "body": "..."}]}`
     : `Crie ${count} templates DIFERENTES de mensagem de WhatsApp B2B com as seguintes características:
 - Tom: ${toneLabel}
