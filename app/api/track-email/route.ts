@@ -47,10 +47,10 @@ export async function GET(req: NextRequest) {
           const resendKey = process.env.RESEND_API_KEY;
           if (resendKey && lead.email) {
             const workspaceSenders: Record<string, { name: string; email: string; color: string; phone: string; site: string }> = {
-              lottus:    { name: 'getLOG/Lottustech', email: 'crm@getlog.com.br', color: '#16a34a', phone: '(41) 99949-9815', site: 'www.gettms.com.br' },
-              iota:      { name: 'IOTA',              email: 'crm@getlog.com.br', color: '#1a56db', phone: '(41) 99949-9815', site: 'www.gettms.com.br' },
-              splice:    { name: 'Splice',            email: 'crm@getlog.com.br', color: '#ea580c', phone: '(41) 99949-9815', site: 'www.gettms.com.br' },
-              connectfy: { name: 'Connectfy',         email: 'crm@getlog.com.br', color: '#7c3aed', phone: '(41) 99949-9815', site: 'www.gettms.com.br' },
+              lottus:    { name: 'getLOG/Lottustech', email: 'crm@itskilltech.com.br', color: '#16a34a', phone: '(41) 99949-9815', site: 'www.gettms.com.br' },
+              iota:      { name: 'IOTA',              email: 'crm@itskilltech.com.br', color: '#1a56db', phone: '(41) 99949-9815', site: 'www.gettms.com.br' },
+              splice:    { name: 'Splice',            email: 'crm@itskilltech.com.br', color: '#ea580c', phone: '(41) 99949-9815', site: 'www.gettms.com.br' },
+              connectfy: { name: 'Connectfy',         email: 'crm@itskilltech.com.br', color: '#7c3aed', phone: '(41) 99949-9815', site: 'www.gettms.com.br' },
             };
             const sender = workspaceSenders[workspace] || workspaceSenders['lottus'];
             const leadName = lead.name?.split(' ')[0] || 'você';

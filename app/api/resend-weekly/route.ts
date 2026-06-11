@@ -18,7 +18,7 @@ interface WorkspaceSender {
 
 const WORKSPACE_SENDERS: Record<string, WorkspaceSender> = {
   lottus: {
-    email: 'crm@getlog.com.br',
+    email: 'crm@itskilltech.com.br',
     name: 'getLOG/Lottustech',
     displayName: 'Danilo Cabral',
     contactEmail: 'danilo@lottustech.com.br',
