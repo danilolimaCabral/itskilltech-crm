@@ -79,6 +79,7 @@ export default function CRM() {
   const [editing, setEditing] = useState<Lead | null>(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [filterNotContacted2d, setFilterNotContacted2d] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [wsListOpen, setWsListOpen] = useState(false);
   const [wsPassModal, setWsPassModal] = useState<string | null>(null); // workspace id a trocar
@@ -561,10 +562,21 @@ export default function CRM() {
   };
 
   const ws = workspaces.find(w => w.id === workspace) || workspaces[0];
+  const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
   const filtered = leads.filter(l => {
     const t = search.toLowerCase();
     const ms = !t || l.name.toLowerCase().includes(t) || (l.email || '').toLowerCase().includes(t) || (l.company || '').toLowerCase().includes(t);
-    return ms && (statusFilter === 'all' || normalizeStatus(l.status) === statusFilter);
+    const statusOk = statusFilter === 'all' || normalizeStatus(l.status) === statusFilter;
+    if (!ms || !statusOk) return false;
+    if (filterNotContacted2d) {
+      // Verifica se o lead teve whatsapp ou email nos últimos 2 dias
+      try {
+        const tl = JSON.parse(l.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+        const recentContact = tl.some((e: any) => e.ts && e.ts >= twoDaysAgo && (e.type === 'whatsapp' || e.type === 'email'));
+        if (recentContact) return false; // já foi contatado, não mostra
+      } catch { /* sem timeline, mostra */ }
+    }
+    return true;
   });
   const stats = {
     total: leads.length,
@@ -840,8 +852,24 @@ export default function CRM() {
                   <button onClick={() => { setStatusFilter('all'); setSelectedIds(new Set()); }} style={{ marginLeft: 'auto', fontSize: 11, color: f.color, background: 'none', border: `1px solid ${f.color}55`, borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>✕ Limpar filtro</button>
                 </div>
               ) : null; })()}
+              {/* Filtro: não contatados em 2 dias */}
+              {filterNotContacted2d && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '6px 12px', background: '#fff7ed', borderRadius: 8, border: '1px solid #f97316aa' }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#f97316', flexShrink: 0 }} />
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#ea580c' }}>Sem contato há +2 dias (WhatsApp ou E-mail)</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 4 }}>{filtered.length} lead(s)</span>
+                  <button onClick={() => setFilterNotContacted2d(false)} style={{ marginLeft: 'auto', fontSize: 11, color: '#ea580c', background: 'none', border: '1px solid #f9731655', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>✕ Limpar filtro</button>
+                </div>
+              )}
               <div className="toolbar" style={{ gap: 8 }}>
                 <div className="search"><Icon d='<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>' /><input placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} /></div>
+                <button
+                  className="btn btn-sm"
+                  onClick={() => setFilterNotContacted2d(v => !v)}
+                  style={{ fontSize: 11, padding: '5px 10px', flexShrink: 0, background: filterNotContacted2d ? '#f97316' : 'var(--bg-card)', color: filterNotContacted2d ? '#fff' : 'var(--text-muted)', border: filterNotContacted2d ? '1px solid #f97316' : '1px solid var(--border)', borderRadius: 8, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  title="Mostrar apenas leads sem contato por WhatsApp ou E-mail nos últimos 2 dias">
+                  🕒 Sem contato +2d
+                </button>
                 {/* Botões de seleção em massa */}
                 {filtered.length > 0 && (
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
@@ -916,8 +944,31 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                       <td>
                         <div className="cell-primary">{lead.name}</div>
                         <div className="cell-secondary">{lead.company || '—'}{lead.role ? ` · ${lead.role}` : ''}</div>
-                        {lead.last_contact && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>📧 Último contato: {new Date(lead.last_contact).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}</div>}
-                        {(lead.call_count || 0) > 0 && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>📞 {lead.call_count} ligação(ões)</div>}
+                        {(() => {
+                          // Busca o evento de contato mais recente (whatsapp, email, call) na timeline
+                          let lastEvent: { type: string; ts: number } | null = null;
+                          try {
+                            const tl = JSON.parse(lead.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+                            const contacts = tl.filter((e: any) => e.ts && ['whatsapp','email','call','linkedin'].includes(e.type));
+                            if (contacts.length > 0) lastEvent = contacts.reduce((a: any, b: any) => a.ts > b.ts ? a : b);
+                          } catch {}
+                          if (!lastEvent && lead.last_contact) lastEvent = { type: 'email', ts: lead.last_contact };
+                          if (!lastEvent) return <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>Sem contato registrado</div>;
+                          const daysAgo = Math.floor((Date.now() - lastEvent.ts) / (1000 * 60 * 60 * 24));
+                          const hoursAgo = Math.floor((Date.now() - lastEvent.ts) / (1000 * 60 * 60));
+                          const isOld = daysAgo >= 2;
+                          const channelIcon = lastEvent.type === 'whatsapp' ? '💬' : lastEvent.type === 'email' ? '✉️' : lastEvent.type === 'call' ? '📞' : '💼';
+                          const timeLabel = daysAgo === 0 ? (hoursAgo === 0 ? 'agora' : `${hoursAgo}h atrás`) : daysAgo === 1 ? 'ontem' : `${daysAgo} dias atrás`;
+                          return (
+                            <div style={{ fontSize: 10, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <span>{channelIcon}</span>
+                              <span style={{ color: isOld ? '#ef4444' : 'var(--text-muted)', fontWeight: isOld ? 700 : 400 }}>{timeLabel}</span>
+                              <span style={{ color: '#d1d5db' }}>·</span>
+                              <span style={{ color: 'var(--text-muted)' }}>{new Date(lastEvent.ts).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
+                            </div>
+                          );
+                        })()}
+                        {(lead.call_count || 0) > 0 && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>📞 {lead.call_count} lig.</div>}
                       </td>
                       <td>
                         {lead.email && <div className="cell-secondary">✉ {lead.email}</div>}
