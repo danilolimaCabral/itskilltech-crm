@@ -103,6 +103,7 @@ export default function CRM() {
   const [emailAttachFile, setEmailAttachFile] = useState<{ name: string; base64: string; mimeType: string } | null>(null);
   const emailFileInputRef = useRef<HTMLInputElement>(null);
   const [emailInlineImages, setEmailInlineImages] = useState(false);
+  const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailSentInfo, setEmailSentInfo] = useState<{id: string, to: string} | null>(null);
   // Templates
@@ -1538,8 +1539,16 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                 })()}
               </div>
             </div>
-            <div className="modal-footer">
+            <div className="modal-footer" style={{ gap: 8 }}>
               <button className="btn" onClick={() => setEmailModal(null)}>Cancelar</button>
+              <button
+                className="btn"
+                style={{ background: '#f0fdf4', border: '1.5px solid #16a34a', color: '#15803d', fontWeight: 600 }}
+                onClick={() => setShowEmailPreview(true)}
+                disabled={!emailSubject || !emailBody}
+              >
+                👁 Pré-visualizar
+              </button>
               <button className="btn btn-primary" disabled={!emailModal.email || sendingEmail} onClick={sendEmail}>
                 <Icon d={ICONS.send} />{sendingEmail ? 'Enviando...' : 'Enviar e-mail'}
               </button>
@@ -1547,6 +1556,113 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
           </div>
         </div>
       )}
+
+      {/* Modal de Preview do E-mail */}
+      {showEmailPreview && emailModal && (() => {
+        const GETLOG_IMAGES = [
+          'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/GhIQFKQPUmFSyjsR.png',
+          'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/FmjALsVbrVJvwOsK.png',
+          'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/OtyLGYHZqqUEpeJn.png',
+          'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/GddaxubzZmTXNJZZ.png',
+          'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/etOQbwNpmSHPnqTW.png',
+          'https://files.manuscdn.com/user_upload_by_module/session_file/310519663237750101/IQhCtpbryNiKvpbi.png',
+        ];
+        const ATTACHMENT_NAMES: Record<string, string> = {
+          'jnlLhlJeYfwiGYhP.pdf': 'Apresentação Comercial Getlog',
+          'GhIQFKQPUmFSyjsR.png': 'Post: Inteligência que Move sua Logística',
+          'FmjALsVbrVJvwOsK.png': 'Post: Auditoria de Fretes Inteligente',
+          'OtyLGYHZqqUEpeJn.png': 'Post: Controle Total da Operação Logística',
+          'GddaxubzZmTXNJZZ.png': 'Post: Mais que um TMS — Plataforma Completa',
+          'etOQbwNpmSHPnqTW.png': 'Post: Resultados que sua Logística pode Alcançar',
+          'IQhCtpbryNiKvpbi.png': 'Post: Ferramentas de Auditoria para Embarcadores',
+        };
+        const getName = (url: string) => { const f = url.split('/').pop() || ''; return ATTACHMENT_NAMES[f] || f; };
+        const selectedUrls = emailAttachmentUrl ? emailAttachmentUrl.split('|||').filter(Boolean) : [];
+        const nonImageUrls = selectedUrls.filter(u => !u.match(/\.(png|jpg|jpeg|gif|webp)$/i));
+        return (
+          <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) setShowEmailPreview(false); }} style={{ zIndex: 1100 }}>
+            <div className="modal" style={{ maxWidth: 620, width: '95vw', maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <div className="modal-header" style={{ borderBottom: '1px solid var(--border)', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>👁 Preview do E-mail</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>Exatamente como o destinatário vai receber</div>
+                </div>
+                <button className="btn" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setShowEmailPreview(false)}>Fechar</button>
+              </div>
+              {/* Metadados */}
+              <div style={{ padding: '10px 20px', background: '#f8fafc', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <div><strong>Para:</strong> {emailModal.name} &lt;{emailModal.email}&gt;</div>
+                  <div><strong>Assunto:</strong> {emailSubject}</div>
+                  {emailInlineImages && <div style={{ color: '#16a34a', fontWeight: 600 }}>🖼 Imagens Getlog serão exibidas no corpo</div>}
+                  {nonImageUrls.length > 0 && <div style={{ color: '#16a34a', fontWeight: 600 }}>📎 {nonImageUrls.length} arquivo(s) como botão de acesso: {nonImageUrls.map(getName).join(', ')}</div>}
+                  {emailAttachFile && <div style={{ color: '#16a34a', fontWeight: 600 }}>📎 Arquivo anexado: {emailAttachFile.name}</div>}
+                </div>
+              </div>
+              {/* Preview do corpo */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', background: '#f4f4f5' }}>
+                <div style={{ maxWidth: 560, margin: '0 auto', background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                  {/* Header */}
+                  <div style={{ background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)', padding: '24px 28px' }}>
+                    <div style={{ fontSize: 20, fontWeight: 700, color: '#fff' }}>{ws?.name || 'getLOG/Lottustech'}</div>
+                  </div>
+                  {/* Body */}
+                  <div style={{ padding: '28px' }}>
+                    {emailBody.split('\n').map((line, i) => line.trim() ? <p key={i} style={{ marginBottom: 12, fontSize: 14, color: '#374151', lineHeight: 1.6 }}>{line}</p> : <br key={i} />)}
+                    {/* Botões de materiais */}
+                    {nonImageUrls.length > 0 && (
+                      <div style={{ marginTop: 16, padding: 14, background: '#f0fdf4', borderRadius: 10, border: '1px solid #bbf7d0' }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#15803d', marginBottom: 8 }}>📎 Material em anexo</div>
+                        {nonImageUrls.map((url, i) => (
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#fff', border: '1px solid #d1fae5', borderRadius: 7, marginBottom: 6, fontSize: 13, color: '#15803d', fontWeight: 600 }}>
+                            <span>{url.endsWith('.pdf') ? '📄' : '🖼'}</span>
+                            <span>{getName(url)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Imagens inline Getlog */}
+                    {emailInlineImages && (
+                      <div style={{ marginTop: 20, borderTop: '1px solid #e5e7eb', paddingTop: 20 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.5px' }}>📸 Conheça o Getlog</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                          {GETLOG_IMAGES.map((url, i) => (
+                            <img key={i} src={url} alt={getName(url)} style={{ width: '100%', borderRadius: 8, display: 'block' }} />
+                          ))}
+                        </div>
+                        <div style={{ marginTop: 12, textAlign: 'center' }}>
+                          <span style={{ display: 'inline-block', padding: '10px 24px', background: '#16a34a', color: '#fff', borderRadius: 7, fontSize: 13, fontWeight: 700 }}>🌐 Acesse www.gettms.com.br</span>
+                        </div>
+                      </div>
+                    )}
+                    {/* Assinatura */}
+                    <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid #e5e7eb' }}>
+                      <div style={{ fontWeight: 600, fontSize: 14, color: '#111827' }}>Danilo Cabral</div>
+                      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{ws?.name || 'getLOG/Lottustech'}</div>
+                      <div style={{ marginTop: 6, fontSize: 12, color: '#374151' }}>danilo@lottustech.com.br &nbsp;|&nbsp; (41) 99949-9815</div>
+                    </div>
+                  </div>
+                  {/* Footer */}
+                  <div style={{ background: '#fafafa', padding: '12px 28px', borderTop: '1px solid #f3f4f6' }}>
+                    <div style={{ fontSize: 11, color: '#d1d5db', textAlign: 'center' }}>© {new Date().getFullYear()} {ws?.name || 'getLOG/Lottustech'}. Todos os direitos reservados.</div>
+                  </div>
+                </div>
+              </div>
+              {/* Ações */}
+              <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8, justifyContent: 'flex-end', flexShrink: 0 }}>
+                <button className="btn" onClick={() => setShowEmailPreview(false)}>Voltar e editar</button>
+                <button
+                  className="btn btn-primary"
+                  disabled={!emailModal.email || sendingEmail}
+                  onClick={() => { setShowEmailPreview(false); sendEmail(); }}
+                >
+                  <Icon d={ICONS.send} />{sendingEmail ? 'Enviando...' : '✅ Confirmar e Enviar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Modal de confirmação de envio de e-mail */}
       {emailSentInfo && (
