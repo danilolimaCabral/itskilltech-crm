@@ -2347,8 +2347,9 @@ function CalendarView({ meetings, leads, onOpenLead, onSchedule }: any) {
 }
 // ---------- Dashboard ----------
 function DashboardView({ leads, workspace, wsName }: { leads: any[], workspace: string, wsName: string }) {
+  // Obter data atual de Brasília
   const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
+  const todayStr = today.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }); // sv-SE gera formato YYYY-MM-DD
 
   // Extrair todos os eventos da timeline de todos os leads
   const allEvents: any[] = [];
@@ -2359,23 +2360,23 @@ function DashboardView({ leads, workspace, wsName }: { leads: any[], workspace: 
     }
   }
 
-  // Contadores de hoje
+  // Contadores de hoje (usando fuso de Brasília)
   const todayEvents = allEvents.filter(ev => {
     if (!ev.ts) return false;
-    return new Date(ev.ts).toISOString().slice(0, 10) === todayStr;
+    return new Date(ev.ts).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) === todayStr;
   });
   const todayEmails = todayEvents.filter(ev => ev.type === 'email').length;
   const todayCalls = todayEvents.filter(ev => ev.type === 'call').length;
   const todayWhats = todayEvents.filter(ev => ev.type === 'whatsapp').length;
   const todayTotal = todayEmails + todayCalls + todayWhats;
 
-  // Últimos 7 dias
+  // Últimos 7 dias (usando fuso de Brasília)
   const days7: { label: string; date: string; emails: number; calls: number; whats: number; total: number }[] = [];
   for (let i = 6; i >= 0; i--) {
-    const d = new Date(today);
+    const d = new Date();
     d.setDate(d.getDate() - i);
-    const ds = d.toISOString().slice(0, 10);
-    const dayEvs = allEvents.filter(ev => ev.ts && new Date(ev.ts).toISOString().slice(0, 10) === ds);
+    const ds = d.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+    const dayEvs = allEvents.filter(ev => ev.ts && new Date(ev.ts).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) === ds);
     days7.push({
       label: i === 0 ? 'Hoje' : d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', ''),
       date: ds,

@@ -25,7 +25,8 @@ export async function GET(req: NextRequest) {
 
       for (const ev of timeline) {
         if (!ev.ts || ev.ts < cutoff) continue;
-        const dateKey = new Date(ev.ts).toISOString().slice(0, 10);
+        // Obter data em fuso de Brasília (São Paulo)
+        const dateKey = new Date(ev.ts).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
         if (!dayMap[dateKey]) dayMap[dateKey] = { whatsapp: 0, email: 0, call: 0, linkedin: 0, total: 0, leads: [] };
 
         if (ev.type === 'whatsapp') { dayMap[dateKey].whatsapp++; dayMap[dateKey].total++; }
