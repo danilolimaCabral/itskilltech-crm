@@ -44,24 +44,35 @@ export async function GET(req: NextRequest) {
       let changed = isCorrupted;
 
       for (const call of leadCalls) {
+        // Tratar o timestamp de forma segura
+        const callTime = call.created_at ? new Date(call.created_at).getTime() : Date.now();
+        if (isNaN(callTime)) continue;
+
         // Verificar se a ligação já existe na timeline (pelo timestamp ou proximidade de 5s)
-        const exists = timeline.some(ev => ev.type === 'call' && Math.abs((ev.ts || new Date(ev.date || ev.ts).getTime()) - call.created_at) < 5000);
+        const exists = timeline.some(ev => {
+          const evTime = ev.ts || (ev.date ? new Date(ev.date).getTime() : null);
+          return ev.type === 'call' && evTime && Math.abs(evTime - callTime) < 5000;
+        });
         
         if (!exists) {
           timeline.push({
             type: 'call',
             label: `Ligação realizada: ${call.result === 'atendeu_interesse' ? 'Atendeu e tem Interesse' : call.result === 'atendeu_sem_interesse' ? 'Atendeu sem Interesse' : call.result === 'nao_atendeu' ? 'Não Atendeu' : call.result === 'caixa_postal' ? 'Caixa Postal' : 'Número Errado'}`,
             note: call.notes,
-            date: new Date(call.created_at).toISOString(),
-            ts: call.created_at
+            date: new Date(callTime).toISOString(),
+            ts: callTime
           });
           addedEventsCount++;
           changed = true;
         }
       }
 
-      // Ordenar a timeline reconstruída por timestamp
-      timeline.sort((a, b) => (a.ts || new Date(a.date || a.ts).getTime()) - (b.ts || new Date(b.date || b.ts).getTime()));
+      // Ordenar a timeline reconstruída por timestamp de forma segura
+      timeline.sort((a, b) => {
+        const tA = a.ts || (a.date ? new Date(a.date).getTime() : 0);
+        const tB = b.ts || (b.date ? new Date(b.date).getTime() : 0);
+        return tA - tB;
+      });
 
       if (changed) {
         // Limpar qualquer tag timeline antiga e salvar a nova reconstruída de forma limpa
