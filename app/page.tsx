@@ -69,7 +69,12 @@ const ICONS: any = {
 
 export default function CRM() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>(DEFAULT_WORKSPACES);
-  const [workspace, setWorkspace] = useState('lottus');
+  const [workspace, setWorkspace] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('active_workspace') || 'lottus';
+    }
+    return 'lottus';
+  });
   const [view, setView] = useState('leads');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [hasDb, setHasDb] = useState<boolean | null>(null);
@@ -2003,7 +2008,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                     if (e.key === 'Enter') {
                       if (wsPassInput === WS_PASSWORD) {
                         const targetId = wsPassModal!;
-                        setWorkspace(targetId); loadTemplates(targetId);
+                        setWorkspace(targetId); localStorage.setItem('active_workspace', targetId); loadTemplates(targetId);
                         setSidebarOpen(false); setWsListOpen(false);
                         setWsPassModal(null); setWsPassInput('');
                       } else { alert('Senha incorreta!'); setWsPassInput(''); }
@@ -2018,7 +2023,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
               <button className="btn btn-primary" onClick={() => {
                 if (wsPassInput === WS_PASSWORD) {
                   const targetId = wsPassModal!;
-                  setWorkspace(targetId); loadTemplates(targetId);
+                  setWorkspace(targetId); localStorage.setItem('active_workspace', targetId); loadTemplates(targetId);
                   setSidebarOpen(false); setWsListOpen(false);
                   setWsPassModal(null); setWsPassInput('');
                 } else { alert('Senha incorreta!'); setWsPassInput(''); }
