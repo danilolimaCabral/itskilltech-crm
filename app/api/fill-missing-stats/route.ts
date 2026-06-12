@@ -55,7 +55,6 @@ export async function GET(req: NextRequest) {
           // Verificar se o lead já tem whatsapp nesta data
           const hasWA = item.timeline.some(ev => ev.type === 'whatsapp' && ev.date?.slice(0, 10) === dateStr);
           if (!hasWA) {
-            // Criar um horário aleatório comercial para o evento de whatsapp (ex: entre 09:00 e 18:00)
             const hour = Math.floor(Math.random() * 9) + 9;
             const min = Math.floor(Math.random() * 60);
             const eventDate = new Date(baseDate);
@@ -136,10 +135,10 @@ export async function GET(req: NextRequest) {
         const cleanNotes = item.notes.replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
         const updatedNotes = `${cleanNotes}\n\n[TIMELINE]${JSON.stringify(item.timeline)}[/TIMELINE]`.trim();
 
-        // Salvar updated_at como timestamp numérico (Date.now()) para evitar o erro de bigint do Postgres
+        // Não vamos atualizar o updated_at de jeito nenhum para evitar erros de tipo do Postgres
         await sql`
           UPDATE leads
-          SET notes = ${updatedNotes}, updated_at = ${Date.now()}
+          SET notes = ${updatedNotes}
           WHERE id = ${item.lead.id}
         `;
       }
