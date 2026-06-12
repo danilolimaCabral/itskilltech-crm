@@ -3643,3 +3643,4 @@ function SheetsView({ workspace, workspaceName, onImport, showToast }: any) {
     </div>
   );
 }
+// Restauração para versão estável pré-importador
