@@ -671,9 +671,10 @@ export default function CRM() {
         <div className="sidebar-section">
           <div className="section-label">Navegação</div>
           {[
-            ['dashboard', 'Dashboard', ICONS.bi, '📊', '#2563eb'],
-            ['leads', 'Leads', ICONS.leads, '👥', '#059669'],
-            ['calendar_view', 'Calendário', ICONS.calendar, '📅', '#7c3aed'],
+	            ['dashboard', 'Dashboard', ICONS.bi, '📊', '#2563eb'],
+	            ['leads', 'Leads', ICONS.leads, '👥', '#059669'],
+	            ['followup', 'Follow-up', ICONS.template, '🔄', '#0891b2'],
+	            ['calendar_view', 'Calendário', ICONS.calendar, '📅', '#7c3aed'],
             ['search', 'Buscar Leads', ICONS.search2, '🔍', '#0891b2'],
             ['agent', 'Agente IA', ICONS.sparkles, '🤖', '#ea580c'],
             ['templates', 'Templates', ICONS.template, '📋', '#d97706'],
@@ -1099,6 +1100,20 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
           {view === 'dashboard' && <DashboardView leads={leads} workspace={workspace} wsName={ws?.name || ''} />}
           {view === 'inbox' && <InboxView workspace={workspace} gmailConfigured={gmailConfigured} leads={leads} showToast={showToast} />}
           {view === 'sent' && <SentEmailsView workspace={workspace} leads={leads} showToast={showToast} onOpenLead={(lead: Lead) => { setLeadPanel(lead); setPanelAnalysis(null); setPanelTab('timeline'); }} />}
+          {view === 'followup' && (
+            <FollowupView
+              workspace={workspace}
+              leads={leads}
+              showToast={showToast}
+              onOpenLead={(lead: Lead) => { setLeadPanel(lead); setPanelAnalysis(null); setPanelTab('timeline'); }}
+              openEmailModal={openEmailModal}
+              openWhatsModal={openWhatsModal}
+              registerActivity={registerActivity}
+              setCallModal={setCallModal}
+              setCallResult={setCallResult}
+              setCallNotes={setCallNotes}
+            />
+          )}
           {view === 'search' && <SearchView workspace={workspace} onImport={async (newLeads: any[]) => {
             const now = Date.now();
             for (const nl of newLeads) {
@@ -2654,6 +2669,257 @@ function DashboardView({ leads, workspace, wsName }: { leads: any[], workspace: 
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+
+// ---------- Aba de Follow-up (Acompanhamento) ----------
+function FollowupView({ workspace, leads, showToast, onOpenLead, openEmailModal, openWhatsModal, registerActivity, setCallModal, setCallResult, setCallNotes }: any) {
+  const [followupLeads, setFollowupLeads] = React.useState<any[]>([]);
+  const [search, setSearch] = React.useState('');
+  const [selectedLead, setSelectedLead] = React.useState<any>(null);
+
+  // Filtrar leads que receberam e-mail (ou seja, têm evento de email na timeline)
+  const leadsWithEmail = React.useMemo(() => {
+    return leads.filter((lead: any) => {
+      try {
+        const tl = JSON.parse(lead.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+        return tl.some((ev: any) => ev.type === 'email');
+      } catch {
+        return false;
+      }
+    });
+  }, [leads]);
+
+  // Processar e enriquecer os leads com informações do último e-mail e status de abertura
+  const processedLeads = React.useMemo(() => {
+    const list = leadsWithEmail.map((lead: any) => {
+      try {
+        const tl = JSON.parse(lead.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+        const emailEvents = tl.filter((ev: any) => ev.type === 'email').sort((a: any, b: any) => b.ts - a.ts);
+        const lastEmail = emailEvents[0];
+        
+        // Verificar se houve abertura do e-mail na timeline
+        const hasOpened = tl.some((ev: any) => ev.type === 'email_opened' || ev.opened === true);
+        // Verificar se já houve contato por WhatsApp após o e-mail
+        const hasWhatsFollowup = tl.some((ev: any) => ev.type === 'whatsapp' && ev.ts > (lastEmail?.ts || 0));
+        // Verificar se já houve ligação após o e-mail
+        const hasCallFollowup = tl.some((ev: any) => ev.type === 'call' && ev.ts > (lastEmail?.ts || 0));
+
+        return {
+          ...lead,
+          lastEmailSubject: lastEmail ? lastEmail.label?.replace('E-mail enviado: ', '') || '(sem assunto)' : '',
+          lastEmailTs: lastEmail ? lastEmail.ts : 0,
+          emailOpened: hasOpened || lead.status === 'email_aberto',
+          hasWhatsFollowup,
+          hasCallFollowup,
+          timelineCount: tl.length
+        };
+      } catch {
+        return { ...lead, lastEmailSubject: '', lastEmailTs: 0, emailOpened: false, hasWhatsFollowup: false, hasCallFollowup: false, timelineCount: 0 };
+      }
+    });
+
+    // Ordenar pelos que receberam e-mail mais recentemente
+    return list.sort((a: any, b: any) => b.lastEmailTs - a.lastEmailTs);
+  }, [leadsWithEmail]);
+
+  // Filtrar por busca (nome, empresa, e-mail ou assunto)
+  const filteredLeads = React.useMemo(() => {
+    if (!search.trim()) return processedLeads;
+    const q = search.toLowerCase();
+    return processedLeads.filter((l: any) => 
+      (l.name || '').toLowerCase().includes(q) ||
+      (l.company || '').toLowerCase().includes(q) ||
+      (l.email || '').toLowerCase().includes(q) ||
+      (l.lastEmailSubject || '').toLowerCase().includes(q)
+    );
+  }, [processedLeads, search]);
+
+  const getSaudacao = () => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Bom dia';
+    if (h < 18) return 'Boa tarde';
+    return 'Boa noite';
+  };
+
+  return (
+    <div style={{ display: 'flex', gap: 0, height: 'calc(100vh - 56px)', overflow: 'hidden' }}>
+      {/* Painel da Esquerda: Lista de Leads para Acompanhamento */}
+      <div style={{ width: selectedLead ? 380 : '100%', minWidth: 320, borderRight: selectedLead ? '1px solid var(--border)' : 'none', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface)' }}>
+        {/* Header */}
+        <div style={{ padding: '20px 20px 12px', borderBottom: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div>
+              <div className="page-title" style={{ fontSize: 18 }}>🔄 Central de Follow-up</div>
+              <div className="page-description">{filteredLeads.length} lead(s) abordado(s) por e-mail</div>
+            </div>
+          </div>
+          <input
+            className="search-input"
+            placeholder="Buscar por lead, empresa, assunto..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ width: '100%', fontSize: 13 }}
+          />
+        </div>
+
+        {/* Lista de Leads */}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {filteredLeads.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Nenhum lead em follow-up</div>
+              <div style={{ fontSize: 12 }}>Dispare e-mails para leads da carteira para que apareçam aqui.</div>
+            </div>
+          ) : (
+            filteredLeads.map((lead: any) => {
+              const daysAgo = Math.floor((Date.now() - lead.lastEmailTs) / (1000 * 60 * 60 * 24));
+              return (
+                <div
+                  key={lead.id}
+                  onClick={() => setSelectedLead(selectedLead?.id === lead.id ? null : lead)}
+                  style={{
+                    padding: '14px 16px',
+                    borderBottom: '1px solid var(--border)',
+                    cursor: 'pointer',
+                    background: selectedLead?.id === lead.id ? 'var(--primary-light, #eff6ff)' : 'var(--surface)',
+                    borderLeft: selectedLead?.id === lead.id ? '3px solid #0066ff' : '3px solid transparent',
+                    transition: 'background 0.15s',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {lead.name}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {lead.company}{lead.role ? ` · ${lead.role}` : ''}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontStyle: 'italic' }}>
+                        📧 {lead.lastEmailSubject || '(sem assunto)'}
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                        {lead.emailOpened ? (
+                          <span style={{ fontSize: 10, fontWeight: 700, background: '#dcfce7', color: '#16a34a', padding: '2px 6px', borderRadius: 4 }}>📬 Aberto</span>
+                        ) : (
+                          <span style={{ fontSize: 10, fontWeight: 500, background: 'var(--surface-2)', color: 'var(--text-muted)', padding: '2px 6px', borderRadius: 4 }}>📤 Enviado</span>
+                        )}
+                        {lead.hasWhatsFollowup && <span style={{ fontSize: 10, fontWeight: 600, background: '#e0f2fe', color: '#0369a1', padding: '2px 6px', borderRadius: 4 }}>💬 Retornado Whats</span>}
+                        {lead.hasCallFollowup && <span style={{ fontSize: 10, fontWeight: 600, background: '#ffedd5', color: '#c2410c', padding: '2px 6px', borderRadius: 4 }}>📞 Retornado Ligação</span>}
+                      </div>
+                    </div>
+                    <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: daysAgo >= 3 ? '#ef4444' : 'var(--text-muted)' }}>
+                        {daysAgo === 0 ? 'Hoje' : daysAgo === 1 ? 'Ontem' : `Há ${daysAgo} dias`}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Painel da Direita: Ações Rápidas de Acompanhamento */}
+      {selectedLead && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface)' }}>
+          {/* Header */}
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: 'var(--surface-2)' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>{selectedLead.name}</div>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                {selectedLead.company}{selectedLead.role ? ` · ${selectedLead.role}` : ''}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+              <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={() => onOpenLead(selectedLead)}>Ver Lead Completo</button>
+              <button className="btn" style={{ fontSize: 12, padding: '5px 10px' }} onClick={() => setSelectedLead(null)}>✕</button>
+            </div>
+          </div>
+
+          {/* Conteúdo e Ações */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* Status do Lead */}
+            <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: 14, border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8, letterSpacing: '0.5px' }}>Último e-mail enviado</div>
+              <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{selectedLead.lastEmailSubject || '(sem assunto)'}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                Enviado em: {new Date(selectedLead.lastEmailTs).toLocaleString('pt-BR')}
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                {selectedLead.emailOpened ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#16a34a', fontWeight: 600 }}>
+                    📬 O destinatário abriu o e-mail! Excelente oportunidade de ligação.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)' }}>
+                    📤 E-mail enviado, mas ainda sem confirmação de abertura.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Ações Rápidas de Contato */}
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 10, letterSpacing: '0.5px' }}>⚡ Ações de Follow-up</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                {/* Botão de WhatsApp */}
+                <button
+                  className="btn"
+                  style={{ background: '#25d366', color: 'white', border: 'none', padding: '12px', borderRadius: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', boxShadow: '0 2px 8px rgba(37,211,102,0.2)' }}
+                  onClick={() => openWhatsModal(selectedLead)}
+                >
+                  💬 Mandar WhatsApp
+                </button>
+
+                {/* Botão de Telefone */}
+                <button
+                  className="btn"
+                  style={{ background: '#0066ff', color: 'white', border: 'none', padding: '12px', borderRadius: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,102,255,0.2)' }}
+                  onClick={() => {
+                    const num = (selectedLead.phone || selectedLead.whatsapp || '').replace(/\D/g, '');
+                    const name = encodeURIComponent(selectedLead.name || '');
+                    const lid = encodeURIComponent(selectedLead.id || '');
+                    window.open(`/phone/index.html?call=${num}&lead=${lid}&name=${name}`, 'softphone', 'width=480,height=700,resizable=yes');
+                  }}
+                >
+                  📞 Fazer Ligação
+                </button>
+
+                {/* Botão de Novo E-mail */}
+                <button
+                  className="btn"
+                  style={{ padding: '12px', borderRadius: 10, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, gridColumn: '1 / -1' }}
+                  onClick={() => openEmailModal(selectedLead)}
+                >
+                  ✉ Enviar Novo E-mail
+                </button>
+              </div>
+            </div>
+
+            {/* Registrar Atividade Manual */}
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 10, letterSpacing: '0.5px' }}>📝 Registrar Contato Rápido</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn btn-sm" onClick={() => registerActivity(selectedLead, 'linkedin')}>✅ Conectou no LinkedIn</button>
+                <button className="btn btn-sm" onClick={() => { setCallModal(selectedLead); setCallResult(''); setCallNotes(`${getSaudacao()}, ${selectedLead.name.split(' ')[0]}! `); }}>📞 Registrar Ligação</button>
+              </div>
+            </div>
+
+            {/* Dados de Contato */}
+            <div style={{ borderTop: '1px solid var(--border)', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4, letterSpacing: '0.5px' }}>📞 Informações de Contato</div>
+              {selectedLead.email && <div style={{ fontSize: 13 }}><strong>E-mail:</strong> {selectedLead.email}</div>}
+              {selectedLead.whatsapp && <div style={{ fontSize: 13 }}><strong>WhatsApp:</strong> {selectedLead.whatsapp}</div>}
+              {selectedLead.phone && <div style={{ fontSize: 13 }}><strong>Telefone:</strong> {selectedLead.phone}</div>}
+              {selectedLead.linkedin && <div style={{ fontSize: 13 }}><strong>LinkedIn:</strong> <a href={selectedLead.linkedin.startsWith('http') ? selectedLead.linkedin : `https://linkedin.com/in/${selectedLead.linkedin}`} target="_blank" rel="noopener noreferrer" style={{ color: '#0a66c2', textDecoration: 'none' }}>Ver Perfil</a></div>}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

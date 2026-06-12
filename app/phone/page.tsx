@@ -1,10 +1,8 @@
 'use client';
 export const dynamic = 'force-dynamic';
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 
 export default function PhonePage() {
-  const router = useRouter()
 
   return (
     <div style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column', background: '#0f172a' }}>
