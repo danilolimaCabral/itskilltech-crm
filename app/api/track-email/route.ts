@@ -26,8 +26,18 @@ export async function GET(req: NextRequest) {
 
           // Atualizar status para "email_aberto"
           let notes = lead.notes || '';
+          
+          // Extrair a timeline existente usando a tag [TIMELINE]
+          const timelineMatch = notes.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/);
           let timeline: any[] = [];
-          try { timeline = JSON.parse(notes); } catch { timeline = []; }
+          if (timelineMatch) {
+            try {
+              timeline = JSON.parse(timelineMatch[1]);
+            } catch {
+              timeline = [];
+            }
+          }
+          
           if (!Array.isArray(timeline)) timeline = [];
 
           timeline.push({
@@ -35,11 +45,16 @@ export async function GET(req: NextRequest) {
             label: '📬 E-mail aberto pelo destinatário',
             date: now,
             auto: true,
+            ts: Date.now()
           });
+
+          // Reconstruir o campo notes preservando o texto e as tags [TIMELINE]
+          const cleanNotes = notes.replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
+          const newNotes = `${cleanNotes}\n\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]`.trim();
 
           await sql`
             UPDATE leads
-            SET status = 'email_aberto', notes = ${JSON.stringify(timeline)}, updated_at = ${now}
+            SET status = 'email_aberto', notes = ${newNotes}, updated_at = ${now}
             WHERE id = ${leadId} AND workspace = ${workspace}
           `;
 
@@ -120,10 +135,14 @@ export async function GET(req: NextRequest) {
               label: `📧 Follow-up automático enviado: "Você tem interesse?"`,
               date: new Date().toISOString(),
               auto: true,
+              ts: Date.now()
             });
+            
+            const updatedNotes = `${cleanNotes}\n\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]`.trim();
+            
             await sql`
               UPDATE leads
-              SET notes = ${JSON.stringify(timeline)}, updated_at = ${new Date().toISOString()}
+              SET notes = ${updatedNotes}, updated_at = ${new Date().toISOString()}
               WHERE id = ${leadId} AND workspace = ${workspace}
             `;
           }
