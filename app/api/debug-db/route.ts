@@ -1,76 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@vercel/postgres';
 
-export const dynamic = 'force-dynamic';
-
 export async function GET(req: NextRequest) {
   try {
-    console.log("Iniciando debug de banco de dados...");
-    
-    // 1. Verificar total de leads por workspace
-    const { rows: leadsByWorkspace } = await sql`
-      SELECT workspace, COUNT(*) as count 
+    const { rows: leads } = await sql`
+      SELECT id, name, company, notes 
       FROM leads 
-      GROUP BY workspace;
+      WHERE workspace = 'lottus';
     `;
+    
+    let totalEmails = 0;
+    let totalWhats = 0;
+    let totalCalls = 0;
+    
+    const targetDays = ['10/06', '11/06', '12/06'];
+    const eventsFound: any[] = [];
 
-    // 2. Verificar total de ligações (call_logs) por workspace
-    const { rows: callsByWorkspace } = await sql`
-      SELECT workspace, COUNT(*) as count 
-      FROM call_logs 
-      GROUP BY workspace;
-    `;
-
-    // 3. Buscar os 30 últimos logs de ligações cadastrados de qualquer workspace
-    const { rows: lastCalls } = await sql`
-      SELECT id, lead_id, workspace, result, notes, created_at 
-      FROM call_logs 
-      ORDER BY created_at DESC 
-      LIMIT 30;
-    `;
-
-    // 4. Buscar leads que foram atualizados recentemente e que tenham [TIMELINE]
-    const { rows: recentLeadsWithTimeline } = await sql`
-      SELECT id, name, workspace, status, updated_at, notes
-      FROM leads
-      WHERE notes LIKE '%[TIMELINE]%'
-      ORDER BY updated_at DESC
-      LIMIT 30;
-    `;
-
-    // 5. Contar quantos leads têm timeline em cada workspace
-    const { rows: timelineCount } = await sql`
-      SELECT workspace, COUNT(*) as count
-      FROM leads
-      WHERE notes LIKE '%[TIMELINE]%'
-      GROUP BY workspace;
-    `;
-
+    for (const lead of leads) {
+      const notes = lead.notes || '';
+      const match = notes.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/);
+      if (!match) continue;
+      
+      let timeline = [];
+      try { timeline = JSON.parse(match[1]); } catch { continue; }
+      
+      for (const ev of timeline) {
+        const dateStr = new Date(ev.ts).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }).substring(0, 5);
+        if (targetDays.includes(dateStr)) {
+          if (ev.type === 'email') totalEmails++;
+          if (ev.type === 'whatsapp') totalWhats++;
+          if (ev.type === 'call') totalCalls++;
+          
+          eventsFound.push({
+            lead: lead.name,
+            company: lead.company,
+            type: ev.type,
+            date: dateStr,
+            label: ev.label,
+            ts: ev.ts
+          });
+        }
+      }
+    }
+    
     return NextResponse.json({
-      ok: true,
-      summary: {
-        leads_by_workspace: leadsByWorkspace,
-        calls_by_workspace: callsByWorkspace,
-        timeline_count_by_workspace: timelineCount,
+      success: true,
+      totals: {
+        emails: totalEmails,
+        whatsapps: totalWhats,
+        calls: totalCalls,
+        total_activities: totalEmails + totalWhats + totalCalls
       },
-      last_calls_registered: lastCalls.map(c => ({
-        ...c,
-        date_formatted: new Date(Number(c.created_at)).toLocaleString('pt-BR')
-      })),
-      recent_leads_prospecting: recentLeadsWithTimeline.map(l => {
-        const match = l.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/);
-        return {
-          id: l.id,
-          name: l.name,
-          workspace: l.workspace,
-          status: l.status,
-          updated_at_formatted: new Date(Number(l.updated_at) || Date.now()).toLocaleString('pt-BR'),
-          timeline_preview: match ? match[1].slice(0, 300) : null,
-          raw_notes_preview: l.notes?.slice(0, 150)
-        };
-      })
+      events: eventsFound.slice(-50) // retornar os últimos 50 eventos
     });
   } catch (err: any) {
-    return NextResponse.json({ ok: false, error: err.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
 }
