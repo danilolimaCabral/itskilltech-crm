@@ -157,6 +157,12 @@ export default function CRM() {
   const [unreadSuggestions, setUnreadSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
+  // Modal de Prospecção Rápida por CNPJ (para o Ricardo e prospecção expressa)
+  const [cnpjModalOpen, setCnpjModalOpen] = useState(false);
+  const [cnpjInput, setCnpjInput] = useState('');
+  const [cnpjLoading, setCnpjLoading] = useState(false);
+  const [cnpjResult, setCnpjResult] = useState<any>(null);
+
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2800); };
 
   // Salvar LinkedIn rápido
@@ -761,6 +767,7 @@ export default function CRM() {
                     for (const id of toDelete) await removeLead(id, true);
                     showToast(`✓ ${toDelete.length} duplicado(s) removido(s)`);
                   }}>🗑 Deduplicar</button>
+                  <button className="btn" style={{background:'#0066ff',color:'#fff',border:'none',marginRight:8,fontSize:12,padding:'6px 12px',borderRadius:6,cursor:'pointer',fontWeight:600}} onClick={() => { setCnpjInput(''); setCnpjResult(null); setCnpjModalOpen(true); }}>🔢 Prospectar CNPJ</button>
                   <button className="btn btn-primary" onClick={() => { setEditing(null); setModalOpen(true); }}><Icon d={ICONS.plus} />Novo lead</button>
                 </div>
               </div>
@@ -2063,6 +2070,132 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
             </div>
             <div className="modal-footer">
               <button className="btn" onClick={() => setShowSuggestions(false)}>Fechar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE PROSPECÇÃO RÁPIDA POR CNPJ */}
+      {cnpjModalOpen && (
+        <div className="modal-bg" onClick={() => setCnpjModalOpen(false)}>
+          <div className="modal" style={{ maxWidth: 520 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-title">🔢 Prospectar CNPJ Rápido</span>
+              <button className="modal-close" onClick={() => setCnpjModalOpen(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>Busque dados de qualquer empresa do Brasil e adicione à sua carteira com 1 clique.</p>
+              
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <input
+                  className="field-input"
+                  style={{ flex: 1 }}
+                  placeholder="Digite o CNPJ (ex: 53.113.791/0001-22)"
+                  value={cnpjInput}
+                  onChange={e => setCnpjInput(e.target.value)}
+                  onKeyDown={async e => {
+                    if (e.key === 'Enter' && !cnpjLoading) {
+                      const clean = cnpjInput.replace(/\D/g, '');
+                      if (clean.length !== 14) { alert('Digite um CNPJ válido com 14 números.'); return; }
+                      setCnpjLoading(true); setCnpjResult(null);
+                      try {
+                        const res = await fetch(`/api/prospect-cnpj?cnpj=${clean}`);
+                        const data = await res.json();
+                        if (data.error) { alert(data.error); }
+                        else { setCnpjResult(data.company); }
+                      } catch { alert('Erro ao buscar CNPJ. Tente novamente.'); }
+                      setCnpjLoading(false);
+                    }
+                  }}
+                  autoFocus
+                />
+                <button
+                  className="btn btn-primary"
+                  disabled={cnpjLoading || !cnpjInput.trim()}
+                  onClick={async () => {
+                    const clean = cnpjInput.replace(/\D/g, '');
+                    if (clean.length !== 14) { alert('Digite um CNPJ válido com 14 números.'); return; }
+                    setCnpjLoading(true); setCnpjResult(null);
+                    try {
+                      const res = await fetch(`/api/prospect-cnpj?cnpj=${clean}`);
+                      const data = await res.json();
+                      if (data.error) { alert(data.error); }
+                      else { setCnpjResult(data.company); }
+                    } catch { alert('Erro ao buscar CNPJ. Tente novamente.'); }
+                    setCnpjLoading(false);
+                  }}
+                >
+                  {cnpjLoading ? 'Buscando...' : '🔍 Buscar'}
+                </button>
+              </div>
+
+              {cnpjResult && (
+                <div style={{ background: 'var(--surface-2)', borderRadius: 10, padding: 14, border: '1px solid var(--border)' }}>
+                  <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 2, color: 'var(--text)' }}>{cnpjResult.name || cnpjResult.company}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>{cnpjResult.company}</div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 12px', fontSize: 13, marginBottom: 12 }}>
+                    <div><span style={{ color: 'var(--text-muted)' }}>CNPJ:</span> <strong style={{ color: 'var(--primary)' }}>{cnpjResult.cnpj?.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5')}</strong></div>
+                    <div><span style={{ color: 'var(--text-muted)' }}>Telefone:</span> <strong>{cnpjResult.phone || 'Não cadastrado'}</strong></div>
+                    <div style={{ gridColumn: '1/-1' }}><span style={{ color: 'var(--text-muted)' }}>E-mail:</span> <strong style={{ color: '#16a34a' }}>{cnpjResult.email || 'Não cadastrado'}</strong></div>
+                    <div style={{ gridColumn: '1/-1' }}><span style={{ color: 'var(--text-muted)' }}>Cidade/UF:</span> <strong>{cnpjResult.city}/{cnpjResult.state}</strong></div>
+                    <div style={{ gridColumn: '1/-1' }}><span style={{ color: 'var(--text-muted)' }}>Atividade (CNAE):</span> <strong style={{ fontSize: 11, display: 'block', marginTop: 2 }}>{cnpjResult.cnae}</strong></div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8, marginTop: 14, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <label className="field-label" style={{ fontSize: 11, marginBottom: 4 }}>Nome do Decisor</label>
+                      <input className="field-input" style={{ padding: '6px 10px', fontSize: 13 }} placeholder="Nome do contato decisor" value={cnpjResult.decisorName || ''} onChange={e => setCnpjResult({ ...cnpjResult, decisorName: e.target.value })} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label className="field-label" style={{ fontSize: 11, marginBottom: 4 }}>Cargo do Decisor</label>
+                      <input className="field-input" style={{ padding: '6px 10px', fontSize: 13 }} placeholder="Ex: Diretor de Logística" value={cnpjResult.decisorRole || ''} onChange={e => setCnpjResult({ ...cnpjResult, decisorRole: e.target.value })} />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn" onClick={() => setCnpjModalOpen(false)}>Cancelar</button>
+              <button
+                className="btn btn-primary"
+                disabled={!cnpjResult}
+                onClick={async () => {
+                  try {
+                    const leadPayload = {
+                      name: cnpjResult.decisorName || 'Decisor',
+                      company: cnpjResult.company || cnpjResult.name || '',
+                      role: cnpjResult.decisorRole || 'Diretor de Logística',
+                      email: cnpjResult.email || '',
+                      whatsapp: cleanPhone(cnpjResult.phone || ''),
+                      phone: cnpjResult.phone || '',
+                      cnpj: cnpjResult.cnpj,
+                      cnae: cnpjResult.cnae,
+                      city: cnpjResult.city,
+                      state: cnpjResult.state,
+                      size: cnpjResult.size
+                    };
+
+                    const res = await fetch('/api/prospect-cnpj', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ lead: leadPayload, workspace })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                      showToast('Lead importado com sucesso!');
+                      setCnpjModalOpen(false);
+                      loadLeads(); // Recarrega os leads na tela
+                    } else {
+                      alert(data.error || 'Erro ao importar lead.');
+                    }
+                  } catch {
+                    alert('Erro ao importar lead.');
+                  }
+                }}
+              >
+                📥 Importar para Carteira
+              </button>
             </div>
           </div>
         </div>
