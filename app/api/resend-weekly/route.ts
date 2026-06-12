@@ -4,7 +4,7 @@ import { getLeads } from '@/lib/db'
 
 export const runtime = 'nodejs'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Instanciado dentro das rotas para evitar erros de compilação sem env var
 
 interface WorkspaceSender {
   email: string
@@ -188,6 +188,7 @@ export async function POST(req: NextRequest) {
 
         const fromEmail = `${sender.displayName} | ${sender.name} <${sender.email}>`
 
+        const resend = new Resend(process.env.RESEND_API_KEY)
         const { data, error } = await resend.emails.send({
           from: fromEmail,
           to: item.leadName ? `${item.leadName} <${item.leadEmail}>` : item.leadEmail,

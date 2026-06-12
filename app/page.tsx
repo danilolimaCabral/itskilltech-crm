@@ -1,4 +1,5 @@
 'use client';
+export const dynamic = 'force-dynamic';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { TemplatesView, BIView } from './templates-bi-views';
 import { AgentView } from './agent-view';
