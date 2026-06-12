@@ -48,11 +48,35 @@ export async function POST(req: Request) {
     };
     await insertCallLog(log);
 
-    // Atualizar status e contagem do lead
+    // Atualizar status e contagem do lead e registrar na timeline
     if (lead) {
       const newStatus = RESULT_TO_STATUS[result] || lead.status;
+      
+      // Parsear timeline existente
+      let timeline: any[] = [];
+      try {
+        timeline = JSON.parse(lead.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+      } catch {
+        timeline = [];
+      }
+
+      // Adicionar o evento de ligação
+      timeline.push({
+        id: 'ev_' + Math.random().toString(36).slice(2, 9),
+        type: 'call',
+        label: 'Ligação realizada',
+        notes: notes || `Resultado: ${result === 'atendeu_interesse' ? 'Atendeu (Com Interesse)' : result === 'atendeu_sem_interesse' ? 'Atendeu (Sem Interesse)' : result === 'atendeu_retornar' ? 'Atendeu (Retornar)' : result === 'nao_atendeu' ? 'Não Atendeu' : result === 'caixa_postal' ? 'Caixa Postal' : 'Número Errado'}`,
+        ts: Date.now(),
+        user: 'Ricardo'
+      });
+
+      // Reconstruir notas protegendo a timeline
+      const cleanNotes = (lead.notes || '').replace(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/g, '').trim();
+      const newNotes = `${cleanNotes}\n\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]`.trim();
+
       const updatedLead = {
         ...lead,
+        notes: newNotes,
         status: newStatus,
         call_count: (lead.call_count || 0) + 1,
         last_contact: Date.now(),

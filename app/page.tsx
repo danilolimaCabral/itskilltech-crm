@@ -2966,9 +2966,9 @@ function SearchView({ workspace, onImport, showToast }: any) {
   const STATES = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 
   const buildFromCnpja = (data: any) => ({
-    name: data.alias || data.name || '',
+    name: data.members?.[0] ? data.members[0].name : (data.alias || data.name || 'Decisor'),
     company: data.name || data.alias || '',
-    role: data.members?.[0] ? `${data.members[0].role} — ${data.members[0].name}` : '',
+    role: data.members?.[0] ? data.members[0].role : 'Diretor de Logística',
     email: data.email || '',
     phone: data.phone || '',
     whatsapp: data.phone ? data.phone.replace(/\D/g,'') : '',
@@ -3052,9 +3052,9 @@ function SearchView({ workspace, onImport, showToast }: any) {
     showToast(`${mapped.length} linha(s) lida(s)`);
   };
 
-  const modeLabels: any = { cnpj: 'CNPJ', name: 'Nome da empresa', segment: 'Segmento / CNAE' };
+  const modeLabels: any = { cnpj: '🔢 CNPJ Direto', name: '🏢 Nome da empresa', segment: '🏭 Segmento / CNAE' };
   const modePlaceholders: any = {
-    cnpj: 'Ex: 53.113.791/0001-22',
+    cnpj: 'Digite o CNPJ da empresa (Ex: 53.113.791/0001-22)',
     name: 'Ex: TOTVS, Grupo Alltech, Localfrio...',
     segment: 'Ex: transporte, logística, atacado, TMS, 4930...'
   };
