@@ -50,7 +50,11 @@ export async function GET(req: NextRequest) {
 
         // Verificar se a ligação já existe na timeline (pelo timestamp ou proximidade de 5s)
         const exists = timeline.some(ev => {
-          const evTime = ev.ts || (ev.date ? new Date(ev.date).getTime() : null);
+          let evTime = ev.ts;
+          if (!evTime && ev.date) {
+            const d = new Date(ev.date).getTime();
+            if (!isNaN(d)) evTime = d;
+          }
           return ev.type === 'call' && evTime && Math.abs(evTime - callTime) < 5000;
         });
         
@@ -69,8 +73,20 @@ export async function GET(req: NextRequest) {
 
       // Ordenar a timeline reconstruída por timestamp de forma segura
       timeline.sort((a, b) => {
-        const tA = a.ts || (a.date ? new Date(a.date).getTime() : 0);
-        const tB = b.ts || (b.date ? new Date(b.date).getTime() : 0);
+        let tA = a.ts;
+        if (!tA && a.date) {
+          const d = new Date(a.date).getTime();
+          if (!isNaN(d)) tA = d;
+        }
+        if (!tA) tA = Date.now();
+
+        let tB = b.ts;
+        if (!tB && b.date) {
+          const d = new Date(b.date).getTime();
+          if (!isNaN(d)) tB = d;
+        }
+        if (!tB) tB = Date.now();
+
         return tA - tB;
       });
 
