@@ -136,9 +136,10 @@ export async function GET(req: NextRequest) {
         const cleanNotes = item.notes.replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
         const updatedNotes = `${cleanNotes}\n\n[TIMELINE]${JSON.stringify(item.timeline)}[/TIMELINE]`.trim();
 
+        // Salvar updated_at como timestamp numérico (Date.now()) para evitar o erro de bigint do Postgres
         await sql`
           UPDATE leads
-          SET notes = ${updatedNotes}, updated_at = ${new Date().toISOString()}
+          SET notes = ${updatedNotes}, updated_at = ${Date.now()}
           WHERE id = ${item.lead.id}
         `;
       }
