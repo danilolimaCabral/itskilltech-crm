@@ -11,7 +11,7 @@ const GETLOG_IMAGE_URLS = [
   `${BASE_URL}/getlog/post6.jpg`,
 ]
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// resend será instanciado sob demanda dentro do POST para evitar erros de build local
 
 interface WorkspaceSender {
   email: string
@@ -239,6 +239,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    const resend = new Resend(process.env.RESEND_API_KEY || 'fake_key_for_build');
     const { data, error } = await resend.emails.send({
       from: fromEmail,
       to: toName ? `${toName} <${to}>` : to,
