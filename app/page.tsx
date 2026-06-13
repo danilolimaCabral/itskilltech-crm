@@ -2215,6 +2215,26 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
           </div>
         </div>
       )}
+      {/* BOTTOM NAVIGATION BAR PARA CELULAR — Estilo aplicativo moderno */}
+      <nav className="bottom-nav">
+        <button className={`bottom-nav-item${view === 'dashboard' ? ' active' : ''}`} onClick={() => setView('dashboard')}>
+          <span>📊</span>
+          <span>Dashboard</span>
+        </button>
+        <button className={`bottom-nav-item${view === 'leads' ? ' active' : ''}`} onClick={() => setView('leads')}>
+          <span>👥</span>
+          <span>Leads</span>
+        </button>
+        <button className={`bottom-nav-item${view === 'followup' ? ' active' : ''}`} onClick={() => setView('followup')}>
+          <span>🔄</span>
+          <span>Follow-up</span>
+        </button>
+        <button className={`bottom-nav-item${view === 'calendar_view' ? ' active' : ''}`} onClick={() => setView('calendar_view')}>
+          <span>📅</span>
+          <span>Agenda</span>
+        </button>
+      </nav>
+
       <div className={`toast${toast ? ' show' : ''}`}>{toast}</div>
     </div>
   );

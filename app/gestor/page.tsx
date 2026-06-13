@@ -5,13 +5,58 @@ import React, { useState, useEffect, useCallback } from 'react';
 // Estilos mobile
 const mobileStyle = `
   @media (max-width: 768px) {
-    .gestor-grid-2 { grid-template-columns: 1fr !important; }
-    .gestor-grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
-    .gestor-header { padding: 14px 16px !important; flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; }
+    .gestor-grid-2 { grid-template-columns: 1fr !important; gap: 16px !important; }
+    .gestor-grid-4 { grid-template-columns: repeat(2, 1fr) !important; gap: 12px !important; }
+    .gestor-header { 
+      padding: 12px 16px !important; 
+      flex-direction: row !important; 
+      align-items: center !important; 
+      justify-content: space-between !important;
+      height: auto !important;
+    }
+    .gestor-header > div:first-child {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 4px !important;
+    }
+    .gestor-header > div:first-child > div:nth-child(2) {
+      display: none !important; /* Oculta barra divisória no celular */
+    }
+    .gestor-header span {
+      display: none !important; /* Oculta texto secundário longo no celular */
+    }
     .gestor-content { padding: 16px 12px !important; }
-    .gestor-priority-row { flex-direction: column !important; }
+    .gestor-priority-row { flex-direction: column !important; gap: 8px !important; }
     .gestor-priority-row input { width: 100% !important; }
-    .gestor-lead-form-grid { grid-template-columns: 1fr !important; }
+    .gestor-lead-form-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
+    
+    /* Modernização dos gráficos e tabelas para toque */
+    .gestor-card {
+      padding: 16px !important;
+      border-radius: 16px !important;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.04) !important;
+    }
+    .gestor-table-wrap {
+      overflow-x: auto !important;
+      -webkit-overflow-scrolling: touch !important;
+      margin: 0 -12px !important;
+      padding: 0 12px !important;
+    }
+    .gestor-table {
+      min-width: 500px !important;
+    }
+    
+    /* KPI Cards mais densos e elegantes */
+    .gestor-kpi-card {
+      padding: 14px !important;
+      border-radius: 16px !important;
+    }
+    .gestor-kpi-value {
+      font-size: 28px !important;
+    }
+    .gestor-kpi-label {
+      font-size: 11px !important;
+    }
   }
 `;
 
@@ -191,6 +236,7 @@ export default function GestorPage() {
                 const filteredLeads = c.channel === 'all' ? dayLeads : dayLeads.filter((l: any) => l.channels?.includes(c.channel));
                 return (
                   <div key={c.label}
+                    className="gestor-kpi-card"
                     onClick={() => c.value > 0 && setDayModal({ date: todayKey, channel: c.channel, channelLabel: c.channelLabel, leads: filteredLeads })}
                     style={{ background: '#fff', borderRadius: 14, padding: '20px 20px 16px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: `1px solid ${c.color}18`, cursor: c.value > 0 ? 'pointer' : 'default', transition: 'all 0.18s', position: 'relative', overflow: 'hidden' }}
                     onMouseEnter={e => { (e.currentTarget as HTMLElement).style.transform = 'translateY(-3px)'; (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 24px ${c.color}28`; }}
@@ -201,8 +247,8 @@ export default function GestorPage() {
                       <div style={{ width: 40, height: 40, borderRadius: 10, background: `${c.color}12`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{c.icon}</div>
                       <span style={{ fontSize: 11, color: '#fff', background: c.color, borderRadius: 20, padding: '2px 8px', fontWeight: 600 }}>Meta: {c.goal}</span>
                     </div>
-                    <div style={{ fontSize: 36, fontWeight: 800, color: c.color, letterSpacing: '-0.04em', lineHeight: 1 }}>{c.value}</div>
-                    <div style={{ fontSize: 12, color: '#64748b', marginTop: 4, marginBottom: 10 }}>{c.label}</div>
+                    <div className="gestor-kpi-value" style={{ fontSize: 36, fontWeight: 800, color: c.color, letterSpacing: '-0.04em', lineHeight: 1 }}>{c.value}</div>
+                    <div className="gestor-kpi-label" style={{ fontSize: 12, color: '#64748b', marginTop: 4, marginBottom: 10 }}>{c.label}</div>
                     <ProgressBar value={c.value} max={c.goal} color={c.color} />
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
                       <span style={{ fontSize: 11, color: c.value >= c.goal && c.goal > 0 ? c.color : '#94a3b8', fontWeight: c.value >= c.goal ? 700 : 400 }}>
@@ -272,7 +318,7 @@ export default function GestorPage() {
             {/* Metas + Histórico */}
             <div className="gestor-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 20, marginBottom: 24 }}>
               {/* Metas */}
-              <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e8edf2' }}>
+              <div className="gestor-card" style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e8edf2' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                   <span style={{ fontWeight: 600, fontSize: 15 }}>🎯 Metas Diárias</span>
                   <button onClick={() => setEditGoals(!editGoals)} style={{ background: editGoals ? '#fee2e2' : '#eff6ff', color: editGoals ? '#dc2626' : '#1a56db', border: 'none', borderRadius: 8, padding: '4px 12px', cursor: 'pointer', fontSize: 12 }}>
@@ -316,7 +362,7 @@ export default function GestorPage() {
               </div>
 
               {/* Histórico por dia */}
-              <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e8edf2' }}>
+              <div className="gestor-card" style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', border: '1px solid #e8edf2' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                   <span style={{ fontWeight: 600, fontSize: 15 }}>📅 Histórico de Prospecção</span>
                   <select value={period} onChange={e => setPeriod(parseInt(e.target.value))}
@@ -334,8 +380,8 @@ export default function GestorPage() {
                     <div style={{ fontSize: 12, color: '#94a3b8', lineHeight: 1.6 }}>O histórico será preenchido automaticamente conforme o Danilo registrar atividades no CRM (WhatsApp, e-mail, ligações e LinkedIn).</div>
                   </div>
                 ) : (
-                  <div style={{ overflowY: 'auto', maxHeight: 280 }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <div className="gestor-table-wrap" style={{ overflowY: 'auto', maxHeight: 280 }}>
+                    <table className="gestor-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                       <thead>
                         <tr style={{ borderBottom: '2px solid #f1f5f9' }}>
                           <th style={{ textAlign: 'left', padding: '6px 8px', color: '#64748b', fontWeight: 600 }}>Data</th>
