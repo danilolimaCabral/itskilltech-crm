@@ -541,7 +541,7 @@ table.data tbody tr:hover { background: var(--surface-2); }
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-top: 1px solid rgba(26,35,50,0.06);
-  z-index: 199;
+  z-index: 999; /* Reduzido de 9999 para 999, garantindo que os modais (z-index 99999) fiquem por cima */
   justify-content: space-around;
   align-items: center;
   padding: 0 8px;
@@ -653,7 +653,7 @@ table.data tbody tr:hover { background: var(--surface-2); }
   background: rgba(26,35,50,0.45);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  z-index: 9999; /* Garante que fica acima de qualquer menu inferior ou elemento */
+  z-index: 99999; /* Aumentado para 99999 para ficar absolutamente acima de tudo */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -871,22 +871,32 @@ table.data tbody tr:hover { background: var(--surface-2); }
   }
   .mobile-actions::-webkit-scrollbar { display: none; }
   .mobile-actions .btn { flex: 0 0 auto !important; white-space: nowrap; font-size: 12px; padding: 7px 12px; }
-  .modal-bg { padding: 0; align-items: flex-end; z-index: 9999; }
+  .modal-bg { padding: 0; align-items: flex-end; z-index: 99999; }
   .modal {
     max-width: 100%;
-    max-height: 82vh; /* Reduzido de 95vh para 82vh para garantir que não corte botões no rodapé e caiba acima do teclado */
+    max-height: 88vh; /* Aumentado para 88vh para aproveitar melhor a tela no celular */
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     margin-bottom: 0;
     box-shadow: 0 -10px 25px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
   }
   .modal-body { 
-    padding: 14px 16px 80px; /* Adicionado padding-bottom extra de 80px para dar folga de rolagem no celular */
+    padding: 14px 16px 40px; /* Reduzido de 80px para 40px porque agora a rolagem é perfeita */
     overflow-y: auto !important; 
     -webkit-overflow-scrolling: touch; 
-    max-height: calc(82vh - 120px); /* Garante que o corpo do modal seja perfeitamente rolável */
+    flex: 1; /* Faz o corpo ocupar todo o espaço disponível, empurrando o footer para o final */
+    max-height: calc(88vh - 140px); /* Garante que o corpo do modal seja perfeitamente rolável */
   }
-  .modal-header { padding: 14px 16px; }
-  .modal-footer { padding: 12px 16px; border-radius: 0; }
+  .modal-header { padding: 14px 16px; flex-shrink: 0; }
+  .modal-footer { 
+    padding: 14px 16px 34px; /* Adicionado padding-bottom extra de 34px para ficar acima da barra de navegação do iOS/Android (área segura) */
+    border-radius: 0; 
+    flex-shrink: 0; 
+    background: var(--surface-2);
+    border-top: 1px solid var(--border);
+    z-index: 10;
+  }
   .modal-footer .btn { flex: 1; justify-content: center; }
   .field-row { grid-template-columns: 1fr; }
   .field-input, .field-textarea, .field-select { font-size: 16px; }
