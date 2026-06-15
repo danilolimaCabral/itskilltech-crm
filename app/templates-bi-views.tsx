@@ -80,10 +80,20 @@ export function TemplatesView({ workspace, workspaceName, templates, onReload, s
   };
 
   const remove = async (id: string) => {
+    if (!confirm('Deseja realmente excluir este template?')) return;
     setDeleting(id);
     try {
-      await fetch(`/api/templates?id=${id}`, { method: 'DELETE' });
-      showToast('Template excluido'); onReload();
+      const r = await fetch('/api/templates', { 
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      if (r.ok) {
+        showToast('Template excluído com sucesso!');
+        onReload();
+      } else {
+        showToast('Erro ao excluir template');
+      }
     } catch { showToast('Erro ao excluir'); }
     setDeleting(null);
   };

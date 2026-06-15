@@ -502,10 +502,13 @@ export default function CRM() {
           // Procurar o primeiro template de WhatsApp desse workspace
           const tpl = j.find((t: any) => t.type === 'whatsapp');
           if (tpl) {
+            const primeironome = lead.name ? lead.name.split(' ')[0] : 'Contato';
+            const empresa = lead.company || 'sua empresa';
+            const cargo = lead.role || 'decisor';
             const body = tpl.body
-              .replace(/\{\{nome\}\}/g, lead.name.split(' ')[0])
-              .replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa')
-              .replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
+              .replace(/\{\{nome\}\}/g, primeironome)
+              .replace(/\{\{empresa\}\}/g, empresa)
+              .replace(/\{\{cargo\}\}/g, cargo);
             setWhatsBody(body);
           }
         }
@@ -513,10 +516,13 @@ export default function CRM() {
         // Se a requisição falhar, tenta usar o que já estiver em memória como fallback
         const tplFromState = templates.find((t: any) => t.type === 'whatsapp');
         if (tplFromState) {
+          const primeironome = lead.name ? lead.name.split(' ')[0] : 'Contato';
+          const empresa = lead.company || 'sua empresa';
+          const cargo = lead.role || 'decisor';
           const body = tplFromState.body
-            .replace(/\{\{nome\}\}/g, lead.name.split(' ')[0])
-            .replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa')
-            .replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
+            .replace(/\{\{nome\}\}/g, primeironome)
+            .replace(/\{\{empresa\}\}/g, empresa)
+            .replace(/\{\{cargo\}\}/g, cargo);
           setWhatsBody(body);
         }
       }
@@ -525,10 +531,13 @@ export default function CRM() {
       // Fallback para o estado local se houver erro de rede
       const tplFromState = templates.find((t: any) => t.type === 'whatsapp');
       if (tplFromState) {
+        const primeironome = lead.name ? lead.name.split(' ')[0] : 'Contato';
+        const empresa = lead.company || 'sua empresa';
+        const cargo = lead.role || 'decisor';
         const body = tplFromState.body
-          .replace(/\{\{nome\}\}/g, lead.name.split(' ')[0])
-          .replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa')
-          .replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
+          .replace(/\{\{nome\}\}/g, primeironome)
+          .replace(/\{\{empresa\}\}/g, empresa)
+          .replace(/\{\{cargo\}\}/g, cargo);
         setWhatsBody(body);
       }
     } finally {
@@ -1773,8 +1782,17 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {templates.filter(t => t.type === 'whatsapp').map((tpl: any) => (
                       <button key={tpl.id} className="btn btn-sm" style={{ fontSize: 11, background: '#25d366', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', gap: 4 }} onClick={() => {
-                        const body = tpl.body.replace(/\{\{nome\}\}/g, whatsModal.name.split(' ')[0]).replace(/\{\{empresa\}\}/g, whatsModal.company || 'sua empresa').replace(/\{\{cargo\}\}/g, whatsModal.role || 'decisor');
+                        const primeironome = whatsModal.name ? whatsModal.name.split(' ')[0] : 'Contato';
+                        const empresa = whatsModal.company || 'sua empresa';
+                        const cargo = whatsModal.role || 'decisor';
+                        
+                        const body = tpl.body
+                          .replace(/\{\{nome\}\}/g, primeironome)
+                          .replace(/\{\{empresa\}\}/g, empresa)
+                          .replace(/\{\{cargo\}\}/g, cargo);
+                        
                         setWhatsBody(body);
+                        showToast(`Template "${tpl.name}" aplicado!`);
                       }}>
                         <span>📋</span>
                         {tpl.name || 'Template'}
