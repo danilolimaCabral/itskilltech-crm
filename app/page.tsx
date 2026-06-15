@@ -520,7 +520,19 @@ export default function CRM() {
             const primeironome = lead.name ? lead.name.split(' ')[0] : 'Contato';
             const empresa = lead.company || 'sua empresa';
             const cargo = lead.role || 'decisor';
-            const body = tpl.body
+            const saudacao = getSaudacao();
+            
+            let body = tpl.body;
+            if (body.startsWith('Olá {{nome}}')) {
+              body = body.replace('Olá {{nome}}', `${saudacao} {{nome}}`);
+            } else if (body.startsWith('Olá,')) {
+              body = body.replace('Olá,', `${saudacao},`);
+            } else if (body.startsWith('Olá ')) {
+              body = body.replace('Olá ', `${saudacao} `);
+            }
+
+            body = body
+              .replace(/\{\{saudacao\}\}/g, saudacao)
               .replace(/\{\{nome\}\}/g, primeironome)
               .replace(/\{\{empresa\}\}/g, empresa)
               .replace(/\{\{cargo\}\}/g, cargo);
@@ -534,7 +546,19 @@ export default function CRM() {
           const primeironome = lead.name ? lead.name.split(' ')[0] : 'Contato';
           const empresa = lead.company || 'sua empresa';
           const cargo = lead.role || 'decisor';
-          const body = tplFromState.body
+          const saudacao = getSaudacao();
+          
+          let body = tplFromState.body;
+          if (body.startsWith('Olá {{nome}}')) {
+            body = body.replace('Olá {{nome}}', `${saudacao} {{nome}}`);
+          } else if (body.startsWith('Olá,')) {
+            body = body.replace('Olá,', `${saudacao},`);
+          } else if (body.startsWith('Olá ')) {
+            body = body.replace('Olá ', `${saudacao} `);
+          }
+
+          body = body
+            .replace(/\{\{saudacao\}\}/g, saudacao)
             .replace(/\{\{nome\}\}/g, primeironome)
             .replace(/\{\{empresa\}\}/g, empresa)
             .replace(/\{\{cargo\}\}/g, cargo);
@@ -549,7 +573,19 @@ export default function CRM() {
         const primeironome = lead.name ? lead.name.split(' ')[0] : 'Contato';
         const empresa = lead.company || 'sua empresa';
         const cargo = lead.role || 'decisor';
-        const body = tplFromState.body
+        const saudacao = getSaudacao();
+        
+        let body = tplFromState.body;
+        if (body.startsWith('Olá {{nome}}')) {
+          body = body.replace('Olá {{nome}}', `${saudacao} {{nome}}`);
+        } else if (body.startsWith('Olá,')) {
+          body = body.replace('Olá,', `${saudacao},`);
+        } else if (body.startsWith('Olá ')) {
+          body = body.replace('Olá ', `${saudacao} `);
+        }
+
+        body = body
+          .replace(/\{\{saudacao\}\}/g, saudacao)
           .replace(/\{\{nome\}\}/g, primeironome)
           .replace(/\{\{empresa\}\}/g, empresa)
           .replace(/\{\{cargo\}\}/g, cargo);
@@ -1800,8 +1836,20 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                         const primeironome = whatsModal.name ? whatsModal.name.split(' ')[0] : 'Contato';
                         const empresa = whatsModal.company || 'sua empresa';
                         const cargo = whatsModal.role || 'decisor';
+                        const saudacao = getSaudacao();
                         
-                        const body = tpl.body
+                        // Substituição inteligente: Se o template começar com "Olá {{nome}}" ou "Olá", substitui por "Bom dia/Boa tarde {{nome}}"
+                        let body = tpl.body;
+                        if (body.startsWith('Olá {{nome}}')) {
+                          body = body.replace('Olá {{nome}}', `${saudacao} {{nome}}`);
+                        } else if (body.startsWith('Olá,')) {
+                          body = body.replace('Olá,', `${saudacao},`);
+                        } else if (body.startsWith('Olá ')) {
+                          body = body.replace('Olá ', `${saudacao} `);
+                        }
+                        
+                        body = body
+                          .replace(/\{\{saudacao\}\}/g, saudacao)
                           .replace(/\{\{nome\}\}/g, primeironome)
                           .replace(/\{\{empresa\}\}/g, empresa)
                           .replace(/\{\{cargo\}\}/g, cargo);
