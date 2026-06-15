@@ -22,7 +22,22 @@ const DEFAULT_WORKSPACES: Workspace[] = [
 const STORAGE_KEY = 'itskill_crm_full_v1';
 const uid = () => 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
 const cleanPhone = (p: string) => (p || '').replace(/\D/g, '');
-const getSaudacao = () => { const h = new Date().getHours(); if (h < 12) return 'Bom dia'; if (h < 18) return 'Boa tarde'; return 'Boa noite'; };
+const getSaudacao = () => {
+  try {
+    // Forçar a leitura do fuso horário de Brasília (America/Sao_Paulo)
+    const options = { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false } as const;
+    const formatter = new Intl.DateTimeFormat('pt-BR', options);
+    const h = parseInt(formatter.format(new Date()), 10);
+    if (h < 12) return 'Bom dia';
+    if (h < 18) return 'Boa tarde';
+    return 'Boa noite';
+  } catch {
+    const h = new Date().getHours();
+    if (h < 12) return 'Bom dia';
+    if (h < 18) return 'Boa tarde';
+    return 'Boa noite';
+  }
+};
 // Funil de vendas — 5 etapas
 const FUNNEL = [
   { id: 'prospeccao',   label: '1 · Prospecção',   short: 'Prospecção',   color: '#6366f1', bg: '#eef2ff' },
@@ -2831,10 +2846,19 @@ function FollowupView({ workspace, leads, showToast, onOpenLead, openEmailModal,
   }, [processedLeads, search]);
 
   const getSaudacao = () => {
-    const h = new Date().getHours();
-    if (h < 12) return 'Bom dia';
-    if (h < 18) return 'Boa tarde';
-    return 'Boa noite';
+    try {
+      const options = { timeZone: 'America/Sao_Paulo', hour: 'numeric', hour12: false } as const;
+      const formatter = new Intl.DateTimeFormat('pt-BR', options);
+      const h = parseInt(formatter.format(new Date()), 10);
+      if (h < 12) return 'Bom dia';
+      if (h < 18) return 'Boa tarde';
+      return 'Boa noite';
+    } catch {
+      const h = new Date().getHours();
+      if (h < 12) return 'Bom dia';
+      if (h < 18) return 'Boa tarde';
+      return 'Boa noite';
+    }
   };
 
   return (
