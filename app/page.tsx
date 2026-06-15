@@ -477,34 +477,63 @@ export default function CRM() {
     setShowEmailTemplates(false);
   };
 
-  const openWhatsModal = (lead: Lead) => {
+  // Estados adicionais para robustez do WhatsApp
+  const [loadingWhatsTemplates, setLoadingWhatsTemplates] = useState(false);
+
+  const openWhatsModal = async (lead: Lead) => {
     setWhatsModal(lead);
+    setShowWhatsTemplates(false);
+    
     // Montar mensagem padrão imediatamente (garante que o botão nunca fica vazio)
     const wsNameW = ws?.name || 'getLOG/Lottustech';
     const defaultMsg = `${getSaudacao()}, ${lead.name.split(' ')[0]}! Tudo bem?\n\nSou o Danilo Cabral, da ${wsNameW}.\n\nNossa solução de TMS já ajudou clientes a reduzir em até 20% os custos com transporte e melhorar a pontualidade de entregas.\n\nQue tal explorar como podemos gerar resultados semelhantes para a ${lead.company || 'sua empresa'}? Me diga qual o melhor horário para um bate-papo de 15 minutos. 😊`;
-    // Tentar usar template salvo (do estado ou buscar da API)
-    const tplFromState = templates.find((t: any) => t.type === 'whatsapp');
-    if (tplFromState) {
-      const body = tplFromState.body.replace(/\{\{nome\}\}/g, lead.name.split(' ')[0]).replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa').replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
-      setWhatsBody(body);
-    } else {
-      setWhatsBody(defaultMsg);
-      // Tentar buscar templates da API em background e atualizar se encontrar
-      fetch(`/api/templates?workspace=${workspace}`)
-        .then(r => r.json())
-        .then(j => {
-          if (Array.isArray(j)) {
-            setTemplates(j);
-            const tpl = j.find((t: any) => t.type === 'whatsapp');
-            if (tpl) {
-              const body = tpl.body.replace(/\{\{nome\}\}/g, lead.name.split(' ')[0]).replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa').replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
-              setWhatsBody(body);
-            }
+    
+    // 1. Definir mensagem padrão como fallback inicial
+    setWhatsBody(defaultMsg);
+
+    // 2. Sempre buscar templates atualizados da API ao abrir o modal para evitar estados defasados (stale state)
+    setLoadingWhatsTemplates(true);
+    try {
+      const r = await fetch(`/api/templates?workspace=${workspace}`);
+      if (r.ok) {
+        const j = await r.json();
+        if (Array.isArray(j)) {
+          setTemplates(j);
+          // Procurar o primeiro template de WhatsApp desse workspace
+          const tpl = j.find((t: any) => t.type === 'whatsapp');
+          if (tpl) {
+            const body = tpl.body
+              .replace(/\{\{nome\}\}/g, lead.name.split(' ')[0])
+              .replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa')
+              .replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
+            setWhatsBody(body);
           }
-        })
-        .catch(() => {});
+        }
+      } else {
+        // Se a requisição falhar, tenta usar o que já estiver em memória como fallback
+        const tplFromState = templates.find((t: any) => t.type === 'whatsapp');
+        if (tplFromState) {
+          const body = tplFromState.body
+            .replace(/\{\{nome\}\}/g, lead.name.split(' ')[0])
+            .replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa')
+            .replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
+          setWhatsBody(body);
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao carregar templates do WhatsApp:", err);
+      // Fallback para o estado local se houver erro de rede
+      const tplFromState = templates.find((t: any) => t.type === 'whatsapp');
+      if (tplFromState) {
+        const body = tplFromState.body
+          .replace(/\{\{nome\}\}/g, lead.name.split(' ')[0])
+          .replace(/\{\{empresa\}\}/g, lead.company || 'sua empresa')
+          .replace(/\{\{cargo\}\}/g, lead.role || 'decisor');
+        setWhatsBody(body);
+      }
+    } finally {
+      setLoadingWhatsTemplates(false);
     }
-    setShowWhatsTemplates(false);
   };
 
   // Enviar WhatsApp via Z-API ou abrir no WhatsApp Web
@@ -1730,19 +1759,45 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                 {!whatsModal.whatsapp && !whatsModal.phone && <span style={{ color: '#f79009', marginLeft: 8 }}>⚠ Sem número cadastrado</span>}
               </div>
               {/* Seletor de templates WhatsApp */}
-              {templates.filter(t => t.type === 'whatsapp').length > 0 && (
-                <div style={{ marginBottom: 12 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Templates</div>
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 1 }}>Templates WhatsApp</div>
+                  {loadingWhatsTemplates && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>🔄 Carregando...</span>}
+                </div>
+                {loadingWhatsTemplates ? (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 0' }}>
+                    <div className="spinner-sm" style={{ width: 14, height: 14, border: '2px solid var(--border)', borderTopColor: '#25d366', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Buscando templates atualizados do banco de dados...</span>
+                  </div>
+                ) : templates.filter(t => t.type === 'whatsapp').length > 0 ? (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {templates.filter(t => t.type === 'whatsapp').map((tpl: any) => (
-                      <button key={tpl.id} className="btn btn-sm" style={{ fontSize: 11, background: '#25d366', color: '#fff', border: 'none' }} onClick={() => {
+                      <button key={tpl.id} className="btn btn-sm" style={{ fontSize: 11, background: '#25d366', color: '#fff', border: 'none', display: 'flex', alignItems: 'center', gap: 4 }} onClick={() => {
                         const body = tpl.body.replace(/\{\{nome\}\}/g, whatsModal.name.split(' ')[0]).replace(/\{\{empresa\}\}/g, whatsModal.company || 'sua empresa').replace(/\{\{cargo\}\}/g, whatsModal.role || 'decisor');
                         setWhatsBody(body);
-                      }}>{tpl.name || 'Template'}</button>
+                      }}>
+                        <span>📋</span>
+                        {tpl.name || 'Template'}
+                      </button>
                     ))}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', background: 'var(--surface-2, #f9fafb)', padding: '8px 12px', borderRadius: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>Nenhum template de WhatsApp encontrado para este workspace.</span>
+                    <button className="btn btn-sm" style={{ fontSize: 11, padding: '2px 8px', height: 'auto' }} onClick={async () => {
+                      setLoadingWhatsTemplates(true);
+                      try {
+                        const r = await fetch(`/api/templates?workspace=${workspace}`);
+                        if (r.ok) {
+                          const j = await r.json();
+                          if (Array.isArray(j)) setTemplates(j);
+                        }
+                      } catch {}
+                      setLoadingWhatsTemplates(false);
+                    }}>🔄 Buscar novamente</button>
+                  </div>
+                )}
+              </div>
               <div className="field-group">
                 <label className="field-label">Mensagem</label>
                 <textarea className="field-input" rows={16} value={whatsBody} onChange={e => setWhatsBody(e.target.value)}

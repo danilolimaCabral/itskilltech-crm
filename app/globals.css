@@ -937,3 +937,9 @@ table.data tbody tr:hover { background: var(--surface-2); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .animate-in { animation: fadeInUp 0.25s ease forwards; }
+
+/* Animação do Spinner */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
