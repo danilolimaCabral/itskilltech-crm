@@ -154,8 +154,8 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Sempre retorna o pixel transparente
-  return new NextResponse(PIXEL, {
+  // Sempre retorna o pixel transparente (Uint8Array para compatibilidade universal com Web Streams)
+  return new NextResponse(new Uint8Array(PIXEL), {
     status: 200,
     headers: {
       'Content-Type': 'image/gif',
