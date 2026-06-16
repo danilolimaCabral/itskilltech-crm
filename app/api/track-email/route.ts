@@ -23,6 +23,10 @@ export async function GET(req: NextRequest) {
         // Só avança se ainda não foi marcado como aberto
         if (currentStatus === 'qualificacao' || currentStatus === 'prospeccao') {
           const now = new Date().toISOString();
+          
+          // Gerar data formatada no fuso de Brasília para exibição amigável na timeline
+          const options = { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' } as const;
+          const formattedDate = new Intl.DateTimeFormat('pt-BR', options).format(new Date());
 
           // Atualizar status para "email_aberto"
           let notes = lead.notes || '';
@@ -42,7 +46,7 @@ export async function GET(req: NextRequest) {
 
           timeline.push({
             type: 'email_opened',
-            label: '📬 E-mail aberto pelo destinatário',
+            label: `📬 E-mail aberto pelo destinatário em ${formattedDate}`,
             date: now,
             auto: true,
             ts: Date.now()
