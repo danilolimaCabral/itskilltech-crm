@@ -478,7 +478,11 @@ export default function GestorPage() {
                             <div style={{ display: 'flex', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
                               {lead.email && <a href={`mailto:${lead.email}`} style={{ fontSize: 11, color: '#1d4ed8', textDecoration: 'none' }}>✉ {lead.email}</a>}
                               {lead.phone && <a href={`tel:${lead.phone}`} style={{ fontSize: 11, color: '#0066ff', fontWeight: 600, textDecoration: 'none' }}>📞 {lead.phone}</a>}
-                              {lead.whatsapp && lead.whatsapp !== lead.phone && <a href={`https://wa.me/55${lead.whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, textDecoration: 'none' }}>💬 {lead.whatsapp}</a>}
+                              {lead.whatsapp && lead.whatsapp !== lead.phone && (() => {
+                                const rawNum = lead.whatsapp.replace(/\D/g,'');
+                                const cleanNum = rawNum.startsWith('55') && rawNum.length > 10 ? rawNum : `55${rawNum}`;
+                                return <a href={`https://wa.me/${cleanNum}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#16a34a', fontWeight: 600, textDecoration: 'none' }}>💬 {lead.whatsapp}</a>;
+                              })()}
                               {lead.linkedin ? (
                                 <a href={lead.linkedin.startsWith('http') ? lead.linkedin : `https://linkedin.com/in/${lead.linkedin}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#0a66c2', fontWeight: 600, textDecoration: 'none' }}>💼 LinkedIn</a>
                               ) : lead.name ? (

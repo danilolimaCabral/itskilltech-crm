@@ -21,7 +21,14 @@ const DEFAULT_WORKSPACES: Workspace[] = [
 
 const STORAGE_KEY = 'itskill_crm_full_v1';
 const uid = () => 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-const cleanPhone = (p: string) => (p || '').replace(/\D/g, '');
+const cleanPhone = (p: string) => {
+  let num = (p || '').replace(/\D/g, '');
+  // Se o número for brasileiro e começar com 55 (com mais de 10 dígitos no total), remove o 55 para deixar apenas DDD + Número
+  if (num.startsWith('55') && num.length > 10) {
+    num = num.slice(2);
+  }
+  return num;
+};
 const getSaudacao = () => {
   try {
     // Forçar a leitura do fuso horário de Brasília (America/Sao_Paulo)
@@ -626,7 +633,9 @@ export default function CRM() {
     } else {
       // Fallback: abrir no WhatsApp Web
       const msg = encodeURIComponent(message);
-      window.open(`https://wa.me/55${num}?text=${msg}`, '_blank');
+      // Garante que o link wa.me terá exatamente um prefixo 55 no início de forma limpa e segura
+      const finalNum = num.startsWith('55') && num.length > 10 ? num : `55${num}`;
+      window.open(`https://wa.me/${finalNum}?text=${msg}`, '_blank');
       // Registrar na timeline mesmo assim
       const timeline = JSON.parse(lead.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
       timeline.unshift({ type: 'whatsapp', label: `WhatsApp aberto no WhatsApp Web`, ts: Date.now() });

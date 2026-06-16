@@ -34,7 +34,19 @@ export async function POST(req: Request) {
     const props = payload.properties || payload;
     
     const email = (props.email?.value || props.email || '').trim().toLowerCase();
-    const phone = (props.mobilephone?.value || props.mobilephone || props.phone?.value || props.phone || '').trim();
+    const rawPhone = (props.mobilephone?.value || props.mobilephone || props.phone?.value || props.phone || '').trim();
+    
+    // Função de limpeza inteligente para telefone
+    const cleanPhone = (p: string) => {
+      let num = (p || '').replace(/\D/g, '');
+      // Se o número for brasileiro e começar com 55 (com mais de 10 dígitos no total), remove o 55 para deixar apenas DDD + Número
+      if (num.startsWith('55') && num.length > 10) {
+        num = num.slice(2);
+      }
+      return num;
+    };
+    
+    const phone = cleanPhone(rawPhone);
     const firstname = (props.firstname?.value || props.firstname || '').trim();
     const lastname = (props.lastname?.value || props.lastname || '').trim();
     const name = `${firstname} ${lastname}`.trim() || 'Lead HubSpot';
