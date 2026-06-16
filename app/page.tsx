@@ -689,6 +689,7 @@ export default function CRM() {
     prospeccao: leads.filter(l => normalizeStatus(l.status) === 'prospeccao').length,
     qualificacao: leads.filter(l => normalizeStatus(l.status) === 'qualificacao').length,
     email_aberto: leads.filter(l => normalizeStatus(l.status) === 'email_aberto').length,
+    interesse: leads.filter(l => normalizeStatus(l.status) === 'interesse').length,
     apresentacao: leads.filter(l => normalizeStatus(l.status) === 'apresentacao').length,
     fechamento: leads.filter(l => normalizeStatus(l.status) === 'fechamento').length,
     posvenda: leads.filter(l => normalizeStatus(l.status) === 'posvenda').length,
@@ -2739,11 +2740,13 @@ function DashboardView({ leads, workspace, wsName }: { leads: any[], workspace: 
 
   // Funil
   const funnel = [
-    { label: 'Prospecção', count: leads.filter(l => ['prospeccao','novo'].includes(l.status)).length, color: '#6b7280' },
+    { label: 'Prospecção', count: leads.filter(l => ['prospeccao','novo'].includes(l.status)).length, color: '#6366f1' },
     { label: 'Qualificação', count: leads.filter(l => l.status === 'qualificacao').length, color: '#f59e0b' },
+    { label: 'E-mail Aberto', count: leads.filter(l => l.status === 'email_aberto').length, color: '#0891b2' },
+    { label: 'Interesse', count: leads.filter(l => l.status === 'interesse').length, color: '#d946ef' },
     { label: 'Apresentação', count: leads.filter(l => l.status === 'apresentacao').length, color: '#3b82f6' },
-    { label: 'Fechamento', count: leads.filter(l => l.status === 'fechamento').length, color: '#8b5cf6' },
-    { label: 'Pós-venda', count: leads.filter(l => l.status === 'posvenda').length, color: '#10b981' },
+    { label: 'Fechamento', count: leads.filter(l => l.status === 'fechamento').length, color: '#10b981' },
+    { label: 'Pós-venda', count: leads.filter(l => l.status === 'posvenda').length, color: '#8b5cf6' },
   ];
   const funnelMax = Math.max(...funnel.map(f => f.count), 1);
 
