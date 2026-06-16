@@ -38,11 +38,12 @@ const getSaudacao = () => {
     return 'Boa noite';
   }
 };
-// Funil de vendas — 5 etapas
+// Funil de vendas — 6 etapas
 const FUNNEL = [
   { id: 'prospeccao',   label: '1 · Prospecção',   short: 'Prospecção',   color: '#6366f1', bg: '#eef2ff' },
   { id: 'qualificacao', label: '2 · Qualificação',  short: 'Qualificação', color: '#f59e0b', bg: '#fffbeb' },
   { id: 'email_aberto', label: '📬 E-mail Aberto',  short: 'E-mail Aberto', color: '#0891b2', bg: '#ecfeff' },
+  { id: 'interesse',    label: '❤️ Interesse',      short: 'Interesse',    color: '#d946ef', bg: '#fdf4ff' },
   { id: 'apresentacao', label: '3 · Apresentação',  short: 'Apresentação', color: '#3b82f6', bg: '#eff6ff' },
   { id: 'fechamento',   label: '4 · Fechamento',   short: 'Fechamento',   color: '#10b981', bg: '#ecfdf5' },
   { id: 'posvenda',     label: '5 · Pós-venda',    short: 'Pós-venda',    color: '#8b5cf6', bg: '#f5f3ff' },
@@ -50,7 +51,7 @@ const FUNNEL = [
 ];
 const FUNNEL_MAP: any = Object.fromEntries(FUNNEL.map(f => [f.id, f]));
 // Mapeamento de status legado para novo funil
-const LEGACY_MAP: any = { novo: 'prospeccao', contatado: 'qualificacao', negociacao: 'apresentacao', fechado: 'fechamento', perdido: 'perdido' };
+const LEGACY_MAP: any = { novo: 'prospeccao', contatado: 'qualificacao', interesse: 'interesse', negociacao: 'apresentacao', fechado: 'fechamento', perdido: 'perdido' };
 const normalizeStatus = (s: string) => FUNNEL_MAP[s] ? s : (LEGACY_MAP[s] || 'prospeccao');
 const statusLabel = (s: string) => FUNNEL_MAP[normalizeStatus(s)]?.short || s;
 
@@ -390,7 +391,7 @@ export default function CRM() {
     if (!callResult || !callModal) return;
     setSavingCall(true);
     const STATUS_MAP: any = {
-      atendeu_interesse: 'apresentacao',
+      atendeu_interesse: 'interesse',
       atendeu_sem_interesse: 'qualificacao',
       nao_atendeu: null,
       caixa_postal: null,
@@ -1076,6 +1077,25 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                           );
                         })()}
                         {(lead.call_count || 0) > 0 && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>📞 {lead.call_count} lig.</div>}
+                        {lead.next_call_at && (
+                          <div style={{ marginTop: 4 }}>
+                            <span style={{ 
+                              display: 'inline-flex', 
+                              alignItems: 'center', 
+                              gap: 3, 
+                              fontSize: 10, 
+                              fontWeight: 700, 
+                              color: Number(lead.next_call_at) < Date.now() ? '#dc2626' : '#d97706', 
+                              background: Number(lead.next_call_at) < Date.now() ? '#fef2f2' : '#fef3c7',
+                              border: `1px solid ${Number(lead.next_call_at) < Date.now() ? '#fecaca' : '#fde68a'}`,
+                              padding: '1px 6px',
+                              borderRadius: 4
+                            }}>
+                              📅 {Number(lead.next_call_at) < Date.now() ? 'Atrasado: ' : 'Retorno: '} 
+                              {new Date(Number(lead.next_call_at)).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td>
                         {lead.email && <div className="cell-secondary">✉ {lead.email}</div>}
@@ -1160,6 +1180,25 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                         {lead.phone && lead.phone !== lead.whatsapp && <span>📞 {lead.phone}</span>}
                         {lead.linkedin && <a href={lead.linkedin.startsWith('http') ? lead.linkedin : `https://linkedin.com/in/${lead.linkedin}`} target="_blank" rel="noopener noreferrer" style={{ color: '#0a66c2', textDecoration: 'none', fontSize: 12 }} onClick={e => e.stopPropagation()}>💼 LinkedIn</a>}
                         {lead.last_contact && <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>Último: {new Date(lead.last_contact).toLocaleDateString('pt-BR')}</span>}
+                        {lead.next_call_at && (
+                          <span style={{ 
+                            display: 'inline-flex', 
+                            alignItems: 'center', 
+                            gap: 4, 
+                            fontSize: 11, 
+                            fontWeight: 700, 
+                            color: Number(lead.next_call_at) < Date.now() ? '#dc2626' : '#f59e0b', 
+                            background: Number(lead.next_call_at) < Date.now() ? '#fef2f2' : '#fffbeb',
+                            border: `1px solid ${Number(lead.next_call_at) < Date.now() ? '#fecaca' : '#fef3c7'}`,
+                            padding: '2px 8px',
+                            borderRadius: 6,
+                            marginTop: 4,
+                            width: 'fit-content'
+                          }}>
+                            📅 {Number(lead.next_call_at) < Date.now() ? 'Atrasado: ' : 'Retorno: '} 
+                            {new Date(Number(lead.next_call_at)).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
                       </div>
                       <div className="lead-card-actions" onClick={e => e.stopPropagation()}>
                         <button className="ch-icon enrich-btn" title="Enriquecer" disabled={!!enriching} onClick={() => enrichLead(lead)}><Icon d={ICONS.enrich} /></button>
@@ -3943,7 +3982,7 @@ function LeadModal({ lead, workspace, onClose, onSave, onDelete }: any) {
   const submit = () => {
     if (!f.name?.trim()) { alert('Nome é obrigatório'); return; }
     const now = Date.now();
-    onSave({ id: f.id || uid(), workspace, name: f.name.trim(), company: f.company || '', role: f.role || '', email: f.email || '', whatsapp: cleanPhone(f.whatsapp || ''), linkedin: f.linkedin || '', phone: f.phone || '', source: f.source || '', notes: f.notes || '', status: f.status || 'novo', created_at: f.created_at || now, updated_at: now, call_count: f.call_count || 0, last_contact: f.last_contact || null });
+    onSave({ id: f.id || uid(), workspace, name: f.name.trim(), company: f.company || '', role: f.role || '', email: f.email || '', whatsapp: cleanPhone(f.whatsapp || ''), linkedin: f.linkedin || '', phone: f.phone || '', source: f.source || '', notes: f.notes || '', status: f.status || 'novo', created_at: f.created_at || now, updated_at: now, call_count: f.call_count || 0, last_contact: f.last_contact || null, next_call_at: f.next_call_at || null });
   };
 
   return (
@@ -3996,6 +4035,22 @@ function LeadModal({ lead, workspace, onClose, onSave, onDelete }: any) {
           <div className="field-row">
             <div className="field"><label className="field-label">Cargo</label><input className="field-input" value={f.role || ''} onChange={e => set('role', e.target.value)} /></div>
             <div className="field"><label className="field-label">Etapa do Funil</label><select className="field-select" value={normalizeStatus(f.status || 'prospeccao')} onChange={e => set('status', e.target.value)}>{FUNNEL.map(fu => <option key={fu.id} value={fu.id}>{fu.label}</option>)}</select></div>
+          </div>
+          <div className="field-row">
+            <div className="field" style={{ flex: 1 }}><label className="field-label" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>📅 Data de Retorno <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)' }}>(Alerta)</span></label><input className="field-input" type="datetime-local" value={f.next_call_at ? new Date(f.next_call_at - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16) : ''} onChange={e => { const val = e.target.value; set('next_call_at', val ? String(new Date(val).getTime()) : ''); }} /></div>
+            <div className="field" style={{ flex: 1 }}><label className="field-label">Atalhos de Retorno</label><div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>{[
+              { label: 'Amanhã', h: 24 },
+              { label: 'Em 2 dias', h: 48 },
+              { label: 'Em 5 dias', h: 120 }
+            ].map(shortcut => (
+              <button key={shortcut.label} type="button" className="btn btn-sm" style={{ padding: '4px 8px', fontSize: 11, height: 'auto' }} onClick={() => {
+                const targetDate = new Date();
+                targetDate.setHours(targetDate.getHours() + shortcut.h);
+                // Arredondar para hora cheia para ficar mais limpo
+                targetDate.setMinutes(0, 0, 0);
+                set('next_call_at', String(targetDate.getTime()));
+              }}>{shortcut.label}</button>
+            ))}</div></div>
           </div>
           <div className="field-row">
             <div className="field"><label className="field-label">E-mail</label><input className="field-input" type="email" value={f.email || ''} onChange={e => set('email', e.target.value)} /></div>
