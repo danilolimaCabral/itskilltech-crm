@@ -7,12 +7,12 @@ const uid = () => 'call_' + Date.now() + '_' + Math.random().toString(36).slice(
 
 // Mapeamento de resultado da ligação para próximo status do lead
 const RESULT_TO_STATUS: Record<string, string> = {
-  'atendeu_interesse': 'negociacao',
-  'atendeu_sem_interesse': 'contatado',
-  'atendeu_retornar': 'contatado',
-  'nao_atendeu': 'novo',
-  'caixa_postal': 'novo',
-  'numero_errado': 'novo',
+  'atendeu_interesse': 'interesse',
+  'atendeu_sem_interesse': 'qualificacao',
+  'atendeu_retornar': 'qualificacao',
+  'nao_atendeu': 'prospeccao',
+  'caixa_postal': 'prospeccao',
+  'numero_errado': 'prospeccao',
 };
 
 export async function GET(req: Request) {

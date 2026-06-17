@@ -315,6 +315,93 @@ export default function GestorPage() {
               </div>
             )}
 
+            {/* ── SEÇÃO ESTRATÉGICA: INTERESSADOS E PLANEJAMENTO DE LIGAÇÕES ── */}
+            <div className="gestor-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 24 }}>
+              {/* Painel de Interessados (Leads Quentes) */}
+              <div className="gestor-card" style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e8edf2', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <span style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    🔥 Leads Interessados ({leads.filter(l => ['interesse', 'Apresentação', 'Apresentação Realizada', 'Qualificação'].includes(l.status)).length})
+                  </span>
+                  <span style={{ fontSize: 11, background: '#fee2e2', color: '#dc2626', borderRadius: 20, padding: '2px 8px', fontWeight: 700 }}>Oportunidades</span>
+                </div>
+                <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>Estes são os leads quentes que demonstraram interesse ou estão em fase de apresentação.</div>
+                <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+                  {leads.filter(l => ['interesse', 'Apresentação', 'Apresentação Realizada', 'Qualificação'].includes(l.status)).length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8', fontSize: 13 }}>Nenhum lead qualificado ou interessado no momento.</div>
+                  ) : (
+                    leads
+                      .filter(l => ['interesse', 'Apresentação', 'Apresentação Realizada', 'Qualificação'].includes(l.status))
+                      .slice(0, 50)
+                      .map((l: any) => {
+                        const statusColors: Record<string, { bg: string; color: string; label: string }> = {
+                          'interesse': { bg: '#dcfce7', color: '#16a34a', label: '🔥 Interesse' },
+                          'Apresentação': { bg: '#eff6ff', color: '#1d4ed8', label: '📅 Apresentação' },
+                          'Apresentação Realizada': { bg: '#f5f3ff', color: '#7c3aed', label: '✨ Reunião Feita' },
+                          'Qualificação': { bg: '#fef9c3', color: '#ca8a04', label: '⚡ Qualificação' },
+                        };
+                        const c = statusColors[l.status] || { bg: '#f1f5f9', color: '#475569', label: l.status };
+                        return (
+                          <div key={l.id} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, fontSize: 13, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l.name || '—'}</div>
+                              <div style={{ fontSize: 11, color: '#0066ff', fontWeight: 600 }}>{l.company}</div>
+                              <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>{l.role}</div>
+                            </div>
+                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                              <span style={{ fontSize: 10, background: c.bg, color: c.color, borderRadius: 20, padding: '2px 8px', fontWeight: 700, display: 'inline-block', marginBottom: 4 }}>{c.label}</span>
+                              {l.phone && <div style={{ fontSize: 10, color: '#475569', fontWeight: 500 }}>📞 {l.phone}</div>}
+                            </div>
+                          </div>
+                        );
+                      })
+                  )}
+                </div>
+              </div>
+
+              {/* Planejamento de Ligações Futuras (Agenda) */}
+              <div className="gestor-card" style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: '1px solid #e8edf2', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <span style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    📅 Planejamento de Ligações Futuras ({leads.filter(l => l.next_call_at).length})
+                  </span>
+                  <span style={{ fontSize: 11, background: '#eff6ff', color: '#1d4ed8', borderRadius: 20, padding: '2px 8px', fontWeight: 700 }}>Agenda</span>
+                </div>
+                <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>Acompanhe o cronograma de retornos e ligações agendadas para garantir que nenhum lead seja esquecido.</div>
+                <div style={{ maxHeight: 300, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+                  {leads.filter(l => l.next_call_at).length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8', fontSize: 13 }}>Nenhuma ligação futura agendada.</div>
+                  ) : (
+                    leads
+                      .filter(l => l.next_call_at)
+                      .sort((a, b) => (a.next_call_at || 0) - (b.next_call_at || 0))
+                      .map((l: any) => {
+                        const nextCall = new Date(l.next_call_at);
+                        const isOverdue = nextCall < new Date() && nextCall.toISOString().slice(0, 10) !== new Date().toISOString().slice(0, 10);
+                        const isToday = nextCall.toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10);
+                        return (
+                          <div key={l.id} style={{ background: isOverdue ? '#fff5f5' : isToday ? '#fffbeb' : '#f8fafc', border: `1px solid ${isOverdue ? '#fca5a5' : isToday ? '#fde047' : '#e2e8f0'}`, borderRadius: 10, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, fontSize: 13, color: '#1e293b' }}>{l.name || '—'}</div>
+                              <div style={{ fontSize: 11, color: '#0066ff', fontWeight: 600 }}>{l.company}</div>
+                              {l.gestor_note && <div style={{ fontSize: 11, color: '#b45309', background: '#fef9c3', borderRadius: 4, padding: '2px 6px', marginTop: 4, display: 'inline-block' }}>📌 {l.gestor_note}</div>}
+                            </div>
+                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, color: isOverdue ? '#dc2626' : isToday ? '#ca8a04' : '#16a34a' }}>
+                                {isOverdue ? '⚠️ Atrasado' : isToday ? '🔔 Hoje' : nextCall.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                              </div>
+                              <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>
+                                {nextCall.toLocaleDateString('pt-BR', { weekday: 'short' })}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* Metas + Histórico */}
             <div className="gestor-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 20, marginBottom: 24 }}>
               {/* Metas */}
