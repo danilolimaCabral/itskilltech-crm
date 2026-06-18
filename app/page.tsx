@@ -1078,9 +1078,31 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                       <td onClick={e => e.stopPropagation()} style={{paddingRight:4, width:32}}>
                         <input type="checkbox" checked={selectedIds.has(lead.id)} onChange={e => { e.stopPropagation(); setSelectedIds(prev => { const n = new Set(prev); if (e.target.checked) n.add(lead.id); else n.delete(lead.id); return n; }); }} style={{width:15,height:15,cursor:'pointer',accentColor:'#0066ff'}} />
                       </td>
-                      <td>
-                        <div className="cell-primary">{lead.name}</div>
-                        <div className="cell-secondary">{lead.company || '—'}{lead.role ? ` · ${lead.role}` : ''}</div>
+	                      <td>
+	                        <div className="cell-primary" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+	                          <span>{lead.name}</span>
+	                          {(() => {
+	                            const leadQuote = quotes.find((q: any) => q.lead_id === lead.id);
+	                            if (!leadQuote) return null;
+	                            return (
+	                              <span style={{ 
+	                                fontSize: 10, 
+	                                fontWeight: 800, 
+	                                color: '#ec4899', 
+	                                background: '#fdf2f8', 
+	                                border: '1px solid #fbcfe8', 
+	                                padding: '1px 6px', 
+	                                borderRadius: 6,
+	                                display: 'inline-flex',
+	                                alignItems: 'center',
+	                                gap: 3
+	                              }} title={leadQuote.notes || 'Proposta comercial'}>
+	                                📝 {Number(leadQuote.total).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
+	                              </span>
+	                            );
+	                          })()}
+	                        </div>
+	                        <div className="cell-secondary">{lead.company || '—'}{lead.role ? ` · ${lead.role}` : ''}</div>
                         {(() => {
                           // Busca o evento de contato mais recente (whatsapp, email, call) na timeline
                           let lastEvent: { type: string; ts: number } | null = null;
@@ -1198,7 +1220,28 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                           <input type="checkbox" checked={selectedIds.has(lead.id)} onChange={e => { const s = new Set(selectedIds); e.target.checked ? s.add(lead.id) : s.delete(lead.id); setSelectedIds(s); }} style={{ width: 16, height: 16, cursor: 'pointer' }} />
                         </div>
                         <div className="lead-card-info">
-                          <div className="lead-card-name">{lead.name}</div>
+                          <div className="lead-card-name" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            <span>{lead.name}</span>
+                            {(() => {
+                              const leadQuote = quotes.find((q: any) => q.lead_id === lead.id);
+                              if (!leadQuote) return null;
+                              return (
+                                <span style={{ 
+                                  fontSize: 9, 
+                                  fontWeight: 800, 
+                                  color: '#ec4899', 
+                                  background: '#fdf2f8', 
+                                  border: '1px solid #fbcfe8', 
+                                  padding: '0px 4px', 
+                                  borderRadius: 4,
+                                  display: 'inline-flex',
+                                  alignItems: 'center'
+                                }}>
+                                  📝 {Number(leadQuote.total).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
+                                </span>
+                              );
+                            })()}
+                          </div>
                           <div className="lead-card-company">{lead.company}{lead.role ? ` · ${lead.role}` : ''}</div>
                         </div>
                         {f && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: f.bg, color: f.color, border: `1px solid ${f.color}33`, whiteSpace: 'nowrap', flexShrink: 0 }}><span style={{ width: 5, height: 5, borderRadius: '50%', background: f.color }} />{f.short}</span>}
@@ -2568,7 +2611,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                     const res = await fetch('/api/quotes', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ quote: quotePayload })
+                      body: JSON.stringify(quotePayload)
                     });
                     const data = await res.json();
 
