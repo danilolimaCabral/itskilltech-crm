@@ -52,8 +52,9 @@ const FUNNEL = [
   { id: 'email_aberto', label: '📬 E-mail Aberto',  short: 'E-mail Aberto', color: '#0891b2', bg: '#ecfeff' },
   { id: 'interesse',    label: '❤️ Interesse',      short: 'Interesse',    color: '#d946ef', bg: '#fdf4ff' },
   { id: 'apresentacao', label: '3 · Apresentação',  short: 'Apresentação', color: '#3b82f6', bg: '#eff6ff' },
-  { id: 'fechamento',   label: '4 · Fechamento',   short: 'Fechamento',   color: '#10b981', bg: '#ecfdf5' },
-  { id: 'posvenda',     label: '5 · Pós-venda',    short: 'Pós-venda',    color: '#8b5cf6', bg: '#f5f3ff' },
+  { id: 'proposta',     label: '4 · Proposta Enviada', short: 'Proposta',    color: '#ec4899', bg: '#fdf2f8' },
+  { id: 'fechamento',   label: '5 · Fechamento',   short: 'Fechamento',   color: '#10b981', bg: '#ecfdf5' },
+  { id: 'posvenda',     label: '6 · Pós-venda',    short: 'Pós-venda',    color: '#8b5cf6', bg: '#f5f3ff' },
   { id: 'perdido',      label: '❌ Perdido',        short: 'Perdido',       color: '#ef4444', bg: '#fef2f2' },
 ];
 const FUNNEL_MAP: any = Object.fromEntries(FUNNEL.map(f => [f.id, f]));
@@ -147,7 +148,14 @@ export default function CRM() {
   const [leadPanel, setLeadPanel] = useState<Lead | null>(null);
   const [panelAnalysis, setPanelAnalysis] = useState<any>(null);
   const [analyzingLead, setAnalyzingLead] = useState(false);
-  const [panelTab, setPanelTab] = useState<'info' | 'timeline' | 'analysis'>('info');
+  const [panelTab, setPanelTab] = useState<'info' | 'timeline' | 'analysis' | 'proposta'>('info');
+  // Propostas e Anexos Comerciais
+  const [quoteModal, setQuoteModal] = useState<Lead | null>(null);
+  const [quoteAttachmentUrl, setQuoteAttachmentUrl] = useState('');
+  const [quoteValue, setQuoteValue] = useState('');
+  const [quoteNotes, setQuoteNotes] = useState('');
+  const [savingQuote, setSavingQuote] = useState(false);
+  const [quotes, setQuotes] = useState<any[]>([]);
   // Seleção em massa
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkSending, setBulkSending] = useState(false);
@@ -340,7 +348,18 @@ export default function CRM() {
     }
   }, [workspace, hasDb]);
 
-  useEffect(() => { if (hasDb !== null) loadLeads(); }, [hasDb, workspace, loadLeads]);
+  const loadQuotes = useCallback(async () => {
+    if (hasDb) {
+      try { const r = await fetch(`/api/quotes?workspace=${workspace}`); const j = await r.json(); setQuotes(j.quotes || []); } catch { setQuotes([]); }
+    }
+  }, [workspace, hasDb]);
+
+  useEffect(() => { 
+    if (hasDb !== null) {
+      loadLeads();
+      loadQuotes();
+    }
+  }, [hasDb, workspace, loadLeads, loadQuotes]);
 
   const persistLocal = (next: Lead[]) => {
     try { const raw = localStorage.getItem(STORAGE_KEY); const all = raw ? JSON.parse(raw) : {}; all[workspace] = next; localStorage.setItem(STORAGE_KEY, JSON.stringify(all)); } catch {}
@@ -1305,7 +1324,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
             </div>
             {/* Abas do painel */}
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
-              {([['info','Dados'],['timeline','Histórico'],['analysis','Análise IA']] as const).map(([t, lbl]) => (
+              {([['info','Dados'],['timeline','Histórico'],['analysis','Análise IA'],['proposta','Proposta']] as const).map(([t, lbl]) => (
                 <button key={t} onClick={() => { setPanelTab(t); if (t === 'analysis' && !panelAnalysis && !analyzingLead) analyzeCompany(leadPanel); }}
                   style={{ flex: 1, padding: '10px 4px', fontSize: 12, fontWeight: panelTab === t ? 700 : 400, borderBottom: panelTab === t ? '2px solid var(--primary)' : '2px solid transparent', background: 'none', cursor: 'pointer', color: panelTab === t ? 'var(--primary)' : 'var(--text-muted)', transition: 'all .15s' }}>
                   {lbl}
@@ -1346,6 +1365,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                     {(leadPanel.whatsapp || leadPanel.phone) && <button className="btn btn-sm" style={{ background: '#25d366', color: '#fff', border: 'none' }} onClick={() => { const num = cleanPhone(leadPanel.whatsapp || leadPanel.phone || ''); if (num) window.open(`https://wa.me/${num}`, '_blank'); }}><Icon d={ICONS.whatsapp} />WhatsApp</button>}
                     {leadPanel.email && <button className="btn btn-sm" onClick={() => openEmailModal(leadPanel)}><Icon d={ICONS.email} />E-mail</button>}
                     <button className="btn btn-sm" onClick={() => { setCallModal(leadPanel); setCallResult(''); setCallNotes(`${getSaudacao()}, ${leadPanel.name.split(' ')[0]}! `); }}><Icon d={ICONS.phone} />Registrar ligação</button>
+                    <button className="btn btn-sm btn-primary" style={{ background: '#ec4899', color: '#fff', border: 'none' }} onClick={() => { setQuoteModal(leadPanel); setQuoteAttachmentUrl(''); setQuoteValue(''); setQuoteNotes(''); }}><Icon d={ICONS.template} />Anexar Proposta</button>
                   </div>
                 </div>
               )}
@@ -1433,6 +1453,54 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                   </div>
                 )
               )}
+              {panelTab === 'proposta' && (() => {
+                const leadQuotes = quotes.filter((q: any) => q.lead_id === leadPanel.id);
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Propostas Enviadas ({leadQuotes.length})</div>
+                      <button className="btn btn-sm" style={{ background: '#ec4899', color: '#fff', border: 'none', padding: '4px 10px', fontSize: 11 }}
+                        onClick={() => { setQuoteModal(leadPanel); setQuoteAttachmentUrl(''); setQuoteValue(''); setQuoteNotes(''); }}>
+                        + Anexar Nova
+                      </button>
+                    </div>
+                    {leadQuotes.length === 0 ? (
+                      <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)', border: '1px dashed var(--border)', borderRadius: 10, fontSize: 13 }}>
+                        Nenhuma proposta comercial anexada a este lead ainda.<br/>
+                        <button className="btn btn-sm" style={{ marginTop: 10, background: '#ec4899', color: '#fff', border: 'none' }} onClick={() => { setQuoteModal(leadPanel); setQuoteAttachmentUrl(''); setQuoteValue(''); setQuoteNotes(''); }}>Anexar Proposta Comercial</button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        {leadQuotes.map((q: any) => (
+                          <div key={q.id} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                              <div>
+                                <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 4, background: q.status === 'enviado' ? '#ecfdf5' : '#f3f4f6', color: q.status === 'enviado' ? '#10b981' : '#4b5563', marginRight: 8 }}>
+                                  {q.status}
+                                </span>
+                                <strong style={{ fontSize: 14, color: '#ec4899' }}>
+                                  {q.total ? Number(q.total).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Valor sob consulta'}
+                                </strong>
+                              </div>
+                              <button className="btn btn-sm" style={{ color: '#ef4444', borderColor: '#ef4444', padding: '2px 6px', fontSize: 11 }} onClick={async () => { if (confirm('Excluir esta proposta permanente?')) { await fetch(`/api/quotes?id=${q.id}`, { method: 'DELETE' }); loadQuotes(); } }}>Excluir</button>
+                            </div>
+                            {q.notes && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8, whiteSpace: 'pre-wrap' }}>{q.notes}</div>}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'var(--text-muted)' }}>
+                              <span>Enviada em: {q.sent_at ? new Date(Number(q.sent_at)).toLocaleDateString('pt-BR') : new Date(q.created_at).toLocaleDateString('pt-BR')}</span>
+                              {q.attachment_url && (
+                                <a href={q.attachment_url} target="_blank" rel="noopener noreferrer"
+                                  style={{ fontSize: 12, color: '#ec4899', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4, textDecoration: 'underline' }}>
+                                  📂 Ver Proposta (Anexo)
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -2419,6 +2487,144 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
           <span>Agenda</span>
         </button>
       </nav>
+
+      {/* MODAL DE PROPOSTA COMERCIAL (ANEXAR PROPOSTA) */}
+      {quoteModal && (
+        <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) setQuoteModal(null); }}>
+          <div className="modal" style={{ maxWidth: 480 }}>
+            <div className="modal-header">
+              <span className="modal-title" style={{ color: '#ec4899' }}>
+                📝 Anexar Proposta Comercial — {quoteModal.name}
+              </span>
+              <button className="modal-close" onClick={() => setQuoteModal(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>{quoteModal.company}{quoteModal.role ? ` · ${quoteModal.role}` : ''}</div>
+              
+              <div className="field">
+                <label className="field-label">Valor Total da Proposta (R$)</label>
+                <input
+                  className="field-input"
+                  type="number"
+                  placeholder="Ex: 15000.00"
+                  value={quoteValue}
+                  onChange={e => setQuoteValue(e.target.value)}
+                  style={{ fontWeight: 700, fontSize: 16, color: '#ec4899' }}
+                />
+              </div>
+
+              <div className="field">
+                <label className="field-label">🔗 Link Público do Documento da Proposta (Anexo)</label>
+                <input
+                  className="field-input"
+                  type="url"
+                  placeholder="Ex: https://drive.google.com/... ou link do PDF"
+                  value={quoteAttachmentUrl}
+                  onChange={e => setQuoteAttachmentUrl(e.target.value)}
+                />
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', display: 'block', marginTop: 4 }}>
+                  Cole o link público do Google Drive, OneDrive, Dropbox ou PDF da proposta para ficar anexado de forma permanente no cadastro do cliente.
+                </span>
+              </div>
+
+              <div className="field">
+                <label className="field-label">Observações / Escopo da Proposta</label>
+                <textarea
+                  className="field-input"
+                  rows={4}
+                  placeholder="Ex: Escopo de implantação de TMS + Integração de ERP SAP. Pagamento em 3 parcelas..."
+                  value={quoteNotes}
+                  onChange={e => setQuoteNotes(e.target.value)}
+                  style={{ resize: 'vertical', minHeight: 100 }}
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn" onClick={() => setQuoteModal(null)}>Cancelar</button>
+              <button
+                className="btn btn-primary"
+                style={{ background: '#ec4899', borderColor: '#ec4899' }}
+                disabled={savingQuote || !quoteValue.trim()}
+                onClick={async () => {
+                  setSavingQuote(true);
+                  try {
+                    const valueNum = parseFloat(quoteValue) || 0;
+                    
+                    // Salvar proposta comercial no banco de dados via API
+                    const quotePayload = {
+                      lead_id: quoteModal.id,
+                      lead_name: quoteModal.name,
+                      lead_company: quoteModal.company || '',
+                      lead_email: quoteModal.email || '',
+                      lead_phone: quoteModal.phone || '',
+                      workspace,
+                      total: valueNum,
+                      notes: quoteNotes,
+                      attachment_url: quoteAttachmentUrl,
+                      status: 'enviado',
+                      sent_at: Date.now()
+                    };
+
+                    const res = await fetch('/api/quotes', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ quote: quotePayload })
+                    });
+                    const data = await res.json();
+
+                    if (data.ok) {
+                      // Registrar na timeline do lead de forma nativa
+                      const timeline = JSON.parse(quoteModal.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+                      const valorFormatado = valueNum.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+                      
+                      timeline.unshift({
+                        type: 'quote',
+                        label: `Proposta comercial anexada: ${valorFormatado}${quoteAttachmentUrl ? ' · [Ver Proposta](' + quoteAttachmentUrl + ')' : ''}`,
+                        ts: Date.now()
+                      });
+                      if (quoteNotes) {
+                        timeline.unshift({
+                          type: 'note',
+                          label: `Detalhes da Proposta: ${quoteNotes}`,
+                          ts: Date.now()
+                        });
+                      }
+
+                      const notesClean = (quoteModal.notes || '').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
+                      
+                      // Avança automaticamente o lead para o status 'proposta' (Proposta Enviada)
+                      await saveLead({
+                        ...quoteModal,
+                        status: 'proposta',
+                        updated_at: Date.now(),
+                        notes: notesClean + `\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]`
+                      });
+
+                      showToast(`✓ Proposta de ${valorFormatado} anexada e lead avançado para Proposta Enviada!`);
+                      setQuoteModal(null);
+                      loadQuotes(); // Recarrega propostas
+                      if (leadPanel && quoteModal.id === leadPanel.id) {
+                        setLeadPanel({
+                          ...quoteModal,
+                          status: 'proposta',
+                          notes: notesClean + `\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]`
+                        });
+                      }
+                    } else {
+                      alert('Erro ao salvar proposta.');
+                    }
+                  } catch {
+                    alert('Erro ao conectar com o servidor.');
+                  }
+                  setSavingQuote(false);
+                }}
+              >
+                {savingQuote ? 'Anexando...' : '📝 Anexar Proposta'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className={`toast${toast ? ' show' : ''}`}>{toast}</div>
     </div>

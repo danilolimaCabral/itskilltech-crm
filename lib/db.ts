@@ -97,10 +97,12 @@ export async function initDatabase() {
       notes TEXT,
       status TEXT DEFAULT 'rascunho',
       sent_at BIGINT,
+      attachment_url TEXT DEFAULT '',
       created_at BIGINT,
       updated_at BIGINT
     );
   `;
+  try { await sql`ALTER TABLE quotes ADD COLUMN IF NOT EXISTS attachment_url TEXT DEFAULT '';`; } catch {}
 
   // Tabela de templates de mensagem
   await sql`
@@ -211,14 +213,14 @@ export async function getQuotes(workspace: string) {
 export async function upsertQuote(quote: any) {
   if (!hasDatabase) return null;
   await sql`
-    INSERT INTO quotes (id, workspace, lead_id, lead_name, lead_company, lead_email, lead_phone, items, subtotal, discount, total, notes, status, sent_at, created_at, updated_at)
-    VALUES (${quote.id}, ${quote.workspace}, ${quote.lead_id || null}, ${quote.lead_name || ''}, ${quote.lead_company || ''}, ${quote.lead_email || ''}, ${quote.lead_phone || ''}, ${JSON.stringify(quote.items || [])}, ${quote.subtotal || 0}, ${quote.discount || 0}, ${quote.total || 0}, ${quote.notes || ''}, ${quote.status || 'rascunho'}, ${quote.sent_at || null}, ${quote.created_at}, ${quote.updated_at})
+    INSERT INTO quotes (id, workspace, lead_id, lead_name, lead_company, lead_email, lead_phone, items, subtotal, discount, total, notes, status, sent_at, attachment_url, created_at, updated_at)
+    VALUES (${quote.id}, ${quote.workspace}, ${quote.lead_id || null}, ${quote.lead_name || ''}, ${quote.lead_company || ''}, ${quote.lead_email || ''}, ${quote.lead_phone || ''}, ${JSON.stringify(quote.items || [])}, ${quote.subtotal || 0}, ${quote.discount || 0}, ${quote.total || 0}, ${quote.notes || ''}, ${quote.status || 'rascunho'}, ${quote.sent_at || null}, ${quote.attachment_url || ''}, ${quote.created_at}, ${quote.updated_at})
     ON CONFLICT (id) DO UPDATE SET
       lead_name = EXCLUDED.lead_name, lead_company = EXCLUDED.lead_company,
       lead_email = EXCLUDED.lead_email, lead_phone = EXCLUDED.lead_phone,
       items = EXCLUDED.items, subtotal = EXCLUDED.subtotal, discount = EXCLUDED.discount,
       total = EXCLUDED.total, notes = EXCLUDED.notes, status = EXCLUDED.status,
-      sent_at = EXCLUDED.sent_at, updated_at = EXCLUDED.updated_at;
+      sent_at = EXCLUDED.sent_at, attachment_url = EXCLUDED.attachment_url, updated_at = EXCLUDED.updated_at;
   `;
   return quote;
 }

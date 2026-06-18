@@ -35,6 +35,7 @@ export async function POST(req: Request) {
       notes: body.notes || '',
       status: body.status || 'rascunho',
       sent_at: body.sent_at || null,
+      attachment_url: body.attachment_url || '',
       created_at: body.created_at || now,
       updated_at: now,
     };
