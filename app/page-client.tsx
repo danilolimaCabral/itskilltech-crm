@@ -873,7 +873,7 @@ export default function CRM() {
             <>
               <div className="page-header">
                 <div><div className="page-title">Leads</div><div className="page-description">{ws?.name} · {leads.length} contato(s)</div></div>
-                <div className="page-actions mobile-actions">
+                <div className="page-actions mobile-actions desktop-only-flex">
                   <button className="btn" style={{background:'#f59e0b',color:'#fff',border:'none',marginRight:8,fontSize:12,padding:'6px 12px',borderRadius:6,cursor:'pointer',opacity:enrichingAll?0.6:1}} disabled={enrichingAll} onClick={async () => {
                     const toEnrich = leads.filter(l => !l.phone && l.company);
                     if (!toEnrich.length) { showToast('Todos os leads já têm telefone!'); return; }
@@ -930,8 +930,8 @@ export default function CRM() {
                   <button className="btn btn-primary" onClick={() => { setEditing(null); setModalOpen(true); }}><Icon d={ICONS.plus} />Novo lead</button>
                 </div>
               </div>
-              {/* Funil de vendas — 5 etapas */}
-              <div className="stats">
+              {/* Funil de vendas — 5 etapas (Oculto no mobile para focar na lista de leads) */}
+              <div className="stats desktop-only-flex">
                 <div className="stat stat-blue" style={{ cursor: 'pointer', '--stat-accent': statusFilter === 'all' ? '#475467' : 'transparent' } as any} onClick={() => setStatusFilter('all')}>
                   <div className="stat-label"><span className="stat-dot" style={{ background: '#475467' }} />Total</div>
                   <div className="stat-value">{stats.total}</div>
@@ -947,8 +947,8 @@ export default function CRM() {
                   </div>
                 ))}
               </div>
-              {/* Prospecção de hoje com metas */}
-              <div style={{ margin: '8px 0', padding: '16px 18px', background: 'var(--surface)', borderRadius: 14, border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
+              {/* Prospecção de hoje com metas (Oculto no mobile na aba de leads para focar na lista de leads) */}
+              <div className="desktop-only-block" style={{ margin: '8px 0', padding: '16px 18px', background: 'var(--surface)', borderRadius: 14, border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>📊 Prospecção de Hoje</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -987,9 +987,9 @@ export default function CRM() {
                   })}
                 </div>
               </div>
-              {/* Painel de alertas de retorno */}
+              {/* Painel de alertas de retorno (Oculto no mobile na aba de leads para focar na lista de leads) */}
               {pendingAlerts.length > 0 && (
-                <div style={{ margin: '8px 0', padding: '12px 14px', background: overdueAlerts.length > 0 ? '#fff7ed' : '#fffbeb', borderRadius: 10, border: `1px solid ${overdueAlerts.length > 0 ? '#f97316' : '#f59e0b'}55` }}>
+                <div className="desktop-only-block" style={{ margin: '8px 0', padding: '12px 14px', background: overdueAlerts.length > 0 ? '#fff7ed' : '#fffbeb', borderRadius: 10, border: `1px solid ${overdueAlerts.length > 0 ? '#f97316' : '#f59e0b'}55` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <span style={{ fontSize: 14 }}>🔔</span>
                     <span style={{ fontSize: 12, fontWeight: 700, color: overdueAlerts.length > 0 ? '#c2410c' : '#b45309' }}>

@@ -451,6 +451,9 @@ table.data tbody tr:hover { background: var(--surface-2); }
 
 .mobile-only-btn { display: none !important; }
 .desktop-only { display: block !important; }
+.desktop-only-block { display: block !important; }
+.desktop-only-flex { display: flex !important; }
+.desktop-only-grid { display: grid !important; }
 
 .dashboard-grid-row {
   display: grid !important;
@@ -998,6 +1001,15 @@ table.data tbody tr:hover { background: var(--surface-2); }
     display: inline-flex !important;
   }
   .desktop-only {
+    display: none !important;
+  }
+  .desktop-only-block {
+    display: none !important;
+  }
+  .desktop-only-flex {
+    display: none !important;
+  }
+  .desktop-only-grid {
     display: none !important;
   }
   .page-actions { width: 100%; display: flex; flex-wrap: wrap; gap: 6px; }
