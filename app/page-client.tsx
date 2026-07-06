@@ -114,6 +114,7 @@ export default function CRM() {
   const [stateFilter, setStateFilter] = useState('all');
   const [industryFilter, setIndustryFilter] = useState('all');
   const [filterNotContacted2d, setFilterNotContacted2d] = useState(false);
+  const [filterEmailProspectedWithPhone, setFilterEmailProspectedWithPhone] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [wsListOpen, setWsListOpen] = useState(false);
   const [wsPassModal, setWsPassModal] = useState<string | null>(null); // workspace id a trocar
@@ -749,6 +750,20 @@ export default function CRM() {
         if (recentContact) return false; // já foi contatado, não mostra
       } catch { /* sem timeline, mostra */ }
     }
+    if (filterEmailProspectedWithPhone) {
+      // Verifica se possui telefone/whatsapp cadastrado
+      const hasPhone = !!(l.phone || l.whatsapp);
+      if (!hasPhone) return false;
+
+      // Verifica se possui o evento 'email' na timeline (notes)
+      try {
+        const tl = JSON.parse(l.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+        const hasEmailSent = tl.some((e: any) => e.type === 'email');
+        if (!hasEmailSent) return false;
+      } catch {
+        return false; // se der erro ou não tiver timeline, descarta
+      }
+    }
     return true;
   });
   const stats = {
@@ -1078,7 +1093,7 @@ export default function CRM() {
                     alignItems: 'center', 
                     gap: 6, 
                     fontSize: 13, 
-                    padding: '8px 14px', 
+                    padding: '8px 12px', 
                     borderRadius: 8, 
                     fontWeight: 600,
                     background: 'var(--surface-2)',
@@ -1087,7 +1102,7 @@ export default function CRM() {
                   }}
                   className="btn mobile-only-btn"
                 >
-                  ⚙️ Filtros {(companyFilter !== 'all' ? 1 : 0) + (stateFilter !== 'all' ? 1 : 0) + (industryFilter !== 'all' ? 1 : 0) + (filterNotContacted2d ? 1 : 0) > 0 ? `(${(companyFilter !== 'all' ? 1 : 0) + (stateFilter !== 'all' ? 1 : 0) + (industryFilter !== 'all' ? 1 : 0) + (filterNotContacted2d ? 1 : 0)})` : ''}
+                  ⚙️ Filtros {(companyFilter !== 'all' ? 1 : 0) + (stateFilter !== 'all' ? 1 : 0) + (industryFilter !== 'all' ? 1 : 0) + (filterNotContacted2d ? 1 : 0) + (filterEmailProspectedWithPhone ? 1 : 0) > 0 ? `(${(companyFilter !== 'all' ? 1 : 0) + (stateFilter !== 'all' ? 1 : 0) + (industryFilter !== 'all' ? 1 : 0) + (filterNotContacted2d ? 1 : 0) + (filterEmailProspectedWithPhone ? 1 : 0)})` : ''}
                 </button>
 
                 {/* Filtros em Desktop (Ocultos no mobile via classe .desktop-filters) */}
@@ -1182,6 +1197,14 @@ export default function CRM() {
                     style={{ fontSize: 11, padding: '5px 10px', flexShrink: 0, background: filterNotContacted2d ? '#f97316' : 'var(--bg-card)', color: filterNotContacted2d ? '#fff' : 'var(--text-muted)', border: filterNotContacted2d ? '1px solid #f97316' : '1px solid var(--border)', borderRadius: 8, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
                     title="Mostrar apenas leads sem contato por WhatsApp ou E-mail nos últimos 2 dias">
                     🕒 Sem contato +2d
+                  </button>
+
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => setFilterEmailProspectedWithPhone(v => !v)}
+                    style={{ fontSize: 11, padding: '5px 10px', flexShrink: 0, background: filterEmailProspectedWithPhone ? '#0066ff' : 'var(--bg-card)', color: filterEmailProspectedWithPhone ? '#fff' : 'var(--text-muted)', border: filterEmailProspectedWithPhone ? '1px solid #0066ff' : '1px solid var(--border)', borderRadius: 8, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    title="Mostrar apenas leads que já foram prospectados por e-mail e possuem telefone para ligar agora">
+                    📞 Ligar p/ E-mail
                   </button>
                 </div>
 
@@ -1653,6 +1676,26 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                 }}
               >
                 🕒 {filterNotContacted2d ? 'Filtro Ativo: Sem contato +2d' : 'Mostrar sem contato há +2 dias'}
+              </button>
+            </div>
+
+            <div className="mobile-filters-row" style={{ marginTop: 8 }}>
+              <button
+                className="btn"
+                onClick={() => setFilterEmailProspectedWithPhone(v => !v)}
+                style={{ 
+                  width: '100%', 
+                  padding: '12px', 
+                  borderRadius: 10, 
+                  background: filterEmailProspectedWithPhone ? '#0066ff' : 'var(--surface-2)', 
+                  color: filterEmailProspectedWithPhone ? '#fff' : 'var(--text-main)', 
+                  border: filterEmailProspectedWithPhone ? '1px solid #0066ff' : '1px solid var(--border)',
+                  fontWeight: 700,
+                  fontSize: 14,
+                  cursor: 'pointer'
+                }}
+              >
+                📞 {filterEmailProspectedWithPhone ? 'Filtro Ativo: Ligar p/ E-mail' : 'Ligar para Prospectados por E-mail'}
               </button>
             </div>
 
