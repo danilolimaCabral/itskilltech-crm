@@ -66,6 +66,8 @@ export async function initDatabase() {
   try { await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS last_contact BIGINT;`; } catch {}
   try { await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS next_call_at BIGINT;`; } catch {}
   try { await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS gestor_note TEXT;`; } catch {}
+  try { await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS state TEXT;`; } catch {}
+  try { await sql`ALTER TABLE leads ADD COLUMN IF NOT EXISTS industry TEXT;`; } catch {}
 
   // Tabela de histórico de ligações
   await sql`
@@ -157,7 +159,7 @@ export async function deleteWorkspace(id: string) {
 export async function getLeads(workspace: string) {
   if (!hasDatabase) return [];
   const { rows } = await sql`
-    SELECT * FROM leads WHERE workspace = ${workspace} ORDER BY updated_at DESC;
+    SELECT * FROM leads WHERE workspace = ${workspace} ORDER BY created_at ASC;
   `;
   return rows;
 }
@@ -165,14 +167,15 @@ export async function getLeads(workspace: string) {
 export async function upsertLead(lead: any) {
   if (!hasDatabase) return null;
   await sql`
-    INSERT INTO leads (id, workspace, name, company, role, email, whatsapp, linkedin, phone, source, notes, status, call_count, last_contact, next_call_at, gestor_note, created_at, updated_at)
-    VALUES (${lead.id}, ${lead.workspace}, ${lead.name}, ${lead.company || ''}, ${lead.role || ''}, ${lead.email || ''}, ${lead.whatsapp || ''}, ${lead.linkedin || ''}, ${lead.phone || ''}, ${lead.source || ''}, ${lead.notes || ''}, ${lead.status || 'novo'}, ${lead.call_count || 0}, ${lead.last_contact || null}, ${lead.next_call_at || null}, ${lead.gestor_note || ''}, ${lead.created_at}, ${lead.updated_at})
+    INSERT INTO leads (id, workspace, name, company, role, email, whatsapp, linkedin, phone, source, notes, status, call_count, last_contact, next_call_at, gestor_note, created_at, updated_at, state, industry)
+    VALUES (${lead.id}, ${lead.workspace}, ${lead.name}, ${lead.company || ''}, ${lead.role || ''}, ${lead.email || ''}, ${lead.whatsapp || ''}, ${lead.linkedin || ''}, ${lead.phone || ''}, ${lead.source || ''}, ${lead.notes || ''}, ${lead.status || 'novo'}, ${lead.call_count || 0}, ${lead.last_contact || null}, ${lead.next_call_at || null}, ${lead.gestor_note || ''}, ${lead.created_at}, ${lead.updated_at}, ${lead.state || ''}, ${lead.industry || ''})
     ON CONFLICT (id) DO UPDATE SET
       name = EXCLUDED.name, company = EXCLUDED.company, role = EXCLUDED.role,
       email = EXCLUDED.email, whatsapp = EXCLUDED.whatsapp, linkedin = EXCLUDED.linkedin,
       phone = EXCLUDED.phone, source = EXCLUDED.source, notes = EXCLUDED.notes,
       status = EXCLUDED.status, call_count = EXCLUDED.call_count,
-      last_contact = EXCLUDED.last_contact, next_call_at = EXCLUDED.next_call_at, gestor_note = EXCLUDED.gestor_note, updated_at = EXCLUDED.updated_at;
+      last_contact = EXCLUDED.last_contact, next_call_at = EXCLUDED.next_call_at, gestor_note = EXCLUDED.gestor_note, updated_at = EXCLUDED.updated_at,
+      state = EXCLUDED.state, industry = EXCLUDED.industry;
   `;
   return lead;
 }

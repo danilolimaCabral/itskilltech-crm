@@ -375,7 +375,7 @@ export default function CRM() {
 
   const saveLead = async (lead: Lead) => {
     if (hasDb) { await fetch('/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lead) }); await loadLeads(); }
-    else { const ex = leads.some(l => l.id === lead.id); const next = ex ? leads.map(l => l.id === lead.id ? lead : l) : [lead, ...leads]; setLeads(next); persistLocal(next); }
+    else { const ex = leads.some(l => l.id === lead.id); const next = ex ? leads.map(l => l.id === lead.id ? lead : l) : [...leads, lead]; setLeads(next); persistLocal(next); }
   };
 
   const removeLead = async (id: string, skipConfirm?: boolean) => {
