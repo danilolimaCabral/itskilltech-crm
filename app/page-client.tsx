@@ -114,6 +114,7 @@ export default function CRM() {
   const [stateFilter, setStateFilter] = useState('all');
   const [industryFilter, setIndustryFilter] = useState('all');
   const [filterNotContacted2d, setFilterNotContacted2d] = useState(false);
+  const [filterNotContacted30d, setFilterNotContacted30d] = useState(false);
   const [filterEmailProspectedWithPhone, setFilterEmailProspectedWithPhone] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [wsListOpen, setWsListOpen] = useState(false);
@@ -711,6 +712,7 @@ export default function CRM() {
 
   const ws = workspaces.find(w => w.id === workspace) || workspaces[0];
   const twoDaysAgo = Date.now() - 2 * 24 * 60 * 60 * 1000;
+  const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
   // Função auxiliar para extrair o estado do lead (pode estar em l.state ou no campo notes se importado de forma simples)
   const getLeadState = (l: Lead) => {
     if (l.state) return l.state.trim().toUpperCase();
@@ -749,6 +751,27 @@ export default function CRM() {
         const recentContact = tl.some((e: any) => e.ts && e.ts >= twoDaysAgo && (e.type === 'whatsapp' || e.type === 'email'));
         if (recentContact) return false; // já foi contatado, não mostra
       } catch { /* sem timeline, mostra */ }
+    }
+    if (filterNotContacted30d) {
+      // Verifica se o lead teve QUALQUER contato nos últimos 30 dias (whatsapp, email, call, linkedin)
+      try {
+        const tl = JSON.parse(l.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
+        const contacts = tl.filter((e: any) => e.ts && ['whatsapp','email','call','linkedin'].includes(e.type));
+        if (contacts.length > 0) {
+          const lastEvent = contacts.reduce((a: any, b: any) => a.ts > b.ts ? a : b);
+          if (lastEvent.ts >= thirtyDaysAgo) return false; // foi contatado recentemente, não mostra
+        } else if (l.last_contact && l.last_contact >= thirtyDaysAgo) {
+          return false;
+        } else {
+          // Se nunca foi contatado, verifica se foi cadastrado nos últimos 30 dias
+          const leadCreated = Number(l.created_at || 0);
+          if (leadCreated > thirtyDaysAgo) return false; // lead muito novo, não mostra
+        }
+      } catch {
+        // Se der erro de parse, usa a data de criação
+        const leadCreated = Number(l.created_at || 0);
+        if (leadCreated > thirtyDaysAgo) return false;
+      }
     }
     if (filterEmailProspectedWithPhone) {
       // Verifica se possui telefone/whatsapp cadastrado
@@ -1102,7 +1125,7 @@ export default function CRM() {
                   }}
                   className="btn mobile-only-btn"
                 >
-                  ⚙️ Filtros {(companyFilter !== 'all' ? 1 : 0) + (stateFilter !== 'all' ? 1 : 0) + (industryFilter !== 'all' ? 1 : 0) + (filterNotContacted2d ? 1 : 0) + (filterEmailProspectedWithPhone ? 1 : 0) > 0 ? `(${(companyFilter !== 'all' ? 1 : 0) + (stateFilter !== 'all' ? 1 : 0) + (industryFilter !== 'all' ? 1 : 0) + (filterNotContacted2d ? 1 : 0) + (filterEmailProspectedWithPhone ? 1 : 0)})` : ''}
+                  ⚙️ Filtros {(companyFilter !== 'all' ? 1 : 0) + (stateFilter !== 'all' ? 1 : 0) + (industryFilter !== 'all' ? 1 : 0) + (filterNotContacted2d ? 1 : 0) + (filterNotContacted30d ? 1 : 0) + (filterEmailProspectedWithPhone ? 1 : 0) > 0 ? `(${(companyFilter !== 'all' ? 1 : 0) + (stateFilter !== 'all' ? 1 : 0) + (industryFilter !== 'all' ? 1 : 0) + (filterNotContacted2d ? 1 : 0) + (filterNotContacted30d ? 1 : 0) + (filterEmailProspectedWithPhone ? 1 : 0)})` : ''}
                 </button>
 
                 {/* Filtros em Desktop (Ocultos no mobile via classe .desktop-filters) */}
@@ -1197,6 +1220,14 @@ export default function CRM() {
                     style={{ fontSize: 11, padding: '5px 10px', flexShrink: 0, background: filterNotContacted2d ? '#f97316' : 'var(--bg-card)', color: filterNotContacted2d ? '#fff' : 'var(--text-muted)', border: filterNotContacted2d ? '1px solid #f97316' : '1px solid var(--border)', borderRadius: 8, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
                     title="Mostrar apenas leads sem contato por WhatsApp ou E-mail nos últimos 2 dias">
                     🕒 Sem contato +2d
+                  </button>
+
+                  <button
+                    className="btn btn-sm"
+                    onClick={() => setFilterNotContacted30d(v => !v)}
+                    style={{ fontSize: 11, padding: '5px 10px', flexShrink: 0, background: filterNotContacted30d ? '#dc2626' : 'var(--bg-card)', color: filterNotContacted30d ? '#fff' : 'var(--text-muted)', border: filterNotContacted30d ? '1px solid #dc2626' : '1px solid var(--border)', borderRadius: 8, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                    title="Mostrar apenas leads sem qualquer contato (WhatsApp, E-mail, Ligação ou LinkedIn) nos últimos 30 dias">
+                    ⏳ Sem contato +30d
                   </button>
 
                   <button
@@ -1680,6 +1711,26 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                 }}
               >
                 🕒 {filterNotContacted2d ? 'Filtro Ativo: Sem contato +2d' : 'Mostrar sem contato há +2 dias'}
+              </button>
+            </div>
+
+            <div className="mobile-filters-row" style={{ marginTop: 8 }}>
+              <button
+                className="btn"
+                onClick={() => setFilterNotContacted30d(v => !v)}
+                style={{ 
+                  width: '100%', 
+                  padding: '12px', 
+                  borderRadius: 10, 
+                  background: filterNotContacted30d ? '#dc2626' : 'var(--surface-2)', 
+                  color: filterNotContacted30d ? '#fff' : 'var(--text-main)', 
+                  border: filterNotContacted30d ? '1px solid #dc2626' : '1px solid var(--border)',
+                  fontWeight: 700,
+                  fontSize: 14,
+                  cursor: 'pointer'
+                }}
+              >
+                ⏳ {filterNotContacted30d ? 'Filtro Ativo: Sem contato +30d' : 'Mostrar sem contato há +30 dias'}
               </button>
             </div>
 
