@@ -1435,6 +1435,10 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
                           </button>
                         )}
+                        {/* Excluir Lead */}
+                        <button className="ch-icon trash-btn" title="Excluir Lead" style={{ color: '#ef4444' }} onClick={() => removeLead(lead.id)}>
+                          <Icon d={ICONS.trash} />
+                        </button>
                       </div></td>
                     </tr>
                   ))}
