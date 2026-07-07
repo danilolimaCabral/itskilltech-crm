@@ -975,22 +975,51 @@ export default function CRM() {
                   <button className="btn btn-primary" onClick={() => { setEditing(null); setModalOpen(true); }}><Icon d={ICONS.plus} />Novo lead</button>
                 </div>
               </div>
-              {/* Funil de vendas — 5 etapas (Oculto no mobile para focar na lista de leads) */}
-              <div className="stats desktop-only-flex">
-                <div className="stat stat-blue" style={{ cursor: 'pointer', '--stat-accent': statusFilter === 'all' ? '#475467' : 'transparent' } as any} onClick={() => setStatusFilter('all')}>
-                  <div className="stat-label"><span className="stat-dot" style={{ background: '#475467' }} />Total</div>
-                  <div className="stat-value">{stats.total}</div>
-                </div>
-                <div className="stat" style={{ cursor: 'pointer', '--stat-accent': '#0066ff' } as any} onClick={() => setView('calendar_view')}>
-                  <div className="stat-label"><span className="stat-dot" style={{ background: '#0066ff' }} />Reuniões</div>
-                  <div className="stat-value" style={{ color: '#0066ff' }}>{stats.reunioes}</div>
-                </div>
-                {FUNNEL.map(f => (
-                  <div key={f.id} className="stat" style={{ cursor: 'pointer', '--stat-accent': f.color } as any} onClick={() => setStatusFilter(f.id)}>
-                    <div className="stat-label"><span className="stat-dot" style={{ background: f.color }} />{f.short}</div>
-                    <div className="stat-value" style={{ color: f.color }}>{(stats as any)[f.id] || 0}</div>
+              {/* Funil de vendas — 10 etapas fluidas (Oculto no mobile para focar na lista de leads) */}
+              <div className="stats-funnel-container desktop-only-flex">
+                <div className="stats-funnel">
+                  {/* Card de Total */}
+                  <div className={`stat-funnel ${statusFilter === 'all' ? 'active' : ''}`} 
+                    style={{ '--stat-accent': '#475467' } as any} 
+                    onClick={() => setStatusFilter('all')}>
+                    <div className="stat-funnel-label">
+                      <span className="stat-funnel-dot" style={{ background: '#475467' }} />
+                      Total
+                    </div>
+                    <div className="stat-funnel-value" style={{ color: '#475467' }}>
+                      {stats.total}
+                    </div>
                   </div>
-                ))}
+
+                  {/* Card de Reuniões */}
+                  <div className="stat-funnel" 
+                    style={{ '--stat-accent': '#0066ff' } as any} 
+                    onClick={() => setView('calendar_view')}>
+                    <div className="stat-funnel-label">
+                      <span className="stat-funnel-dot" style={{ background: '#0066ff' }} />
+                      Reuniões
+                    </div>
+                    <div className="stat-funnel-value" style={{ color: '#0066ff' }}>
+                      {stats.reunioes}
+                    </div>
+                  </div>
+
+                  {/* Cards de Etapas do Funil */}
+                  {FUNNEL.map(f => (
+                    <div key={f.id} 
+                      className={`stat-funnel ${statusFilter === f.id ? 'active' : ''}`} 
+                      style={{ '--stat-accent': f.color } as any} 
+                      onClick={() => setStatusFilter(f.id)}>
+                      <div className="stat-funnel-label" title={f.short}>
+                        <span className="stat-funnel-dot" style={{ background: f.color }} />
+                        {f.short}
+                      </div>
+                      <div className="stat-funnel-value" style={{ color: f.color }}>
+                        {(stats as any)[f.id] || 0}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
               {/* Prospecção de hoje com metas (Oculto no mobile na aba de leads para focar na lista de leads) */}
               <div className="desktop-only-block" style={{ margin: '8px 0', padding: '16px 18px', background: 'var(--surface)', borderRadius: 14, border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>

@@ -349,6 +349,107 @@ body.gestor-page {
 .stat-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .stat-value { font-size: 26px; font-weight: 800; letter-spacing: -0.04em; color: var(--text); line-height: 1; }
 
+/* ─── FUNNEL DE ETAPAS DO TOPO (SOFISTICADO & SEM CORTES) ─── */
+.stats-funnel-container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin-bottom: 24px;
+  padding: 4px 4px 12px 4px;
+  /* Scrollbar customizada e super sutil */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  -webkit-overflow-scrolling: touch;
+}
+
+.stats-funnel-container::-webkit-scrollbar {
+  height: 5px;
+}
+
+.stats-funnel-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.stats-funnel-container::-webkit-scrollbar-thumb {
+  background-color: var(--border-strong);
+  border-radius: 10px;
+}
+
+.stats-funnel {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  gap: 10px;
+  min-width: max-content; /* Garante que os cards não encolham e fiquem em uma linha contínua */
+}
+
+.stat-funnel {
+  flex: 0 0 135px; /* Largura fixa ideal para cada card de etapa do funil */
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 64px; /* Altura compacta e proporcional */
+}
+
+.stat-funnel::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--stat-accent, var(--primary));
+}
+
+.stat-funnel:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+}
+
+/* Card ativo selecionado */
+.stat-funnel.active {
+  background: var(--surface-2);
+  border-color: var(--stat-accent, var(--primary));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.stat-funnel-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stat-funnel-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.stat-funnel-value {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin-top: 4px;
+}
+
 /* Cards de métrica grandes com gradiente (estilo template) */
 .metric-card {
   border-radius: var(--radius-lg);
