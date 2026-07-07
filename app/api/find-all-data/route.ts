@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
       if (!match) continue;
       
-      let timeline = [];
+      let timeline: any[] = [];
       try { timeline = JSON.parse(match[1]); } catch { continue; }
       
       for (const ev of timeline) {

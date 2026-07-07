@@ -111,9 +111,9 @@ export async function POST(req: NextRequest) {
     Website: <a href="https://www.gettms.com.br" target="_blank" style="color: #2563eb; text-decoration: none;">www.gettms.com.br</a> &nbsp;|&nbsp; <a href="https://www.lottustech.com.br" target="_blank" style="color: #2563eb; text-decoration: none;">www.lottustech.com.br</a>
   </div>
 
+  ${leadId && workspaceSlug ? `<img src="https://itskilltech-crm.vercel.app/api/track-email?lid=${leadId}&ws=${workspaceSlug}" width="1" height="1" style="display:none;width:1px;height:1px;" />` : ''}
 </body>
 </html>`
-
     const resend = new Resend(process.env.RESEND_API_KEY)
 
     // Configurar o envio via Resend. O reply_to é configurado com o e-mail real do Danilo

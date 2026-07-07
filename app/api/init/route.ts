@@ -9,7 +9,7 @@ export async function GET() {
   }
   try {
     const result = await initDatabase();
-    return NextResponse.json({ hasDatabase: true, ok: true, ...result });
+    return NextResponse.json({ hasDatabase: true, ...result, ok: true });
   } catch (e: any) {
     return NextResponse.json({ hasDatabase: true, ok: false, error: e.message }, { status: 500 });
   }

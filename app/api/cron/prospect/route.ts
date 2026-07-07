@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 
     // Buscar todos os workspaces com agente ativo
     const workspaces = await getWorkspaces();
-    const activeWorkspaces = [];
+    const activeWorkspaces: any[] = [];
 
     for (const ws of workspaces) {
       const config = await getAgentConfig(ws.id);

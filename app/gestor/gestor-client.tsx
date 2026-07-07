@@ -116,6 +116,16 @@ export default function GestorPage() {
   const [addingPending, setAddingPending] = useState(false);
   const [dayModal, setDayModal] = useState<{ date: string; channel: string; channelLabel: string; leads: any[] } | null>(null);
   const [liFilter, setLiFilter] = useState<'all'|'with_li'|'without_li'>('with_li');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'emails_sent' | 'send_email'>('dashboard');
+  
+  // Estados para aba de envio de e-mail do gestor
+  const [gestorEmailLead, setGestorEmailLead] = useState<any>(null);
+  const [gestorEmailSubject, setGestorEmailSubject] = useState('');
+  const [gestorEmailBody, setGestorEmailBody] = useState('');
+  const [sendingGestorEmail, setSendingGestorEmail] = useState(false);
+  const [gestorEmailTo, setGestorEmailTo] = useState('');
+  const [gestorEmailToName, setGestorEmailToName] = useState('');
+  const [gestorEmailCompany, setGestorEmailCompany] = useState('');
   const [liSearch, setLiSearch] = useState('');
   const [liMsgLead, setLiMsgLead] = useState<any>(null);
   const [liMsg, setLiMsg] = useState('');
@@ -234,6 +244,19 @@ export default function GestorPage() {
       )}
 
       <div className="gestor-content" style={{ maxWidth: 1560, margin: '0 auto', padding: '24px 20px', width: '100%' }}>
+        {/* Barra de Navegação de Abas do Gestor */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20, background: '#fff', padding: 8, borderRadius: 12, border: '1px solid #e8edf2', boxShadow: '0 1px 3px rgba(0,0,0,0.02)' }}>
+          <button onClick={() => setActiveTab('dashboard')} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 16px', background: activeTab === 'dashboard' ? '#0066ff' : 'transparent', color: activeTab === 'dashboard' ? '#fff' : '#475569', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}>
+            📊 Painel de Monitoramento
+          </button>
+          <button onClick={() => setActiveTab('emails_sent')} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 16px', background: activeTab === 'emails_sent' ? '#0066ff' : 'transparent', color: activeTab === 'emails_sent' ? '#fff' : '#475569', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}>
+            📤 E-mails Enviados & Status
+          </button>
+          <button onClick={() => setActiveTab('send_email')} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 16px', background: activeTab === 'send_email' ? '#0066ff' : 'transparent', color: activeTab === 'send_email' ? '#fff' : '#475569', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}>
+            ✉ Enviar E-mail para Lead
+          </button>
+        </div>
+
         {loading ? (
           <div style={{ textAlign: 'center', padding: 60 }}>
             <div style={{ width: 40, height: 40, borderRadius: '50%', border: '3px solid #e2e8f0', borderTopColor: '#0066ff', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
@@ -242,7 +265,9 @@ export default function GestorPage() {
           </div>
         ) : (
           <>
-            {/* Cards de hoje — clicáveis por canal */}
+            {activeTab === 'dashboard' && (
+              <>
+                {/* Cards de hoje — clicáveis por canal */}
             <div className="gestor-grid-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
               {[
                 { label: 'WhatsApp Hoje', value: todayData.whatsapp, goal: goals.whatsapp_goal, color: '#16a34a', bg: '#f0fdf4', icon: '💬', channel: 'whatsapp', channelLabel: 'WhatsApp' },
@@ -1006,7 +1031,158 @@ export default function GestorPage() {
             </div>
             <div style={{ fontSize: 12, color: '#94a3b8' }}>O Danilo verá um alerta vermelho urgente no CRM com o nome do lead e a instrução.</div>
           </div>
-        </>
+              </>
+            )}
+
+            {/* ABA: E-mails Enviados & Status */}
+            {activeTab === 'emails_sent' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div style={{ background: '#fff', borderRadius: 14, padding: '24px', border: '1px solid #e8edf2', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                  <GestorEmailsSentView workspace={WORKSPACE} leads={leads} showToast={showToast} onOpenLead={(lead: any) => {
+                    setGestorEmailLead(lead);
+                    setGestorEmailTo(lead.email || '');
+                    setGestorEmailToName(lead.name || '');
+                    setGestorEmailCompany(lead.company || '');
+                    setGestorEmailSubject(`Apresentação getLOG — Solução TMS para ${lead.company || 'sua empresa'}`);
+                    setGestorEmailBody(`Olá, ${lead.name?.split(' ')[0] || 'tudo bem'}!\n\nTudo bem?\n\nEstava analisando a operação da ${lead.company || 'sua empresa'} e percebi que vocês possuem uma demanda importante de logística e fretes.\n\nNossa solução de TMS (Sistema de Gestão de Transporte) ajuda embarcadores a otimizar processos e reduzir em até 20% os custos com transporte. Gostaria de agendar uma conversa rápida de 15 minutos para entender se faz sentido para o seu cenário.\n\nQual seria o melhor dia e horário para você?\n\nAtenciosamente,\nVandir\nDiretor Comercial | getLOG\ncrm@itskilltech.com.br`);
+                    setActiveTab('send_email');
+                  }} />
+                </div>
+              </div>
+            )}
+
+            {/* ABA: Enviar E-mail para Lead */}
+            {activeTab === 'send_email' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div style={{ background: '#fff', borderRadius: 14, padding: '24px', border: '1px solid #e8edf2', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 16, marginBottom: 20 }}>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1e293b' }}>✉️ Enviar E-mail de Prospecção</h3>
+                      <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b' }}>Dispare e-mails profissionais utilizando o domínio homologado no Resend</p>
+                    </div>
+                    {gestorEmailLead && (
+                      <button onClick={() => {
+                        setGestorEmailLead(null);
+                        setGestorEmailTo('');
+                        setGestorEmailToName('');
+                        setGestorEmailCompany('');
+                        setGestorEmailSubject('');
+                        setGestorEmailBody('');
+                      }} style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', color: '#475569', fontWeight: 500 }}>
+                        Limpar Seleção
+                      </button>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 16 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Selecionar Lead Existente (Opcional)</label>
+                      <select onChange={(e) => {
+                        const leadId = e.target.value;
+                        const lead = leads.find((l: any) => l.id === leadId);
+                        if (lead) {
+                          setGestorEmailLead(lead);
+                          setGestorEmailTo(lead.email || '');
+                          setGestorEmailToName(lead.name || '');
+                          setGestorEmailCompany(lead.company || '');
+                          setGestorEmailSubject(`Apresentação getLOG — Solução TMS para ${lead.company || 'sua empresa'}`);
+                          setGestorEmailBody(`Olá, ${lead.name?.split(' ')[0] || 'tudo bem'}!\n\nTudo bem?\n\nEstava analisando a operação da ${lead.company || 'sua empresa'} e percebi que vocês possuem uma demanda importante de logística e fretes.\n\nNossa solução de TMS (Sistema de Gestão de Transporte) ajuda embarcadores a otimizar processos e reduzir em até 20% os custos com transporte. Gostaria de agendar uma conversa rápida de 15 minutos para entender se faz sentido para o seu cenário.\n\nQual seria o melhor dia e horário para você?\n\nAtenciosamente,\nVandir\nDiretor Comercial | getLOG\ncrm@itskilltech.com.br`);
+                        } else {
+                          setGestorEmailLead(null);
+                        }
+                      }} value={gestorEmailLead?.id || ''} style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13, background: '#fff' }}>
+                        <option value="">-- Selecione um Lead --</option>
+                        {leads.filter((l: any) => l.email).map((l: any) => (
+                          <option key={l.id} value={l.id}>{l.name} ({l.company})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 }}>E-mail de Destino</label>
+                      <input type="email" value={gestorEmailTo} onChange={(e) => setGestorEmailTo(e.target.value)} placeholder="exemplo@empresa.com" style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13, boxSizing: 'border-box' }} />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginBottom: 16 }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Nome do Contato</label>
+                      <input type="text" value={gestorEmailToName} onChange={(e) => setGestorEmailToName(e.target.value)} placeholder="Nome do decisor" style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13, boxSizing: 'border-box' }} />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Empresa</label>
+                      <input type="text" value={gestorEmailCompany} onChange={(e) => setGestorEmailCompany(e.target.value)} placeholder="Nome da empresa" style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13, boxSizing: 'border-box' }} />
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Assunto do E-mail</label>
+                    <input type="text" value={gestorEmailSubject} onChange={(e) => setGestorEmailSubject(e.target.value)} placeholder="Digite o assunto" style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13, boxSizing: 'border-box' }} />
+                  </div>
+
+                  <div style={{ marginBottom: 20 }}>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 6 }}>Mensagem</label>
+                    <textarea value={gestorEmailBody} onChange={(e) => setGestorEmailBody(e.target.value)} rows={10} placeholder="Escreva o corpo do e-mail..." style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'sans-serif', lineHeight: 1.5 }} />
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+                    <button onClick={() => {
+                      setGestorEmailLead(null);
+                      setGestorEmailTo('');
+                      setGestorEmailToName('');
+                      setGestorEmailCompany('');
+                      setGestorEmailSubject('');
+                      setGestorEmailBody('');
+                      setActiveTab('dashboard');
+                    }} style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, padding: '10px 20px', fontSize: 13, cursor: 'pointer', color: '#475569', fontWeight: 600 }}>
+                      Cancelar
+                    </button>
+                    <button
+                      disabled={sendingGestorEmail || !gestorEmailTo || !gestorEmailSubject || !gestorEmailBody}
+                      onClick={async () => {
+                        setSendingGestorEmail(true);
+                        try {
+                          const res = await fetch('/api/send-email', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              to: gestorEmailTo,
+                              subject: gestorEmailSubject,
+                              body: gestorEmailBody,
+                              workspaceSlug: WORKSPACE,
+                              leadId: gestorEmailLead?.id || undefined
+                            })
+                          });
+                          const data = await res.json();
+                          if (data.success) {
+                            showToast('✉️ E-mail enviado com sucesso!');
+                            setGestorEmailLead(null);
+                            setGestorEmailTo('');
+                            setGestorEmailToName('');
+                            setGestorEmailCompany('');
+                            setGestorEmailSubject('');
+                            setGestorEmailBody('');
+                            setActiveTab('emails_sent');
+                            load();
+                          } else {
+                            alert(data.error || 'Erro ao enviar e-mail.');
+                          }
+                        } catch (e) {
+                          alert('Erro de rede ao enviar e-mail.');
+                        } finally {
+                          setSendingGestorEmail(false);
+                        }
+                      }}
+                      style={{ background: '#0066ff', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+                    >
+                      {sendingGestorEmail ? '⏳ Enviando...' : '✉️ Disparar E-mail'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -1094,6 +1270,248 @@ function GestorBuscaEmpresa({ onPreencher }: { onPreencher: (data: any) => void 
       {filled && (
         <div style={{ marginTop: 8, fontSize: 11, color: '#16a34a', fontWeight: 600 }}>
           ✅ Dados preenchidos: {filled.razao_social} ({filled.municipio}/{filled.uf})
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Componente de Visualização de E-mails Enviados pelo Gestor ────────────────
+function GestorEmailsSentView({ workspace, leads, showToast, onOpenLead }: { workspace: string; leads: any[]; showToast: (msg: string) => void; onOpenLead: (lead: any) => void }) {
+  const [emails, setEmails] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState<any>(null);
+  const [resendStatuses, setResendStatuses] = useState<Record<string, any>>({});
+  const [loadingStatuses, setLoadingStatuses] = useState(false);
+
+  // Buscar status do Resend para os e-mails que têm resend_id
+  const fetchResendStatuses = React.useCallback(async (emailList: any[]) => {
+    const ids = emailList.filter(e => e.resend_id).map(e => e.resend_id);
+    if (ids.length === 0) return;
+    setLoadingStatuses(true);
+    try {
+      const r = await fetch('/api/resend-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: ids.slice(0, 20) }), // Limite de 20 por lote na rota de API
+      });
+      const d = await r.json();
+      if (d.ok) setResendStatuses(prev => ({ ...prev, ...d.statuses }));
+    } catch { /* ignore */ }
+    setLoadingStatuses(false);
+  }, []);
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/sent-emails?workspace=${workspace}&search=${encodeURIComponent(search)}&limit=300`);
+      const d = await r.json();
+      if (d.ok) {
+        setEmails(d.emails || []);
+        fetchResendStatuses(d.emails || []);
+      }
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, [workspace, search, fetchResendStatuses]);
+
+  React.useEffect(() => {
+    load();
+  }, [load]);
+
+  const grouped = React.useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    for (const e of emails) {
+      const day = new Date(e.ts).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+      if (!groups[day]) groups[day] = [];
+      groups[day].push(e);
+    }
+    return groups;
+  }, [emails]);
+
+  return (
+    <div style={{ display: 'flex', gap: 20, minHeight: 600 }}>
+      {/* Lista de e-mails */}
+      <div style={{ width: selected ? 380 : '100%', borderRight: selected ? '1px solid #e2e8f0' : 'none', display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingRight: selected ? 20 : 0 }}>
+        {/* Header */}
+        <div style={{ paddingBottom: 16, borderBottom: '1px solid #e2e8f0', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#1e293b' }}>📤 Histórico de E-mails Enviados</h3>
+              <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b' }}>{loading ? 'Carregando...' : `${emails.length} e-mail(s) disparado(s)`}</p>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={load} style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>
+                ↻ Atualizar
+              </button>
+              <button
+                onClick={() => fetchResendStatuses(emails)}
+                disabled={loadingStatuses}
+                style={{ background: loadingStatuses ? '#f1f5f9' : '#eff6ff', color: '#0066ff', border: '1px solid #0066ff33', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+              >
+                {loadingStatuses ? '⏳ Verificando...' : '📊 Status Resend'}
+              </button>
+            </div>
+          </div>
+          <input
+            placeholder="Buscar por nome, empresa, assunto..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ width: '100%', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13, boxSizing: 'border-box' }}
+          />
+        </div>
+
+        {/* Lista */}
+        <div style={{ flex: 1, overflowY: 'auto', maxHeight: 500 }}>
+          {loading ? (
+            <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>Carregando e-mails...</div>
+          ) : emails.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>Nenhum e-mail enviado ainda</div>
+              <div style={{ fontSize: 12 }}>Os e-mails disparados pelo CRM aparecerão aqui</div>
+            </div>
+          ) : (
+            Object.entries(grouped).map(([day, dayEmails]) => (
+              <div key={day} style={{ marginBottom: 16 }}>
+                <div style={{ padding: '4px 8px', fontSize: 11, fontWeight: 600, color: '#64748b', background: '#f8fafc', borderRadius: 6, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  {day}
+                </div>
+                {dayEmails.map((email: any) => (
+                  <div
+                    key={email.id}
+                    onClick={() => setSelected(selected?.id === email.id ? null : email)}
+                    style={{
+                      padding: '12px',
+                      borderRadius: 8,
+                      border: '1px solid #e2e8f0',
+                      cursor: 'pointer',
+                      background: selected?.id === email.id ? '#eff6ff' : '#fff',
+                      borderLeft: selected?.id === email.id ? '4px solid #0066ff' : '1px solid #e2e8f0',
+                      transition: 'all 0.15s',
+                      marginBottom: 8,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: '#1e293b', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {email.leadName || '(sem nome)'}
+                        </div>
+                        <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {email.leadCompany}{email.leadRole ? ` · ${email.leadRole}` : ''}
+                        </div>
+                        <div style={{ fontSize: 12, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {email.subject}
+                        </div>
+                      </div>
+                      <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                        <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                          {new Date(email.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                        {/* Badge de status Resend */}
+                        {email.resend_id && resendStatuses[email.resend_id] ? (() => {
+                          const st = resendStatuses[email.resend_id];
+                          if (st.clicked) return <div style={{ fontSize: 10, color: '#0066ff', marginTop: 4, fontWeight: 700, background: '#e0f2fe', padding: '2px 6px', borderRadius: 4, display: 'inline-block' }}>🔗 Clicou</div>;
+                          if (st.opened) return <div style={{ fontSize: 10, color: '#16a34a', marginTop: 4, fontWeight: 700, background: '#dcfce7', padding: '2px 6px', borderRadius: 4, display: 'inline-block' }}>✓ Aberto</div>;
+                          if (st.bounced) return <div style={{ fontSize: 10, color: '#dc2626', marginTop: 4, fontWeight: 700, background: '#fee2e2', padding: '2px 6px', borderRadius: 4, display: 'inline-block' }}>⚠ Bounce</div>;
+                          if (st.complained) return <div style={{ fontSize: 10, color: '#ea580c', marginTop: 4, fontWeight: 700, background: '#ffedd5', padding: '2px 6px', borderRadius: 4, display: 'inline-block' }}>🚫 Spam</div>;
+                          return <div style={{ fontSize: 10, color: '#475569', marginTop: 4, fontWeight: 500, background: '#f1f5f9', padding: '2px 6px', borderRadius: 4, display: 'inline-block' }}>📤 Enviado</div>;
+                        })() : email.opened ? <div style={{ fontSize: 10, color: '#16a34a', marginTop: 4, fontWeight: 700, background: '#dcfce7', padding: '2px 6px', borderRadius: 4, display: 'inline-block' }}>✓ Aberto</div> : <div style={{ fontSize: 10, color: '#475569', marginTop: 4, fontWeight: 500, background: '#f1f5f9', padding: '2px 6px', borderRadius: 4, display: 'inline-block' }}>📤 Enviado</div>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Painel de detalhe */}
+      {selected && (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', padding: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #f1f5f9', paddingBottom: 16, marginBottom: 16 }}>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <h4 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selected.subject}</h4>
+              <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b' }}>
+                Para: <strong>{selected.leadName}</strong> &lt;{selected.leadEmail}&gt;
+              </p>
+            </div>
+            <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', color: '#94a3b8' }}>✕</button>
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ background: '#f8fafc', borderRadius: 8, padding: 16, fontSize: 13 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>DESTINATÁRIO</div>
+                  <div style={{ fontWeight: 600, color: '#1e293b' }}>{selected.leadName}</div>
+                  <div style={{ fontSize: 12, color: '#64748b' }}>{selected.leadRole}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>EMPRESA</div>
+                  <div style={{ fontWeight: 600, color: '#1e293b' }}>{selected.leadCompany || '—'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>E-MAIL</div>
+                  <div style={{ fontSize: 12, color: '#1e293b' }}>{selected.leadEmail || '—'}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', marginBottom: 4 }}>STATUS RESEND</div>
+                  {selected.resend_id && resendStatuses[selected.resend_id] ? (() => {
+                    const st = resendStatuses[selected.resend_id];
+                    const statusMap: any = {
+                      clicked: { label: '🔗 Clicou no link', color: '#0066ff' },
+                      opened: { label: '✅ E-mail aberto', color: '#16a34a' },
+                      bounced: { label: '⚠️ Bounce (não entregue)', color: '#dc2626' },
+                      complained: { label: '🚫 Marcado como spam', color: '#ea580c' },
+                      delivered: { label: '✔ Entregue', color: '#0891b2' },
+                      sent: { label: '📤 Enviado', color: '#6b7280' },
+                    };
+                    const s = statusMap[st.status] || statusMap['sent'];
+                    return (
+                      <div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: s.color }}>{s.label}</div>
+                        {st.last_event && <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>Evento: {st.last_event}</div>}
+                        {st.created_at && <div style={{ fontSize: 11, color: '#64748b' }}>Criado: {new Date(st.created_at).toLocaleString('pt-BR')}</div>}
+                      </div>
+                    );
+                  })() : (
+                    <div style={{ fontSize: 12, color: '#64748b' }}>
+                      {selected.resend_id ? (
+                        <span>📤 Clique em "📊 Status Resend" para verificar<br/><span style={{ fontSize: 10, fontFamily: 'monospace' }}>{selected.resend_id}</span></span>
+                      ) : selected.opened ? '✓ Aberto (pixel)' : '📤 Enviado'}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ background: '#f8fafc', borderRadius: 8, padding: 16 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>ASSUNTO</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', marginBottom: 12 }}>{selected.subject}</div>
+              <div style={{ fontSize: 10, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>MENSAGEM REGISTRADA</div>
+              <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5, fontStyle: 'italic' }}>
+                O corpo do e-mail não é armazenado por privacidade — apenas o assunto e data/hora ficam registrados na timeline do lead.
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 'auto' }}>
+              <button
+                onClick={() => {
+                  const lead = leads.find((l: any) => l.id === selected.leadId);
+                  if (lead) {
+                    onOpenLead(lead);
+                  } else {
+                    showToast('Lead não encontrado na lista');
+                  }
+                }}
+                style={{ flex: 1, background: '#0066ff', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 16px', fontWeight: 600, cursor: 'pointer', fontSize: 12, transition: 'all 0.15s' }}
+              >
+                ✉️ Responder / Enviar Novo
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

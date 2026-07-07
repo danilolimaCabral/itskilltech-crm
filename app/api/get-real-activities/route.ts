@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
         const dateObj = new Date(ev.ts);
         const dateStr = dateObj.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
         
-        if (['email', 'call', 'whatsapp', 'linkedin'].includes(ev.type)) {
+        if (['email', 'call', 'whatsapp', 'linkedin', 'email_opened'].includes(ev.type)) {
           allEvents.push({
             leadId: lead.id,
             leadName: lead.name,
@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
     const summary: Record<string, any> = {};
     for (const ev of allEvents) {
       if (!summary[ev.dateStr]) {
-        summary[ev.dateStr] = { email: 0, call: 0, whatsapp: 0, linkedin: 0, total: 0, activities: [] };
+        summary[ev.dateStr] = { email: 0, call: 0, whatsapp: 0, linkedin: 0, email_opened: 0, total: 0, activities: [] };
       }
       summary[ev.dateStr][ev.type] = (summary[ev.dateStr][ev.type] || 0) + 1;
       summary[ev.dateStr].total++;
