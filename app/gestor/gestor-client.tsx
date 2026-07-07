@@ -61,6 +61,26 @@ const mobileStyle = `
 
 const WORKSPACE = 'lottus';
 
+const safeFormatDate = (value: any, options?: Intl.DateTimeFormatOptions) => {
+  if (!value) return '—';
+  const num = Number(value);
+  const d = !isNaN(num) ? new Date(num) : new Date(value);
+  if (d instanceof Date && !isNaN(d.getTime())) {
+    return d.toLocaleDateString('pt-BR', options);
+  }
+  return '—';
+};
+
+const safeFormatTime = (value: any, options?: Intl.DateTimeFormatOptions) => {
+  if (!value) return '—';
+  const num = Number(value);
+  const d = !isNaN(num) ? new Date(num) : new Date(value);
+  if (d instanceof Date && !isNaN(d.getTime())) {
+    return d.toLocaleTimeString('pt-BR', options);
+  }
+  return '—';
+};
+
 function ProgressBar({ value, max, color }: { value: number; max: number; color: string }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
   return (
@@ -267,7 +287,7 @@ export default function GestorPage() {
                   <div style={{ padding: '18px 20px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 15 }}>📋 Leads prospectados — {dayModal.channelLabel}</div>
-                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{new Date(dayModal.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}</div>
+                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{safeFormatDate(dayModal.date + 'T12:00:00', { weekday: 'long', day: '2-digit', month: 'long' })}</div>
                     </div>
                     <button onClick={() => setDayModal(null)} style={{ background: '#f1f5f9', border: 'none', borderRadius: 8, width: 32, height: 32, cursor: 'pointer', fontSize: 16 }}>✕</button>
                   </div>
@@ -388,10 +408,10 @@ export default function GestorPage() {
                             </div>
                             <div style={{ textAlign: 'right', flexShrink: 0 }}>
                               <div style={{ fontSize: 11, fontWeight: 700, color: isOverdue ? '#dc2626' : isToday ? '#ca8a04' : '#16a34a' }}>
-                                {isOverdue ? '⚠️ Atrasado' : isToday ? '🔔 Hoje' : nextCall ? nextCall.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'}
+                                {isOverdue ? '⚠️ Atrasado' : isToday ? '🔔 Hoje' : nextCall ? safeFormatDate(nextCall, { day: '2-digit', month: '2-digit' }) : '—'}
                               </div>
                               <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>
-                                {nextCall ? nextCall.toLocaleDateString('pt-BR', { weekday: 'short' }) : '—'}
+                                {nextCall ? safeFormatDate(nextCall, { weekday: 'short' }) : '—'}
                               </div>
                             </div>
                           </div>
@@ -487,7 +507,7 @@ export default function GestorPage() {
                           return (
                             <tr key={d.date} style={{ borderBottom: '1px solid #f8fafc', background: isToday ? '#eff6ff' : 'transparent' }}>
                               <td style={{ padding: '7px 8px', fontWeight: isToday ? 700 : 400, color: isToday ? '#1a56db' : '#374151' }}>
-                                {isToday ? '📍 Hoje' : new Date(d.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', weekday: 'short' })}
+                                {isToday ? '📍 Hoje' : safeFormatDate(d.date + 'T12:00:00', { day: '2-digit', month: '2-digit', weekday: 'short' })}
                               </td>
                               <td style={{ textAlign: 'center', padding: '7px 8px', color: '#16a34a', fontWeight: 600 }}>{d.whatsapp}</td>
                               <td style={{ textAlign: 'center', padding: '7px 8px', color: '#1a56db', fontWeight: 600 }}>{d.email}</td>
@@ -527,7 +547,7 @@ export default function GestorPage() {
             {selectedDay && selectedData && (
               <div style={{ background: '#fff', borderRadius: 14, padding: 20, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', marginBottom: 24 }}>
                 <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 12 }}>
-                  📋 Leads prospectados em {new Date(selectedDay + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+                  📋 Leads prospectados em {safeFormatDate(selectedDay + 'T12:00:00', { weekday: 'long', day: '2-digit', month: 'long' })}
                 </div>
                 {selectedData.leads?.length === 0 ? (
                   <div style={{ color: '#94a3b8', fontSize: 14 }}>Nenhum lead registrado neste dia</div>
@@ -558,7 +578,7 @@ export default function GestorPage() {
                                 const c = channelColors[ch] || { bg: '#f1f5f9', color: '#374151', label: ch };
                                 return <span key={ch} style={{ fontSize: 11, background: c.bg, color: c.color, borderRadius: 20, padding: '2px 8px', fontWeight: 600 }}>{c.label}</span>;
                               })}
-                              <span style={{ fontSize: 11, color: '#94a3b8' }}>{new Date(Number(lead.ts)).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                              <span style={{ fontSize: 11, color: '#94a3b8' }}>{safeFormatTime(lead.ts, { hour: '2-digit', minute: '2-digit' })}</span>
                             </div>
                             {lead.result && lead.result.length > 5 && (
                               <div style={{ fontSize: 11, color: '#475569', marginTop: 4, fontStyle: 'italic' }}>Resultado: {lead.result.replace(/^Ligação: /, '').replace(/^LinkedIn: /, '')}</div>
@@ -585,7 +605,7 @@ export default function GestorPage() {
                                   {isOverdue ? '⚠ Atrasado' : isToday ? '🔔 Hoje' : '📅 Próxima ligação'}
                                 </div>
                                 <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginTop: 2 }}>
-                                  {nextCall.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                  {safeFormatDate(nextCall, { day: '2-digit', month: '2-digit' })}
                                 </div>
                               </div>
                             ) : (
@@ -736,7 +756,7 @@ export default function GestorPage() {
                           <span style={{ fontWeight: 600, fontSize: 13 }}>{l.name || '—'}</span>
                           <span style={{ fontSize: 11, color: '#64748b' }}>{l.company}</span>
                           <span style={{ fontSize: 11, background: l.status === 'Prospecção' ? '#eff6ff' : l.status === 'Qualificação' ? '#f0fdf4' : '#fff7ed', color: l.status === 'Prospecção' ? '#1a56db' : l.status === 'Qualificação' ? '#16a34a' : '#ea580c', borderRadius: 6, padding: '1px 8px' }}>{l.status}</span>
-                          {nextCall && <span style={{ fontSize: 11, background: isOverdue ? '#fee2e2' : '#fef9c3', color: isOverdue ? '#dc2626' : '#92400e', borderRadius: 6, padding: '1px 8px' }}>{isOverdue ? '⚠ Retorno atrasado' : `🔔 Retorno: ${nextCall.toLocaleDateString('pt-BR')}`}</span>}
+                          {nextCall && <span style={{ fontSize: 11, background: isOverdue ? '#fee2e2' : '#fef9c3', color: isOverdue ? '#dc2626' : '#92400e', borderRadius: 6, padding: '1px 8px' }}>{isOverdue ? '⚠ Retorno atrasado' : `🔔 Retorno: ${safeFormatDate(nextCall)}`}</span>}
                         </div>
                         <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{l.email} {l.phone ? `· ${l.phone}` : ''}</div>
                         <div style={{ display: 'flex', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
@@ -746,7 +766,7 @@ export default function GestorPage() {
                             <a href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent((l.name || '') + ' ' + (l.company || ''))}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#94a3b8', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3 }}>🔍 Buscar no LinkedIn</a>
                           )}
                         </div>
-                        {lastActivity && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Último contato: {lastActivity.type || lastActivity.action} — {new Date(Number(lastActivity.date || lastActivity.ts)).toLocaleDateString('pt-BR')}</div>}
+                        {lastActivity && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Último contato: {lastActivity.type || lastActivity.action} — {safeFormatDate(lastActivity.date || lastActivity.ts)}</div>}
                         {l.gestor_note && <div style={{ fontSize: 12, background: '#fef9c3', color: '#92400e', borderRadius: 6, padding: '4px 8px', marginTop: 4 }}>💡 Nota do gestor: {l.gestor_note}</div>}
                       </div>
                       <button
