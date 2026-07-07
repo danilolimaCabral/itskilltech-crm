@@ -163,6 +163,11 @@ export default function CRM() {
   const [quoteNotes, setQuoteNotes] = useState('');
   const [savingQuote, setSavingQuote] = useState(false);
   const [quotes, setQuotes] = useState<any[]>([]);
+  // Estados para itens internos da proposta comercial
+  const [quoteItems, setQuoteItems] = useState<{description: string; qty: number; price: number}[]>([]);
+  const [quoteItemDesc, setQuoteItemDesc] = useState('');
+  const [quoteItemQty, setQuoteItemQty] = useState('1');
+  const [quoteItemPrice, setQuoteItemPrice] = useState('');
   // Seleção em massa
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkSending, setBulkSending] = useState(false);
@@ -1841,7 +1846,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                     {(leadPanel.whatsapp || leadPanel.phone) && <button className="btn btn-sm" style={{ background: '#25d366', color: '#fff', border: 'none' }} onClick={() => { const num = cleanPhone(leadPanel.whatsapp || leadPanel.phone || ''); if (num) window.open(`https://wa.me/${num}`, '_blank'); }}><Icon d={ICONS.whatsapp} />WhatsApp</button>}
                     {leadPanel.email && <button className="btn btn-sm" onClick={() => openEmailModal(leadPanel)}><Icon d={ICONS.email} />E-mail</button>}
                     <button className="btn btn-sm" onClick={() => { setCallModal(leadPanel); setCallResult(''); setCallNotes(`${getSaudacao()}, ${leadPanel.name.split(' ')[0]}! `); }}><Icon d={ICONS.phone} />Registrar ligação</button>
-                    <button className="btn btn-sm btn-primary" style={{ background: '#ec4899', color: '#fff', border: 'none' }} onClick={() => { setQuoteModal(leadPanel); setQuoteAttachmentUrl(''); setQuoteValue(''); setQuoteNotes(''); }}><Icon d={ICONS.template} />Anexar Proposta</button>
+                    <button className="btn btn-sm btn-primary" style={{ background: '#ec4899', color: '#fff', border: 'none' }} onClick={() => { setQuoteModal(leadPanel); setQuoteAttachmentUrl(''); setQuoteValue(''); setQuoteNotes(''); setQuoteItems([]); setQuoteItemDesc(''); setQuoteItemQty('1'); setQuoteItemPrice(''); }}><Icon d={ICONS.template} />Anexar Proposta</button>
                   </div>
                 </div>
               )}
@@ -1936,7 +1941,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Propostas Enviadas ({leadQuotes.length})</div>
                       <button className="btn btn-sm" style={{ background: '#ec4899', color: '#fff', border: 'none', padding: '4px 10px', fontSize: 11 }}
-                        onClick={() => { setQuoteModal(leadPanel); setQuoteAttachmentUrl(''); setQuoteValue(''); setQuoteNotes(''); }}>
+                        onClick={() => { setQuoteModal(leadPanel); setQuoteAttachmentUrl(''); setQuoteValue(''); setQuoteNotes(''); setQuoteItems([]); setQuoteItemDesc(''); setQuoteItemQty('1'); setQuoteItemPrice(''); }}>
                         + Anexar Nova
                       </button>
                     </div>
@@ -1960,6 +1965,22 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                               </div>
                               <button className="btn btn-sm" style={{ color: '#ef4444', borderColor: '#ef4444', padding: '2px 6px', fontSize: 11 }} onClick={async () => { if (confirm('Excluir esta proposta permanente?')) { await fetch(`/api/quotes?id=${q.id}`, { method: 'DELETE' }); loadQuotes(); } }}>Excluir</button>
                             </div>
+                            {/* Itens internos da proposta */}
+                            {q.items && q.items.length > 0 && (
+                              <div style={{ background: 'var(--surface-1)', borderRadius: 8, padding: '8px 10px', marginBottom: 8, border: '1px solid var(--border)' }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4, borderBottom: '1px solid var(--border)', paddingBottom: 2 }}>Itens da Proposta</div>
+                                {q.items.map((item: any, idx: number) => (
+                                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '3px 0', borderBottom: idx < q.items.length - 1 ? '1px dashed var(--border)' : 'none' }}>
+                                    <span style={{ color: 'var(--text-secondary)' }}>
+                                      {item.description} <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>({item.qty}x)</span>
+                                    </span>
+                                    <span style={{ fontWeight: 600, color: 'var(--text)' }}>
+                                      {((item.price || 0) * (item.qty || 1)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                             {q.notes && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8, whiteSpace: 'pre-wrap' }}>{q.notes}</div>}
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: 'var(--text-muted)' }}>
                               <span>Enviada em: {q.sent_at ? new Date(Number(q.sent_at)).toLocaleDateString('pt-BR') : new Date(q.created_at).toLocaleDateString('pt-BR')}</span>
@@ -2971,6 +2992,97 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
             <div className="modal-body">
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>{quoteModal.company}{quoteModal.role ? ` · ${quoteModal.role}` : ''}</div>
               
+              {/* Seção de Itens Internos da Proposta */}
+              <div style={{ border: '1.5px solid #fbcfe8', borderRadius: 10, padding: 12, marginBottom: 14, background: '#fffdfa' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#db2777', textTransform: 'uppercase', marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+                  <span>📦 Itens / Serviços da Proposta</span>
+                  <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)' }}>Opcional</span>
+                </div>
+
+                {/* Lista de itens já adicionados */}
+                {quoteItems.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+                    {quoteItems.map((item, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>
+                          <strong>{item.description}</strong> <span style={{ color: 'var(--text-muted)' }}>({item.qty}x R$ {item.price.toFixed(2)})</span>
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontWeight: 600 }}>
+                            {(item.qty * item.price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </span>
+                          <button type="button" onClick={() => {
+                            const updated = quoteItems.filter((_, i) => i !== idx);
+                            setQuoteItems(updated);
+                            // Recalcular total automaticamente
+                            const newTotal = updated.reduce((acc, curr) => acc + (curr.qty * curr.price), 0);
+                            if (newTotal > 0) setQuoteValue(newTotal.toString());
+                          }} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '2px 4px', fontSize: 11 }}>✕</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', padding: '10px 0', borderBottom: '1px dashed var(--border)', marginBottom: 10 }}>
+                    Nenhum item adicionado. Adicione itens abaixo para calcular o total automaticamente.
+                  </div>
+                )}
+
+                {/* Formulário para adicionar novo item */}
+                <div style={{ display: 'flex', gap: 6, flexDirection: 'column' }}>
+                  <input
+                    className="field-input"
+                    type="text"
+                    placeholder="Descrição do serviço/produto"
+                    value={quoteItemDesc}
+                    onChange={e => setQuoteItemDesc(e.target.value)}
+                    style={{ fontSize: 12, padding: '6px 10px' }}
+                  />
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <input
+                      className="field-input"
+                      type="number"
+                      placeholder="Qtd"
+                      value={quoteItemQty}
+                      onChange={e => setQuoteItemQty(e.target.value)}
+                      style={{ fontSize: 12, padding: '6px 10px', width: '25%' }}
+                    />
+                    <input
+                      className="field-input"
+                      type="number"
+                      placeholder="Preço Unitário (R$)"
+                      value={quoteItemPrice}
+                      onChange={e => setQuoteItemPrice(e.target.value)}
+                      style={{ fontSize: 12, padding: '6px 10px', width: '45%' }}
+                    />
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => {
+                        if (!quoteItemDesc.trim() || !quoteItemPrice.trim()) return;
+                        const qty = parseInt(quoteItemQty) || 1;
+                        const price = parseFloat(quoteItemPrice) || 0;
+                        const newItem = { description: quoteItemDesc.trim(), qty, price };
+                        const updated = [...quoteItems, newItem];
+                        setQuoteItems(updated);
+                        
+                        // Limpar campos de adição de item
+                        setQuoteItemDesc('');
+                        setQuoteItemQty('1');
+                        setQuoteItemPrice('');
+
+                        // Atualizar valor total automaticamente
+                        const newTotal = updated.reduce((acc, curr) => acc + (curr.qty * curr.price), 0);
+                        setQuoteValue(newTotal.toString());
+                      }}
+                      style={{ fontSize: 11, padding: '6px 10px', background: '#ec4899', color: '#fff', border: 'none', flex: 1 }}
+                    >
+                      + Add
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div className="field">
                 <label className="field-label">Valor Total da Proposta (R$)</label>
                 <input
@@ -3028,6 +3140,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                       lead_email: quoteModal.email || '',
                       lead_phone: quoteModal.phone || '',
                       workspace,
+                      items: quoteItems,
                       total: valueNum,
                       notes: quoteNotes,
                       attachment_url: quoteAttachmentUrl,
