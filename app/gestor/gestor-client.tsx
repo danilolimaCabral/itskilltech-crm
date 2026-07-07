@@ -375,10 +375,10 @@ export default function GestorPage() {
                       .filter(l => l.next_call_at)
                       .sort((a, b) => (a.next_call_at || 0) - (b.next_call_at || 0))
                       .map((l: any) => {
-                        const nextCall = new Date(Number(l.next_call_at));
-                        const isValid = nextCall instanceof Date && !isNaN(nextCall.getTime());
-                        const isOverdue = isValid && nextCall < new Date() && nextCall.toISOString().slice(0, 10) !== new Date().toISOString().slice(0, 10);
-                        const isToday = isValid && nextCall.toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10);
+                        const nextCallRaw = new Date(Number(l.next_call_at));
+                        const nextCall = nextCallRaw && !isNaN(nextCallRaw.getTime()) ? nextCallRaw : null;
+                        const isOverdue = nextCall && nextCall < new Date() && nextCall.toISOString().slice(0, 10) !== new Date().toISOString().slice(0, 10);
+                        const isToday = nextCall && nextCall.toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10);
                         return (
                           <div key={l.id} style={{ background: isOverdue ? '#fff5f5' : isToday ? '#fffbeb' : '#f8fafc', border: `1px solid ${isOverdue ? '#fca5a5' : isToday ? '#fde047' : '#e2e8f0'}`, borderRadius: 10, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
                             <div style={{ minWidth: 0 }}>
@@ -388,10 +388,10 @@ export default function GestorPage() {
                             </div>
                             <div style={{ textAlign: 'right', flexShrink: 0 }}>
                               <div style={{ fontSize: 11, fontWeight: 700, color: isOverdue ? '#dc2626' : isToday ? '#ca8a04' : '#16a34a' }}>
-                                {isOverdue ? '⚠️ Atrasado' : isToday ? '🔔 Hoje' : nextCall.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                                {isOverdue ? '⚠️ Atrasado' : isToday ? '🔔 Hoje' : nextCall ? nextCall.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'}
                               </div>
                               <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>
-                                {nextCall.toLocaleDateString('pt-BR', { weekday: 'short' })}
+                                {nextCall ? nextCall.toLocaleDateString('pt-BR', { weekday: 'short' }) : '—'}
                               </div>
                             </div>
                           </div>
@@ -541,10 +541,10 @@ export default function GestorPage() {
                         linkedin: { bg: '#dbeafe', color: '#0077b5', label: '💼 LinkedIn' },
                       };
                       const channels = lead.channels || [lead.type];
-                      const nextCall = lead.next_call_at ? new Date(Number(lead.next_call_at)) : null;
-                      const isValid = nextCall instanceof Date && !isNaN(nextCall.getTime());
-                      const isOverdue = isValid && nextCall < new Date();
-                      const isToday = isValid && nextCall.toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10);
+                      const nextCallRaw = lead.next_call_at ? new Date(Number(lead.next_call_at)) : null;
+                      const nextCall = nextCallRaw && !isNaN(nextCallRaw.getTime()) ? nextCallRaw : null;
+                      const isOverdue = nextCall && nextCall < new Date();
+                      const isToday = nextCall && nextCall.toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10);
                       return (
                         <div key={lead.id} style={{ background: '#f8fafc', borderRadius: 10, padding: '12px 16px', border: '1px solid #e2e8f0', display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'start' }}>
                           <div>
@@ -723,9 +723,9 @@ export default function GestorPage() {
                 .map((l: any) => {
                   const timeline = (() => { try { return JSON.parse(l.notes || '[]'); } catch { return []; } })();
                   const lastActivity = timeline.length > 0 ? timeline[timeline.length - 1] : null;
-                  const nextCall = l.next_call_at ? new Date(Number(l.next_call_at)) : null;
-                  const isValid = nextCall instanceof Date && !isNaN(nextCall.getTime());
-                  const isOverdue = isValid && nextCall < new Date();
+                  const nextCallRaw = l.next_call_at ? new Date(Number(l.next_call_at)) : null;
+                  const nextCall = nextCallRaw && !isNaN(nextCallRaw.getTime()) ? nextCallRaw : null;
+                  const isOverdue = nextCall && nextCall < new Date();
                   return (
                     <div key={l.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
                       <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: '#1a56db', flexShrink: 0 }}>
