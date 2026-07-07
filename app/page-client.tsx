@@ -802,6 +802,7 @@ export default function CRM() {
     email_aberto: leads.filter(l => normalizeStatus(l.status) === 'email_aberto').length,
     interesse: leads.filter(l => normalizeStatus(l.status) === 'interesse').length,
     apresentacao: leads.filter(l => normalizeStatus(l.status) === 'apresentacao').length,
+    proposta: leads.filter(l => normalizeStatus(l.status) === 'proposta').length,
     fechamento: leads.filter(l => normalizeStatus(l.status) === 'fechamento').length,
     posvenda: leads.filter(l => normalizeStatus(l.status) === 'posvenda').length,
     perdido: leads.filter(l => normalizeStatus(l.status) === 'perdido').length,
