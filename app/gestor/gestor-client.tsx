@@ -375,7 +375,7 @@ export default function GestorPage() {
                       .filter(l => l.next_call_at)
                       .sort((a, b) => (a.next_call_at || 0) - (b.next_call_at || 0))
                       .map((l: any) => {
-                        const nextCall = new Date(l.next_call_at);
+                        const nextCall = new Date(Number(l.next_call_at));
                         const isOverdue = nextCall < new Date() && nextCall.toISOString().slice(0, 10) !== new Date().toISOString().slice(0, 10);
                         const isToday = nextCall.toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10);
                         return (
@@ -540,7 +540,7 @@ export default function GestorPage() {
                         linkedin: { bg: '#dbeafe', color: '#0077b5', label: '💼 LinkedIn' },
                       };
                       const channels = lead.channels || [lead.type];
-                      const nextCall = lead.next_call_at ? new Date(lead.next_call_at) : null;
+                      const nextCall = lead.next_call_at ? new Date(Number(lead.next_call_at)) : null;
                       const isOverdue = nextCall && nextCall < new Date();
                       const isToday = nextCall && nextCall.toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10);
                       return (
@@ -556,7 +556,7 @@ export default function GestorPage() {
                                 const c = channelColors[ch] || { bg: '#f1f5f9', color: '#374151', label: ch };
                                 return <span key={ch} style={{ fontSize: 11, background: c.bg, color: c.color, borderRadius: 20, padding: '2px 8px', fontWeight: 600 }}>{c.label}</span>;
                               })}
-                              <span style={{ fontSize: 11, color: '#94a3b8' }}>{new Date(lead.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                              <span style={{ fontSize: 11, color: '#94a3b8' }}>{new Date(Number(lead.ts)).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
                             </div>
                             {lead.result && lead.result.length > 5 && (
                               <div style={{ fontSize: 11, color: '#475569', marginTop: 4, fontStyle: 'italic' }}>Resultado: {lead.result.replace(/^Ligação: /, '').replace(/^LinkedIn: /, '')}</div>
@@ -718,7 +718,7 @@ export default function GestorPage() {
                 .map((l: any) => {
                   const timeline = (() => { try { return JSON.parse(l.notes || '[]'); } catch { return []; } })();
                   const lastActivity = timeline.length > 0 ? timeline[timeline.length - 1] : null;
-                  const nextCall = l.next_call_at ? new Date(l.next_call_at) : null;
+                  const nextCall = l.next_call_at ? new Date(Number(l.next_call_at)) : null;
                   const isOverdue = nextCall && nextCall < new Date();
                   return (
                     <div key={l.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 0', borderBottom: '1px solid #f1f5f9' }}>
@@ -740,7 +740,7 @@ export default function GestorPage() {
                             <a href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent((l.name || '') + ' ' + (l.company || ''))}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#94a3b8', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 3 }}>🔍 Buscar no LinkedIn</a>
                           )}
                         </div>
-                        {lastActivity && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Último contato: {lastActivity.type || lastActivity.action} — {new Date(lastActivity.date || lastActivity.ts).toLocaleDateString('pt-BR')}</div>}
+                        {lastActivity && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Último contato: {lastActivity.type || lastActivity.action} — {new Date(Number(lastActivity.date || lastActivity.ts)).toLocaleDateString('pt-BR')}</div>}
                         {l.gestor_note && <div style={{ fontSize: 12, background: '#fef9c3', color: '#92400e', borderRadius: 6, padding: '4px 8px', marginTop: 4 }}>💡 Nota do gestor: {l.gestor_note}</div>}
                       </div>
                       <button
