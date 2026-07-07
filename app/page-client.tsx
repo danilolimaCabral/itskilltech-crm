@@ -49,6 +49,7 @@ const getSaudacao = () => {
 // Funil de vendas — 6 etapas
 const FUNNEL = [
   { id: 'prospeccao',   label: '1 · Prospecção',   short: 'Prospecção',   color: '#6366f1', bg: '#eef2ff' },
+  { id: 'email_enviado', label: '✉️ E-mail Enviado', short: 'E-mail Enviado', color: '#0284c7', bg: '#f0f9ff' },
   { id: 'qualificacao', label: '2 · Qualificação',  short: 'Qualificação', color: '#f59e0b', bg: '#fffbeb' },
   { id: 'email_aberto', label: '📬 E-mail Aberto',  short: 'E-mail Aberto', color: '#0891b2', bg: '#ecfeff' },
   { id: 'interesse',    label: '❤️ Interesse',      short: 'Interesse',    color: '#d946ef', bg: '#fdf4ff' },
@@ -282,7 +283,7 @@ export default function CRM() {
         const j = await r.json();
         if (j.success) {
           sent++;
-          const STATUS_ADVANCE: any = { prospeccao: 'qualificacao', novo: 'qualificacao', contatado: 'qualificacao' };
+          const STATUS_ADVANCE: any = { prospeccao: 'email_enviado', novo: 'email_enviado', contatado: 'email_enviado' };
           const nextStatus = STATUS_ADVANCE[normalizeStatus(lead.status)] || normalizeStatus(lead.status);
           const timeline = JSON.parse(lead.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
           timeline.unshift({ type: 'email', label: `E-mail enviado: ${subject}`, ts: Date.now() });
@@ -497,7 +498,7 @@ export default function CRM() {
         // Mostrar confirmação com ID Resend (suporta messageId retornado pelo backend)
         setEmailSentInfo({ id: j.messageId || j.id || '—', to: emailModal.email });
         // Avançar para próxima etapa do funil e registrar na timeline
-        const STATUS_ADVANCE: any = { prospeccao: 'qualificacao', novo: 'qualificacao', contatado: 'qualificacao', qualificacao: 'apresentacao', apresentacao: 'fechamento', fechamento: 'posvenda' };
+        const STATUS_ADVANCE: any = { prospeccao: 'email_enviado', novo: 'email_enviado', contatado: 'email_enviado', email_enviado: 'qualificacao', qualificacao: 'apresentacao', apresentacao: 'fechamento', fechamento: 'posvenda' };
         const nextStatus = STATUS_ADVANCE[normalizeStatus(emailModal.status)] || normalizeStatus(emailModal.status);
         const timeline = JSON.parse(emailModal.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
         timeline.unshift({ type: 'email', label: `E-mail enviado: ${emailSubject}${emailInlineImages ? ' (🖼 com imagens Getlog)' : emailAttachFile ? ` (📎 ${emailAttachFile.name})` : emailAttachmentUrl ? ' (com apresentação)' : ''}`, ts: Date.now(), resend_id: j.id || null });
@@ -3425,6 +3426,7 @@ function DashboardView({ leads, workspace, wsName }: { leads: any[], workspace: 
   // Funil
   const funnel = [
     { label: 'Prospecção', count: leads.filter(l => ['prospeccao','novo'].includes(l.status)).length, color: '#6366f1' },
+    { label: 'E-mail Enviado', count: leads.filter(l => l.status === 'email_enviado').length, color: '#0284c7' },
     { label: 'Qualificação', count: leads.filter(l => l.status === 'qualificacao').length, color: '#f59e0b' },
     { label: 'E-mail Aberto', count: leads.filter(l => l.status === 'email_aberto').length, color: '#0891b2' },
     { label: 'Interesse', count: leads.filter(l => l.status === 'interesse').length, color: '#d946ef' },

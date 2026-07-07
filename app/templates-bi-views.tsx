@@ -211,132 +211,343 @@ export function TemplatesView({ workspace, workspaceName, templates, onReload, s
 // ---------- BI / Dashboard ----------
 export function BIView({ workspace, leads }: any) {
   const [callStats, setCallStats] = useState<any>(null);
+  const [activityStats, setActivityStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Estados da Calculadora de Custos
+  const [sdrCost, setSdrCost] = useState<number>(3000);
+  const [toolsCost, setToolsCost] = useState<number>(1000);
+  const [leadsCost, setToolsDataCost] = useState<number>(500);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
+        // Buscar estatísticas de ligações
         const r = await fetch(`/api/stats?workspace=${workspace}`);
         const j = await r.json();
         setCallStats(j);
-      } catch { setCallStats(null); }
+        
+        // Buscar atividades de outbound em tempo real
+        const rAct = await fetch(`/api/get-real-activities`);
+        const jAct = await rAct.json();
+        setActivityStats(jAct);
+      } catch { 
+        setCallStats(null); 
+        setActivityStats(null);
+      }
       setLoading(false);
     })();
   }, [workspace]);
 
-  const total = leads.length;
-  const novos = leads.filter((l: any) => l.status === 'novo').length;
-  const contatados = leads.filter((l: any) => l.status === 'contatado').length;
-  const negociacao = leads.filter((l: any) => l.status === 'negociacao').length;
-  const fechados = leads.filter((l: any) => l.status === 'fechado').length;
-  const perdidos = leads.filter((l: any) => l.status === 'perdido').length;
+  // --- 1. NORMALIZAÇÃO DE STATUS (FUNIL DO CRM) ---
+  const totalLeads = leads.length;
+  
+  // Normalizar todos os leads para o funil atual de 6 etapas
+  const LEGACY_MAP: any = { novo: 'prospeccao', contatado: 'qualificacao', interesse: 'interesse', negociacao: 'apresentacao', fechado: 'fechamento', perdido: 'perdido' };
+  const getNormStatus = (l: any) => {
+    const s = l.status;
+    return ['prospeccao', 'email_enviado', 'qualificacao', 'email_aberto', 'interesse', 'apresentacao', 'proposta', 'fechamento', 'posvenda', 'perdido'].includes(s) ? s : (LEGACY_MAP[s] || 'prospeccao');
+  };
 
-  const convRate = total > 0 ? ((fechados / total) * 100).toFixed(1) : '0.0';
-  const contactRate = total > 0 ? (((total - novos) / total) * 100).toFixed(1) : '0.0';
+  const sProspeccao = leads.filter((l: any) => getNormStatus(l) === 'prospeccao').length;
+  const sEmailEnviado = leads.filter((l: any) => getNormStatus(l) === 'email_enviado').length;
+  const sQualificacao = leads.filter((l: any) => getNormStatus(l) === 'qualificacao').length;
+  const sEmailAberto = leads.filter((l: any) => getNormStatus(l) === 'email_aberto').length;
+  const sInteresse = leads.filter((l: any) => getNormStatus(l) === 'interesse').length;
+  const sApresentacao = leads.filter((l: any) => getNormStatus(l) === 'apresentacao').length;
+  const sProposta = leads.filter((l: any) => getNormStatus(l) === 'proposta').length;
+  const sFechamento = leads.filter((l: any) => getNormStatus(l) === 'fechamento').length;
+  const sPosVenda = leads.filter((l: any) => getNormStatus(l) === 'posvenda').length;
+  const sPerdido = leads.filter((l: any) => getNormStatus(l) === 'perdido').length;
 
+  // --- 2. CÁLCULO DAS 7 MÉTRICAS DE OUTBOUND ---
+  
+  // Atividades reais do endpoint de timeline
+  const summary = activityStats?.summary || {};
+  let totalDials = 0; // Total de tentativas de ligação
+  let totalConnected = 0; // Ligações que viraram conversa real (atendeu_interesse + atendeu_sem_interesse)
+  let totalEmailsSent = 0; // E-mails enviados
+  let totalEmailsOpened = 0; // E-mails abertos
+  let totalWhatsSent = 0; // Mensagens de WhatsApp enviadas
+  let totalLinkedinSent = 0; // Mensagens de LinkedIn enviadas
+
+  // Somar atividades reais
+  Object.values(summary).forEach((day: any) => {
+    totalEmailsSent += day.email || 0;
+    totalEmailsOpened += day.email_opened || 0;
+    totalWhatsSent += day.whatsapp || 0;
+    totalLinkedinSent += day.linkedin || 0;
+  });
+
+  // Pegar ligações do endpoint de stats
+  if (callStats?.calls) {
+    totalDials = callStats.calls.total || 0;
+    totalConnected = (callStats.calls.atendeu_interesse || 0) + (callStats.calls.atendeu_sem_interesse || 0);
+  }
+
+  const totalOutboundTouches = totalDials + totalEmailsSent + totalWhatsSent + totalLinkedinSent;
+
+  // Métricas do post:
+  // 1. Taxa de Conexão: Contatos que viraram conversa real (totalConnected) ÷ total de contatos tentados (totalDials)
+  const connectionRate = totalDials > 0 ? ((totalConnected / totalDials) * 100).toFixed(1) : '0.0';
+
+  // 2. Taxa de Resposta: Respostas obtidas (WhatsApp/LinkedIn ou e-mails abertos) ÷ contatos enviados (e-mails + whats + linkedin)
+  const totalSentTouches = totalEmailsSent + totalWhatsSent + totalLinkedinSent;
+  const totalResponses = totalEmailsOpened + sInteresse; // E-mails abertos + leads que marcaram interesse
+  const responseRate = totalSentTouches > 0 ? ((totalResponses / totalSentTouches) * 100).toFixed(1) : '0.0';
+
+  // 3. MQL (Marketing Qualified Lead): Leads que bateram critério de ICP + sinal de interesse (Etapa de Qualificação, Interesse ou Apresentação)
+  const mqlCount = sQualificacao + sEmailAberto + sInteresse + sApresentacao + sProposta + sFechamento;
+  const mqlRate = totalLeads > 0 ? ((mqlCount / totalLeads) * 100).toFixed(1) : '0.0';
+
+  // 4. Taxa de Agendamento: Reuniões marcadas (Apresentação/Proposta) ÷ MQLs trabalhados
+  const meetingsScheduled = sApresentacao + sProposta + sFechamento;
+  const appointmentRate = mqlCount > 0 ? ((meetingsScheduled / mqlCount) * 100).toFixed(1) : '0.0';
+
+  // 5. Taxa de Show (Comparecimento): Reuniões realizadas (Proposta/Fechamento) ÷ reuniões marcadas
+  const meetingsDone = sProposta + sFechamento;
+  const showRate = meetingsScheduled > 0 ? ((meetingsDone / meetingsScheduled) * 100).toFixed(1) : '0.0';
+
+  // 6. CPR (Custo Por Reunião Realizada)
+  const totalCost = sdrCost + toolsCost + leadsCost;
+  const cprValue = meetingsDone > 0 ? (totalCost / meetingsDone).toFixed(2) : '0.00';
+
+  // 7. CAC de Outbound (Custo de Aquisição de Clientes)
+  const closedDeals = sFechamento + sPosVenda;
+  const cacValue = closedDeals > 0 ? (totalCost / closedDeals).toFixed(2) : '0.00';
+
+  // Funil de Vendas do getLOG
   const funnelSteps = [
-    { label: 'Total de leads', value: total, color: '#0066ff', pct: 100 },
-    { label: 'Contatados', value: total - novos, color: '#6938ef', pct: total > 0 ? Math.round(((total - novos) / total) * 100) : 0 },
-    { label: 'Em negociacao', value: negociacao, color: '#f79009', pct: total > 0 ? Math.round((negociacao / total) * 100) : 0 },
-    { label: 'Fechados', value: fechados, color: '#079455', pct: total > 0 ? Math.round((fechados / total) * 100) : 0 },
+    { label: '1. Prospecção (Lista)', value: totalLeads, color: '#6366f1', pct: 100 },
+    { label: '2. Qualificação (Contatados)', value: mqlCount, color: '#f59e0b', pct: totalLeads > 0 ? Math.round((mqlCount / totalLeads) * 100) : 0 },
+    { label: '3. Apresentação (Demo getLOG)', value: meetingsScheduled, color: '#3b82f6', pct: totalLeads > 0 ? Math.round((meetingsScheduled / totalLeads) * 100) : 0 },
+    { label: '4. Proposta Enviada', value: sProposta + sFechamento, color: '#ec4899', pct: totalLeads > 0 ? Math.round(((sProposta + sFechamento) / totalLeads) * 100) : 0 },
+    { label: '5. Clientes Fechados', value: closedDeals, color: '#10b981', pct: totalLeads > 0 ? Math.round((closedDeals / totalLeads) * 100) : 0 },
   ];
 
   return (
     <>
       <div className="page-header">
-        <div><div className="page-title">BI / Prospeccao</div><div className="page-description">Metricas e funil de vendas deste workspace</div></div>
-      </div>
-
-      <div className="stats" style={{ marginBottom: 20 }}>
-        <div className="stat-card"><div className="stat-value">{total}</div><div className="stat-label">Total de leads</div></div>
-        <div className="stat-card"><div className="stat-value" style={{ color: '#0066ff' }}>{novos}</div><div className="stat-label">Novos</div></div>
-        <div className="stat-card"><div className="stat-value" style={{ color: '#079455' }}>{fechados}</div><div className="stat-label">Fechados</div></div>
-        <div className="stat-card"><div className="stat-value" style={{ color: '#f79009' }}>{negociacao}</div><div className="stat-label">Em negociacao</div></div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
-        <div className="table-wrap" style={{ padding: 16, textAlign: 'center' }}>
-          <div style={{ fontSize: 32, fontWeight: 700, color: '#079455' }}>{convRate}%</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Taxa de conversao</div>
-        </div>
-        <div className="table-wrap" style={{ padding: 16, textAlign: 'center' }}>
-          <div style={{ fontSize: 32, fontWeight: 700, color: '#6938ef' }}>{contactRate}%</div>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Taxa de contato</div>
+        <div>
+          <div className="page-title">📈 Métricas & Outbound (getLOG)</div>
+          <div className="page-description">Análise de eficiência do funil, conversões e custos de outbound em tempo real</div>
         </div>
       </div>
 
-      <div className="table-wrap" style={{ padding: 16, marginBottom: 20 }}>
-        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14 }}>Funil de Vendas</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {funnelSteps.map((step, i) => (
-            <div key={i}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                <span style={{ color: 'var(--text-secondary)' }}>{step.label}</span>
-                <span style={{ fontWeight: 600 }}>{step.value} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({step.pct}%)</span></span>
-              </div>
-              <div style={{ height: 10, background: 'var(--border)', borderRadius: 6, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${step.pct}%`, background: step.color, borderRadius: 6, transition: 'width .6s ease' }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="table-wrap" style={{ padding: 16, marginBottom: 20 }}>
-        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14 }}>Distribuicao por Status</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {[
-            { label: 'Novo', value: novos, color: '#0066ff' },
-            { label: 'Contatado', value: contatados, color: '#6938ef' },
-            { label: 'Em negociacao', value: negociacao, color: '#f79009' },
-            { label: 'Fechado', value: fechados, color: '#079455' },
-            { label: 'Perdido', value: perdidos, color: '#d92d20' },
-          ].map((s, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-              <span style={{ fontSize: 13, flex: 1 }}>{s.label}</span>
-              <span style={{ fontWeight: 600, fontSize: 13 }}>{s.value}</span>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', width: 40, textAlign: 'right' }}>
-                {total > 0 ? Math.round((s.value / total) * 100) : 0}%
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 13 }}>Carregando metricas de ligacoes...</div>
-      ) : callStats ? (
-        <div className="table-wrap" style={{ padding: 16 }}>
-          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14 }}>Metricas de Ligacoes</div>
-          <div className="stats" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 16 }}>
-            <div className="stat-card"><div className="stat-value">{callStats.total_calls || 0}</div><div className="stat-label">Total de ligacoes</div></div>
-            <div className="stat-card"><div className="stat-value" style={{ color: '#079455' }}>{callStats.answered || 0}</div><div className="stat-label">Atendidas</div></div>
-            <div className="stat-card"><div className="stat-value" style={{ color: '#f79009' }}>{callStats.interested || 0}</div><div className="stat-label">Com interesse</div></div>
+      {/* --- CARDS DAS 7 MÉTRICAS DE OURO --- */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 20 }}>
+        {/* 1. Taxa de Conexão */}
+        <div className="table-wrap" style={{ padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>1. Taxa de Conexão</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: '#6366f1', marginTop: 6 }}>{connectionRate}%</div>
           </div>
-          {callStats.total_calls > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {[
-                { label: 'Atendeu com interesse', value: callStats.atendeu_interesse || 0, color: '#079455' },
-                { label: 'Atendeu sem interesse', value: callStats.atendeu_sem_interesse || 0, color: '#f79009' },
-                { label: 'Nao atendeu', value: callStats.nao_atendeu || 0, color: '#667085' },
-                { label: 'Caixa postal', value: callStats.caixa_postal || 0, color: '#98a2b3' },
-                { label: 'Numero errado', value: callStats.numero_errado || 0, color: '#d92d20' },
-              ].map((s, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, flex: 1 }}>{s.label}</span>
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>{s.value}</span>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', width: 40, textAlign: 'right' }}>
-                    {callStats.total_calls > 0 ? Math.round((s.value / callStats.total_calls) * 100) : 0}%
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
+          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 8 }}>
+            Conversas reais ({totalConnected}) ÷ Ligações tentadas ({totalDials})
+          </div>
         </div>
-      ) : null}
+
+        {/* 2. Taxa de Resposta */}
+        <div className="table-wrap" style={{ padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>2. Taxa de Resposta</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: '#0891b2', marginTop: 6 }}>{responseRate}%</div>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 8 }}>
+            Respostas ({totalResponses}) ÷ Envios ({totalSentTouches})
+          </div>
+        </div>
+
+        {/* 3. MQL */}
+        <div className="table-wrap" style={{ padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>3. MQLs Qualificados</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: '#f59e0b', marginTop: 6 }}>{mqlCount} <span style={{ fontSize: 14, fontWeight: 400, color: 'var(--text-muted)' }}>({mqlRate}%)</span></div>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 8 }}>
+            Leads qualificados que bateram critério de ICP
+          </div>
+        </div>
+
+        {/* 4. Taxa de Agendamento */}
+        <div className="table-wrap" style={{ padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>4. Taxa de Agendamento</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: '#7c3aed', marginTop: 6 }}>{appointmentRate}%</div>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 8 }}>
+            Demos agendadas ({meetingsScheduled}) ÷ MQLs ({mqlCount})
+          </div>
+        </div>
+
+        {/* 5. Taxa de Show */}
+        <div className="table-wrap" style={{ padding: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>5. Taxa de Show</div>
+            <div style={{ fontSize: 26, fontWeight: 800, color: '#ec4899', marginTop: 6 }}>{showRate}%</div>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 8 }}>
+            Demos realizadas ({meetingsDone}) ÷ Agendadas ({meetingsScheduled})
+          </div>
+        </div>
+      </div>
+
+      {/* --- CUSTOS, CPR E CAC --- */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+        {/* CPR & CAC */}
+        <div className="table-wrap" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: 0.5 }}>💰 Métricas Financeiras de Outbound</div>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ background: 'var(--surface-2, #f9fafb)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>6. CPR (Custo por Reunião)</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#ea580c', marginTop: 4 }}>R$ {cprValue}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>Custo total ÷ Demos realizadas</div>
+            </div>
+            <div style={{ background: 'var(--surface-2, #f9fafb)', borderRadius: 8, padding: 12, textAlign: 'center' }}>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>7. CAC de Outbound</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: '#10b981', marginTop: 4 }}>R$ {cacValue}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>Custo total ÷ Contratos fechados</div>
+            </div>
+          </div>
+
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+            💡 **Análise de Eficiência**: Se o CPR estiver alto e o CAC estiver baixo, o problema está na geração de reuniões (SDR). Se o CPR estiver baixo e o CAC alto, o gargalo está na conversão comercial (vendas/proposta)!
+          </div>
+        </div>
+
+        {/* Calculadora Interativa de Custos */}
+        <div className="table-wrap" style={{ padding: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 13, textTransform: 'uppercase', color: 'var(--text-muted)', letterSpacing: 0.5, marginBottom: 10 }}>⚙️ Calculadora de Custo Operacional</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Custo do SDR + Equipe (R$/mês)</span>
+              <input type="number" className="field-input" style={{ width: 100, padding: '4px 8px', fontSize: 12, textAlign: 'right' }} value={sdrCost} onChange={e => setSdrCost(Number(e.target.value))} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Custo de Ferramentas/Software (R$/mês)</span>
+              <input type="number" className="field-input" style={{ width: 100, padding: '4px 8px', fontSize: 12, textAlign: 'right' }} value={toolsCost} onChange={e => setToolsCost(Number(e.target.value))} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Custo de Leads/Dados (R$/mês)</span>
+              <input type="number" className="field-input" style={{ width: 100, padding: '4px 8px', fontSize: 12, textAlign: 'right' }} value={leadsCost} onChange={e => setToolsDataCost(Number(e.target.value))} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed var(--border)', paddingTop: 8, fontWeight: 700 }}>
+              <span style={{ fontSize: 12 }}>Custo Total Outbound</span>
+              <span style={{ fontSize: 14, color: 'var(--text)' }}>R$ {totalCost}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* --- FUNIL DE VENDAS E DISTRIBUIÇÃO --- */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+        {/* Funil de Vendas */}
+        <div className="table-wrap" style={{ padding: 16 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14 }}>🏆 Funil de Vendas do getLOG</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {funnelSteps.map((step, i) => (
+              <div key={i}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>{step.label}</span>
+                  <span style={{ fontWeight: 600 }}>{step.value} <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>({step.pct}%)</span></span>
+                </div>
+                <div style={{ height: 10, background: 'var(--border)', borderRadius: 6, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${step.pct}%`, background: step.color, borderRadius: 6, transition: 'width .6s ease' }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Distribuição de Status */}
+        <div className="table-wrap" style={{ padding: 16 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14 }}>📋 Distribuição por Etapas Ativas</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[
+              { label: '1 · Prospecção', value: sProspeccao, color: '#6366f1' },
+              { label: '2 · Qualificação', value: sQualificacao, color: '#f59e0b' },
+              { label: '📬 E-mail Aberto', value: sEmailAberto, color: '#0891b2' },
+              { label: '❤️ Interesse', value: sInteresse, color: '#d946ef' },
+              { label: '3 · Apresentação', value: sApresentacao, color: '#3b82f6' },
+              { label: '4 · Proposta Enviada', value: sProposta, color: '#ec4899' },
+              { label: '5 · Fechamento (Ganho)', value: sFechamento, color: '#10b981' },
+              { label: '6 · Pós-venda', value: sPosVenda, color: '#8b5cf6' },
+              { label: '❌ Perdido', value: sPerdido, color: '#ef4444' },
+            ].map((s, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                <span style={{ fontSize: 12, flex: 1 }}>{s.label}</span>
+                <span style={{ fontWeight: 600, fontSize: 12 }}>{s.value}</span>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', width: 40, textAlign: 'right' }}>
+                  {totalLeads > 0 ? Math.round((s.value / totalLeads) * 100) : 0}%
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* --- ATIVIDADES DIÁRIAS E LIGAÇÕES --- */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+        {/* Atividades Reais por Canal */}
+        <div className="table-wrap" style={{ padding: 16 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14 }}>📣 Volume de Atividades Reais por Canal</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[
+              { label: '📞 Ligações Discadas (Dials)', value: totalDials, color: '#6366f1', icon: '📞' },
+              { label: '✉️ E-mails Enviados', value: totalEmailsSent, color: '#4f46e5', icon: '✉️' },
+              { label: '📬 E-mails Abertos', value: totalEmailsOpened, color: '#0891b2', icon: '📬' },
+              { label: '💬 Mensagens de WhatsApp', value: totalWhatsSent, color: '#059669', icon: '💬' },
+              { label: '💼 Mensagens de LinkedIn', value: totalLinkedinSent, color: '#0284c7', icon: '💼' },
+            ].map((canal, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 14 }}>{canal.icon}</span>
+                <span style={{ fontSize: 12, flex: 1 }}>{canal.label}</span>
+                <span style={{ fontWeight: 700, fontSize: 13 }}>{canal.value}</span>
+                <div style={{ width: 80, height: 6, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${totalOutboundTouches > 0 ? Math.round((canal.value / totalOutboundTouches) * 100) : 0}%`, background: canal.color, borderRadius: 3 }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Métricas de Ligações */}
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 13 }}>Carregando metricas de ligacoes...</div>
+        ) : callStats ? (
+          <div className="table-wrap" style={{ padding: 16 }}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 14 }}>📞 Detalhamento das Ligações</div>
+            <div className="stats" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginBottom: 16 }}>
+              <div className="stat-card"><div className="stat-value" style={{ fontSize: 18 }}>{callStats.calls?.total || 0}</div><div className="stat-label">Total Dials</div></div>
+              <div className="stat-card"><div className="stat-value" style={{ color: '#079455', fontSize: 18 }}>{totalConnected}</div><div className="stat-label">Conectadas</div></div>
+              <div className="stat-card"><div className="stat-value" style={{ color: '#f79009', fontSize: 18 }}>{callStats.calls?.atendeu_interesse || 0}</div><div className="stat-label">Com Interesse</div></div>
+            </div>
+            {callStats.calls?.total > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[
+                  { label: 'Atendeu com interesse', value: callStats.calls.atendeu_interesse || 0, color: '#079455' },
+                  { label: 'Atendeu sem interesse', value: callStats.calls.atendeu_sem_interesse || 0, color: '#f79009' },
+                  { label: 'Nao atendeu', value: callStats.calls.nao_atendeu || 0, color: '#667085' },
+                  { label: 'Caixa postal', value: callStats.calls.caixa_postal || 0, color: '#98a2b3' },
+                  { label: 'Numero errado', value: callStats.calls.numero_errado || 0, color: '#d92d20' },
+                ].map((s, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, flex: 1 }}>{s.label}</span>
+                    <span style={{ fontWeight: 600, fontSize: 12 }}>{s.value}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', width: 40, textAlign: 'right' }}>
+                      {callStats.calls.total > 0 ? Math.round((s.value / callStats.calls.total) * 100) : 0}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </div>
 
       {/* Mapa do Brasil por estado */}
       <MapaBrasil leads={leads} />

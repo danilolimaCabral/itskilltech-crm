@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
         const currentStatus = lead.status || 'prospeccao';
 
         // Só avança se ainda não foi marcado como aberto
-        if (currentStatus === 'qualificacao' || currentStatus === 'prospeccao') {
+        if (currentStatus === 'qualificacao' || currentStatus === 'prospeccao' || currentStatus === 'email_enviado') {
           const now = new Date().toISOString();
           
           // Gerar data formatada no fuso de Brasília para exibição amigável na timeline
