@@ -53,6 +53,7 @@ export async function GET(req: NextRequest) {
             ts: event.ts || 0,
             type: 'email',
             opened: event.opened || false,
+            resend_id: event.resend_id || null,
           }
 
           // Filtro de busca

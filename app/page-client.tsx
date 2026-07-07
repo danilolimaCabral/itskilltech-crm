@@ -501,7 +501,7 @@ export default function CRM() {
         const STATUS_ADVANCE: any = { prospeccao: 'email_enviado', novo: 'email_enviado', contatado: 'email_enviado', email_enviado: 'qualificacao', qualificacao: 'apresentacao', apresentacao: 'fechamento', fechamento: 'posvenda' };
         const nextStatus = STATUS_ADVANCE[normalizeStatus(emailModal.status)] || normalizeStatus(emailModal.status);
         const timeline = JSON.parse(emailModal.notes?.match(/\[TIMELINE\]([\s\S]*?)\[\/TIMELINE\]/)?.[1] || '[]');
-        timeline.unshift({ type: 'email', label: `E-mail enviado: ${emailSubject}${emailInlineImages ? ' (🖼 com imagens Getlog)' : emailAttachFile ? ` (📎 ${emailAttachFile.name})` : emailAttachmentUrl ? ' (com apresentação)' : ''}`, ts: Date.now(), resend_id: j.id || null });
+        timeline.unshift({ type: 'email', label: `E-mail enviado: ${emailSubject}${emailInlineImages ? ' (🖼 com imagens Getlog)' : emailAttachFile ? ` (📎 ${emailAttachFile.name})` : emailAttachmentUrl ? ' (com apresentação)' : ''}`, ts: Date.now(), resend_id: j.messageId || j.id || null });
         if (nextStatus !== normalizeStatus(emailModal.status)) timeline.unshift({ type: 'status', label: `Etapa → ${FUNNEL_MAP[nextStatus]?.label || nextStatus}`, ts: Date.now() });
         const notesClean = (emailModal.notes || '').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
         await saveLead({ ...emailModal, status: nextStatus, updated_at: Date.now(), notes: notesClean + `\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]` });

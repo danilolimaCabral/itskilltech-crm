@@ -146,7 +146,8 @@ export async function POST(req: NextRequest) {
           timeline.unshift({
             type: 'email',
             label: `E-mail enviado: "${subject}"`,
-            ts: Date.now()
+            ts: Date.now(),
+            resend_id: data?.id || null
           })
 
           // Avançar o status se aplicável
