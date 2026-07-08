@@ -61,6 +61,23 @@ const mobileStyle = `
 
 const WORKSPACE = 'lottus';
 
+const FUNNEL = [
+  { id: 'prospeccao',   label: '1 · Prospecção',   short: 'Prospecção',   color: '#6366f1', bg: '#eef2ff' },
+  { id: 'email_enviado', label: '✉️ E-mail Enviado', short: 'E-mail Enviado', color: '#0284c7', bg: '#f0f9ff' },
+  { id: 'qualificacao', label: '2 · Qualificação',  short: 'Qualificação', color: '#f59e0b', bg: '#fffbeb' },
+  { id: 'email_aberto', label: '📬 E-mail Aberto',  short: 'E-mail Aberto', color: '#0891b2', bg: '#ecfeff' },
+  { id: 'interesse',    label: '❤️ Interesse',      short: 'Interesse',    color: '#d946ef', bg: '#fdf4ff' },
+  { id: 'apresentacao', label: '3 · Apresentação',  short: 'Apresentação', color: '#3b82f6', bg: '#eff6ff' },
+  { id: 'proposta',     label: '4 · Proposta Enviada', short: 'Proposta',    color: '#ec4899', bg: '#fdf2f8' },
+  { id: 'fechamento',   label: '5 · Fechamento',   short: 'Fechamento',   color: '#10b981', bg: '#ecfdf5' },
+  { id: 'posvenda',     label: '6 · Pós-venda',    short: 'Pós-venda',    color: '#8b5cf6', bg: '#f5f3ff' },
+  { id: 'perdido',      label: '❌ Perdido',        short: 'Perdido',       color: '#ef4444', bg: '#fef2f2' },
+];
+const FUNNEL_MAP: any = Object.fromEntries(FUNNEL.map(f => [f.id, f]));
+const LEGACY_MAP: any = { novo: 'prospeccao', contatado: 'qualificacao', interesse: 'interesse', negociacao: 'apresentacao', fechado: 'fechamento', perdido: 'perdido' };
+const normalizeStatus = (s: string) => FUNNEL_MAP[s] ? s : (LEGACY_MAP[s] || 'prospeccao');
+const statusLabel = (s: string) => FUNNEL_MAP[normalizeStatus(s)]?.short || s;
+
 const safeFormatDate = (value: any, options?: Intl.DateTimeFormatOptions) => {
   if (!value) return '—';
   const num = Number(value);
@@ -745,11 +762,15 @@ export default function GestorPage() {
           <div style={{ background: '#fff', borderRadius: 14, padding: '20px 24px', marginTop: 20, border: '1px solid #e8edf2', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
             <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
               <span>👥 Todos os Leads ({leads.length})</span>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {['all','Prospecção','Qualificação','Apresentação','Pós-venda'].map(f => (
-                  <button key={f} onClick={() => setLeadsFilter(f)}
-                    style={{ background: leadsFilter === f ? '#0066ff' : '#f1f5f9', color: leadsFilter === f ? '#fff' : '#374151', border: 'none', borderRadius: 8, padding: '4px 12px', fontSize: 12, cursor: 'pointer', fontWeight: leadsFilter === f ? 600 : 400 }}>
-                    {f === 'all' ? 'Todos' : f}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button onClick={() => setLeadsFilter('all')}
+                  style={{ background: leadsFilter === 'all' ? '#0066ff' : '#f1f5f9', color: leadsFilter === 'all' ? '#fff' : '#374151', border: 'none', borderRadius: 8, padding: '4px 12px', fontSize: 12, cursor: 'pointer', fontWeight: leadsFilter === 'all' ? 600 : 400 }}>
+                  Todos
+                </button>
+                {FUNNEL.map(f => (
+                  <button key={f.id} onClick={() => setLeadsFilter(f.id)}
+                    style={{ background: leadsFilter === f.id ? f.color : '#f1f5f9', color: leadsFilter === f.id ? '#fff' : '#374151', border: 'none', borderRadius: 8, padding: '4px 12px', fontSize: 12, cursor: 'pointer', fontWeight: leadsFilter === f.id ? 600 : 400 }}>
+                    {f.short}
                   </button>
                 ))}
               </div>
@@ -762,7 +783,7 @@ export default function GestorPage() {
             />
             <div style={{ maxHeight: 500, overflowY: 'auto' }}>
               {leads
-                .filter(l => leadsFilter === 'all' || l.status === leadsFilter)
+                .filter(l => leadsFilter === 'all' || normalizeStatus(l.status) === leadsFilter)
                 .filter(l => !leadsSearch || `${l.name} ${l.company} ${l.email}`.toLowerCase().includes(leadsSearch.toLowerCase()))
                 .slice(0, 100)
                 .map((l: any) => {
@@ -780,7 +801,19 @@ export default function GestorPage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                           <span style={{ fontWeight: 600, fontSize: 13 }}>{l.name || '—'}</span>
                           <span style={{ fontSize: 11, color: '#64748b' }}>{l.company}</span>
-                          <span style={{ fontSize: 11, background: l.status === 'Prospecção' ? '#eff6ff' : l.status === 'Qualificação' ? '#f0fdf4' : '#fff7ed', color: l.status === 'Prospecção' ? '#1a56db' : l.status === 'Qualificação' ? '#16a34a' : '#ea580c', borderRadius: 6, padding: '1px 8px' }}>{l.status}</span>
+                          {(() => {
+                            const statusNormalized = normalizeStatus(l.status);
+                            const f = FUNNEL_MAP[statusNormalized];
+                            return f ? (
+                              <span style={{ fontSize: 11, background: f.bg, color: f.color, border: `1px solid ${f.color}22`, borderRadius: 6, padding: '1px 8px', fontWeight: 600 }}>
+                                {f.short}
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: 11, background: '#f1f5f9', color: '#475569', borderRadius: 6, padding: '1px 8px' }}>
+                                {l.status}
+                              </span>
+                            );
+                          })()}
                           {nextCall && <span style={{ fontSize: 11, background: isOverdue ? '#fee2e2' : '#fef9c3', color: isOverdue ? '#dc2626' : '#92400e', borderRadius: 6, padding: '1px 8px' }}>{isOverdue ? '⚠ Retorno atrasado' : `🔔 Retorno: ${safeFormatDate(nextCall)}`}</span>}
                         </div>
                         <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{l.email} {l.phone ? `· ${l.phone}` : ''}</div>
@@ -801,7 +834,7 @@ export default function GestorPage() {
                     </div>
                   );
                 })}
-              {leads.filter(l => leadsFilter === 'all' || l.status === leadsFilter).filter(l => !leadsSearch || `${l.name} ${l.company} ${l.email}`.toLowerCase().includes(leadsSearch.toLowerCase())).length > 100 && (
+              {leads.filter(l => leadsFilter === 'all' || normalizeStatus(l.status) === leadsFilter).filter(l => !leadsSearch || `${l.name} ${l.company} ${l.email}`.toLowerCase().includes(leadsSearch.toLowerCase())).length > 100 && (
                 <div style={{ textAlign: 'center', padding: 12, color: '#64748b', fontSize: 12 }}>Mostrando os primeiros 100 resultados. Use a busca para filtrar.</div>
               )}
             </div>
