@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getQuotes, upsertQuote, deleteQuote } from '@/lib/db';
+import { resolveWorkspace } from '@/lib/auth';
 export const dynamic = 'force-dynamic';
 
 const uid = () => 'qt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
@@ -7,8 +8,9 @@ const uid = () => 'qt_' + Date.now() + '_' + Math.random().toString(36).slice(2,
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const workspace = searchParams.get('workspace');
-    if (!workspace) return NextResponse.json({ error: 'workspace obrigatório' }, { status: 400 });
+    const access = await resolveWorkspace(req, searchParams.get('workspace'));
+    if (!access.workspace) return NextResponse.json({ error: access.error }, { status: access.session ? 403 : 401 });
+    const workspace = access.workspace;
     const quotes = await getQuotes(workspace);
     return NextResponse.json({ quotes });
   } catch (e: any) {
@@ -19,10 +21,12 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+    const access = await resolveWorkspace(req, body.workspace);
+    if (!access.workspace) return NextResponse.json({ error: access.error }, { status: access.session ? 403 : 401 });
     const now = Date.now();
     const quote = {
       id: body.id || uid(),
-      workspace: body.workspace,
+      workspace: access.workspace,
       lead_id: body.lead_id || null,
       lead_name: body.lead_name || '',
       lead_company: body.lead_company || '',
@@ -49,9 +53,11 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
+    const access = await resolveWorkspace(req, searchParams.get('workspace'));
+    if (!access.workspace) return NextResponse.json({ error: access.error }, { status: access.session ? 403 : 401 });
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'id obrigatório' }, { status: 400 });
-    await deleteQuote(id);
+    await deleteQuote(id, access.workspace);
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });

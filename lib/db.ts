@@ -26,6 +26,8 @@ export async function initDatabase() {
       created_at BIGINT
     );
   `;
+  try { await sql`ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';`; } catch {}
+  try { await sql`ALTER TABLE workspaces ADD COLUMN IF NOT EXISTS plan TEXT DEFAULT 'starter';`; } catch {}
 
   // Inserir workspaces padrão se não existirem
   await sql`
@@ -33,7 +35,7 @@ export async function initDatabase() {
     VALUES
       ('lottus', 'Lottus Tech', '#0066ff', ${Date.now()}),
       ('iota', 'IOTA', '#6938ef', ${Date.now()}),
-      ('splice', 'Splice', '#079455', ${Date.now()})
+      ('splitc', 'SPLITC', '#079455', ${Date.now()})
     ON CONFLICT (id) DO NOTHING;
   `;
 
@@ -124,6 +126,38 @@ export async function initDatabase() {
   // Migração segura: adicionar attachment_url se não existir
   try { await sql`ALTER TABLE templates ADD COLUMN IF NOT EXISTS attachment_url TEXT DEFAULT '';`; } catch {}
 
+  // Usuários por empresa e sessões revogáveis. Senhas são armazenadas apenas como hash PBKDF2.
+  await sql`
+    CREATE TABLE IF NOT EXISTS tenant_users (
+      id TEXT PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      workspace TEXT NOT NULL REFERENCES workspaces(id),
+      role TEXT NOT NULL DEFAULT 'operator',
+      active BOOLEAN DEFAULT true,
+      created_at BIGINT NOT NULL,
+      updated_at BIGINT NOT NULL
+    );
+  `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS crm_sessions (
+      id TEXT PRIMARY KEY,
+      token_hash TEXT UNIQUE NOT NULL,
+      user_id TEXT NOT NULL REFERENCES tenant_users(id) ON DELETE CASCADE,
+      workspace TEXT NOT NULL REFERENCES workspaces(id),
+      role TEXT NOT NULL,
+      expires_at BIGINT NOT NULL,
+      created_at BIGINT NOT NULL
+    );
+  `;
+  // Conta administrativa legada migrada para hash não reversível. A senha original não permanece no código.
+  await sql`
+    INSERT INTO tenant_users (id, username, password_hash, display_name, workspace, role, active, created_at, updated_at)
+    VALUES ('usr_danilo_master', 'danilo', 'pbkdf2$210000$7ZZeEGBTe9SHEJK01F7RMw$UAOatwE1NikxJ1nsAOcAan1wqGFYzVM03D7MeUrqZVk', 'Danilo Cabral', 'lottus', 'master', true, ${Date.now()}, ${Date.now()})
+    ON CONFLICT (username) DO NOTHING;
+  `;
+
   return { ok: true };
 }
 
@@ -155,6 +189,66 @@ export async function deleteWorkspace(id: string) {
   return { id };
 }
 
+export async function getWorkspace(id: string) {
+  if (!hasDatabase) return null;
+  const { rows } = await sql`SELECT * FROM workspaces WHERE id = ${id} LIMIT 1;`;
+  return rows[0] || null;
+}
+
+// ---- Usuários e sessões multiempresa ----
+export async function getTenantUserByUsername(username: string) {
+  if (!hasDatabase) return null;
+  const { rows } = await sql`SELECT * FROM tenant_users WHERE username = ${username.toLowerCase()} LIMIT 1;`;
+  return rows[0] || null;
+}
+
+export async function listTenantUsers() {
+  if (!hasDatabase) return [];
+  const { rows } = await sql`
+    SELECT u.id, u.username, u.display_name, u.workspace, u.role, u.active, u.created_at, w.name AS workspace_name
+    FROM tenant_users u
+    LEFT JOIN workspaces w ON w.id = u.workspace
+    ORDER BY u.created_at ASC;
+  `;
+  return rows;
+}
+
+export async function insertTenantUser(user: any) {
+  if (!hasDatabase) return null;
+  await sql`
+    INSERT INTO tenant_users (id, username, password_hash, display_name, workspace, role, active, created_at, updated_at)
+    VALUES (${user.id}, ${user.username.toLowerCase()}, ${user.password_hash}, ${user.display_name}, ${user.workspace}, ${user.role || 'operator'}, ${user.active ?? true}, ${user.created_at || Date.now()}, ${Date.now()});
+  `;
+  return user;
+}
+
+export async function createTenantSession(session: any) {
+  if (!hasDatabase) return null;
+  await sql`
+    INSERT INTO crm_sessions (id, token_hash, user_id, workspace, role, expires_at, created_at)
+    VALUES (${session.id}, ${session.token_hash}, ${session.user_id}, ${session.workspace}, ${session.role}, ${session.expires_at}, ${session.created_at});
+  `;
+  return session;
+}
+
+export async function getTenantSessionByTokenHash(tokenHash: string) {
+  if (!hasDatabase) return null;
+  const { rows } = await sql`
+    SELECT s.id, s.user_id, s.workspace, s.role, s.expires_at, u.username, u.display_name, u.active
+    FROM crm_sessions s
+    INNER JOIN tenant_users u ON u.id = s.user_id
+    WHERE s.token_hash = ${tokenHash}
+    LIMIT 1;
+  `;
+  return rows[0] || null;
+}
+
+export async function deleteTenantSession(tokenHash: string) {
+  if (!hasDatabase) return null;
+  await sql`DELETE FROM crm_sessions WHERE token_hash = ${tokenHash};`;
+  return true;
+}
+
 // ---- Leads ----
 export async function getLeads(workspace: string) {
   if (!hasDatabase) return [];
@@ -180,18 +274,19 @@ export async function upsertLead(lead: any) {
   return lead;
 }
 
-export async function deleteLead(id: string) {
+export async function deleteLead(id: string, workspace?: string) {
   if (!hasDatabase) return null;
-  await sql`DELETE FROM leads WHERE id = ${id};`;
+  if (workspace) await sql`DELETE FROM leads WHERE id = ${id} AND workspace = ${workspace};`;
+  else await sql`DELETE FROM leads WHERE id = ${id};`;
   return { id };
 }
 
 // ---- Ligações ----
-export async function getCallLogs(leadId: string) {
+export async function getCallLogs(leadId: string, workspace?: string) {
   if (!hasDatabase) return [];
-  const { rows } = await sql`
-    SELECT * FROM call_logs WHERE lead_id = ${leadId} ORDER BY created_at DESC;
-  `;
+  const { rows } = workspace
+    ? await sql`SELECT * FROM call_logs WHERE lead_id = ${leadId} AND workspace = ${workspace} ORDER BY created_at DESC;`
+    : await sql`SELECT * FROM call_logs WHERE lead_id = ${leadId} ORDER BY created_at DESC;`;
   return rows;
 }
 
@@ -228,9 +323,10 @@ export async function upsertQuote(quote: any) {
   return quote;
 }
 
-export async function deleteQuote(id: string) {
+export async function deleteQuote(id: string, workspace?: string) {
   if (!hasDatabase) return null;
-  await sql`DELETE FROM quotes WHERE id = ${id};`;
+  if (workspace) await sql`DELETE FROM quotes WHERE id = ${id} AND workspace = ${workspace};`;
+  else await sql`DELETE FROM quotes WHERE id = ${id};`;
   return { id };
 }
 
@@ -255,9 +351,10 @@ export async function upsertTemplate(t: any) {
   return t;
 }
 
-export async function deleteTemplate(id: string) {
+export async function deleteTemplate(id: string, workspace?: string) {
   if (!hasDatabase) return null;
-  await sql`DELETE FROM templates WHERE id = ${id};`;
+  if (workspace) await sql`DELETE FROM templates WHERE id = ${id} AND workspace = ${workspace};`;
+  else await sql`DELETE FROM templates WHERE id = ${id};`;
   return { id };
 }
 

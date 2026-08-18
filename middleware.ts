@@ -3,7 +3,6 @@ import type { NextRequest } from 'next/server';
 
 const LOGIN_PATH = '/login';
 const SESSION_COOKIE = 'crm_session';
-const SESSION_VALUE = 'danilo_getlog2026_authenticated';
 
 // Rotas que NÃO precisam de autenticação
 const PUBLIC_PATHS = [
@@ -26,9 +25,10 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Verificar cookie de sessão
+  // A validade e o tenant da sessão são verificados nas APIs por token revogável no banco.
+  // Aqui mantemos a barreira de navegação, sem expor dados caso um cookie seja falsificado.
   const session = request.cookies.get(SESSION_COOKIE);
-  if (session?.value === SESSION_VALUE) {
+  if (session?.value) {
     return NextResponse.next();
   }
 

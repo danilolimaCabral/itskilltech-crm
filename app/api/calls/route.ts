@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getCallLogs, insertCallLog, upsertLead } from '@/lib/db';
-import { getLeads } from '@/lib/db';
+import { getCallLogs, insertCallLog, upsertLead, getLeads } from '@/lib/db';
+import { resolveWorkspace } from '@/lib/auth';
 export const dynamic = 'force-dynamic';
 
 const uid = () => 'call_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
@@ -18,9 +18,11 @@ const RESULT_TO_STATUS: Record<string, string> = {
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
+    const access = await resolveWorkspace(req, searchParams.get('workspace'));
+    if (!access.workspace) return NextResponse.json({ error: access.error }, { status: access.session ? 403 : 401 });
     const leadId = searchParams.get('lead_id');
     if (!leadId) return NextResponse.json({ error: 'lead_id obrigatório' }, { status: 400 });
-    const logs = await getCallLogs(leadId);
+    const logs = await getCallLogs(leadId, access.workspace);
     return NextResponse.json({ logs });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
@@ -30,10 +32,14 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { lead_id, workspace, result, notes, duration, lead } = body;
+    const { lead_id, result, notes, duration } = body;
+    const access = await resolveWorkspace(req, body.workspace);
+    if (!access.workspace) return NextResponse.json({ error: access.error }, { status: access.session ? 403 : 401 });
+    const workspace = access.workspace;
+    const lead = (await getLeads(workspace)).find((item: any) => item.id === lead_id);
 
-    if (!lead_id || !workspace || !result) {
-      return NextResponse.json({ error: 'lead_id, workspace e result são obrigatórios' }, { status: 400 });
+    if (!lead_id || !result) {
+      return NextResponse.json({ error: 'lead_id e result são obrigatórios' }, { status: 400 });
     }
 
     // Registrar a ligação
@@ -76,6 +82,7 @@ export async function POST(req: Request) {
 
       const updatedLead = {
         ...lead,
+        workspace,
         notes: newNotes,
         status: newStatus,
         call_count: (lead.call_count || 0) + 1,
@@ -86,7 +93,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, log, new_status: newStatus, lead: updatedLead });
     }
 
-    return NextResponse.json({ ok: true, log });
+    return NextResponse.json({ error: 'Lead não encontrado neste workspace.' }, { status: 404 });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }

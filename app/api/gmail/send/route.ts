@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { gmailClient } from '@/lib/google';
 import { getAccount } from '@/lib/accounts';
+import { resolveWorkspace } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +27,10 @@ function buildRawEmail(from: string, to: string, subject: string, body: string) 
 // POST /api/gmail/send  { workspace, to, subject, body }
 export async function POST(req: Request) {
   try {
-    const { workspace, to, subject, body } = await req.json();
+    const { workspace: requestedWorkspace, to, subject, body } = await req.json();
+    const access = await resolveWorkspace(req, requestedWorkspace);
+    if (!access.workspace) return NextResponse.json({ ok: false, error: access.error }, { status: access.session ? 403 : 401 });
+    const workspace = access.workspace;
     const account = getAccount(workspace);
     if (!account) {
       return NextResponse.json({ ok: false, error: 'Conta não conectada para este workspace' }, { status: 401 });

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { gmailClient } from '@/lib/google';
 import { getAccount } from '@/lib/accounts';
+import { resolveWorkspace } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +14,9 @@ function header(headers: any[], name: string) {
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const workspace = searchParams.get('workspace') || 'lottus';
+    const access = await resolveWorkspace(req, searchParams.get('workspace'));
+    if (!access.workspace) return NextResponse.json({ error: access.error, messages: [] }, { status: access.session ? 403 : 401 });
+    const workspace = access.workspace;
     const q = searchParams.get('q') || ''; // ex: "from:cliente@x.com" ou vazio
     const max = parseInt(searchParams.get('max') || '20', 10);
 

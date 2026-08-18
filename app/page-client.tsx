@@ -12,12 +12,13 @@ interface Lead {
   state?: string; industry?: string;
 }
 
-interface Workspace { id: string; name: string; color: string; }
+interface Workspace { id: string; name: string; color: string; company_name?: string; company_cnpj?: string; status?: string; plan?: string; }
+interface SessionInfo { username: string; display_name: string; role: 'master' | 'operator'; workspace: string; }
 
 const DEFAULT_WORKSPACES: Workspace[] = [
   { id: 'lottus', name: 'Lottus Tech', color: '#0066ff' },
   { id: 'iota', name: 'IOTA', color: '#6938ef' },
-  { id: 'splice', name: 'Splice', color: '#079455' },
+  { id: 'splitc', name: 'SPLITC', color: '#079455' },
 ];
 
 const STORAGE_KEY = 'itskill_crm_full_v1';
@@ -96,12 +97,10 @@ const ICONS: any = {
 
 export default function CRM() {
   const [workspaces, setWorkspaces] = useState<Workspace[]>(DEFAULT_WORKSPACES);
-  const [workspace, setWorkspace] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('active_workspace') || 'lottus';
-    }
-    return 'lottus';
-  });
+  const [workspace, setWorkspace] = useState('lottus');
+  const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [switchingWorkspace, setSwitchingWorkspace] = useState(false);
   const [view, setView] = useState('leads');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [hasDb, setHasDb] = useState<boolean | null>(null);
@@ -118,10 +117,6 @@ export default function CRM() {
   const [filterNotContacted30d, setFilterNotContacted30d] = useState(false);
   const [filterEmailProspectedWithPhone, setFilterEmailProspectedWithPhone] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [wsListOpen, setWsListOpen] = useState(false);
-  const [wsPassModal, setWsPassModal] = useState<string | null>(null); // workspace id a trocar
-  const [wsPassInput, setWsPassInput] = useState('');
-  const WS_PASSWORD = 'lottus2025';
   const [enriching, setEnriching] = useState<string | null>(null);
   const [enrichingAll, setEnrichingAll] = useState(false);
   const [enrichProgress, setEnrichProgress] = useState({ done: 0, total: 0 });
@@ -210,6 +205,27 @@ export default function CRM() {
   const [cnpjResult, setCnpjResult] = useState<any>(null);
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2800); };
+  const isMaster = sessionInfo?.role === 'master';
+
+  // O tenant é definido no servidor pela sessão, nunca pelo armazenamento local do navegador.
+  useEffect(() => {
+    (async () => {
+      try {
+        const response = await fetch('/api/auth/me');
+        if (!response.ok) {
+          window.location.assign(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+          return;
+        }
+        const data = await response.json();
+        setSessionInfo(data.session);
+        if (data.workspaces?.length) setWorkspaces(data.workspaces);
+        setWorkspace(data.session.workspace);
+        setAuthReady(true);
+      } catch {
+        window.location.assign(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+      }
+    })();
+  }, []);
 
   // Salvar LinkedIn rápido
   const saveLinkedin = async () => {
@@ -307,6 +323,7 @@ export default function CRM() {
 
   // init
   useEffect(() => {
+    if (!authReady) return;
     (async () => {
       try {
         const r = await fetch('/api/init');
@@ -353,7 +370,7 @@ export default function CRM() {
     })();
     const params = new URLSearchParams(window.location.search);
     if (params.get('auth') === 'ok') { showToast('Conta conectada'); window.history.replaceState({}, '', '/'); }
-  }, []);
+  }, [authReady, workspace]);
 
   const loadLeads = useCallback(async () => {
     if (hasDb) {
@@ -383,6 +400,24 @@ export default function CRM() {
   const saveLead = async (lead: Lead) => {
     if (hasDb) { await fetch('/api/leads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lead) }); await loadLeads(); }
     else { const ex = leads.some(l => l.id === lead.id); const next = ex ? leads.map(l => l.id === lead.id ? lead : l) : [...leads, lead]; setLeads(next); persistLocal(next); }
+  };
+
+  const switchWorkspace = async (targetWorkspace: string) => {
+    if (!isMaster || targetWorkspace === workspace || switchingWorkspace) return;
+    setSwitchingWorkspace(true);
+    try {
+      const response = await fetch('/api/auth/switch-workspace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspace: targetWorkspace }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Não foi possível trocar de empresa.');
+      window.location.assign('/');
+    } catch (error: any) {
+      showToast(error.message || 'Não foi possível trocar de empresa.');
+      setSwitchingWorkspace(false);
+    }
   };
 
   const removeLead = async (id: string, skipConfirm?: boolean) => {
@@ -845,6 +880,10 @@ export default function CRM() {
     } catch { return []; }
   }).sort((a: any, b: any) => b.ts - a.ts);
 
+  if (!authReady) {
+    return <div className="app" style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', color: '#667085' }}>Validando acesso seguro...</div>;
+  }
+
   return (
     <div className="app">
       <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
@@ -861,15 +900,19 @@ export default function CRM() {
           </div>
         </div>
         <div className="sidebar-section">
-          {/* Workspace ativo sempre visível */}
+          {/* Empresa ativa — a troca é permitida apenas a sessões de administrador mestre. */}
           {workspaces.filter(w => w.id === workspace).map(w => (
-            <button key={w.id} className="ws-item active"
-              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start', cursor: 'default' }}>
+            <div key={w.id} className="ws-item active"
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'flex-start' }}>
               <span className="ws-dot" style={{ background: w.color }} />
               <span style={{ flex: 1, textAlign: 'left' }}>{w.name}</span>
-            </button>
+            </div>
           ))}
-          {/* Outros workspaces ocultos — acesso via Configurações */}
+          {isMaster && workspaces.length > 1 && (
+            <select aria-label="Trocar empresa" value={workspace} disabled={switchingWorkspace} onChange={e => switchWorkspace(e.target.value)} style={{ width: '100%', marginTop: 8, border: '1px solid var(--border)', borderRadius: 8, padding: '7px 8px', background: 'var(--surface)', color: 'var(--text)', fontSize: 12 }}>
+              {workspaces.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+            </select>
+          )}
         </div>
         <div className="sidebar-section">
           <div className="section-label">Navegação</div>
@@ -894,6 +937,12 @@ export default function CRM() {
               <span>{label}</span>
             </button>
           ))}
+          {isMaster && (
+            <a href="/admin" className="nav-item" style={{ textDecoration: 'none' }}>
+              <div className="nav-icon"><span style={{ fontSize: 13 }}>🏢</span></div>
+              <span>Clientes & Acessos</span>
+            </a>
+          )}
           <a href="/social" target="_blank" className="nav-item" style={{ textDecoration: 'none' }}>
             <div className="nav-icon"><span style={{ fontSize: 13 }}>📣</span></div>
             <span>Social Media</span>
@@ -1652,7 +1701,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
             }
             showToast(newLeads.length + ' lead(s) importado(s)');
           }} showToast={showToast} />}
-          {view === 'workspaces' && <WorkspacesView workspaces={workspaces} onReload={async () => {
+          {view === 'workspaces' && isMaster && <WorkspacesView workspaces={workspaces} onReload={async () => {
             try { const r = await fetch('/api/workspaces'); const j = await r.json(); if (j.workspaces?.length) setWorkspaces(j.workspaces); } catch {}
           }} showToast={showToast} />}
           {view === 'templates' && <TemplatesView workspace={workspace} workspaceName={ws?.name} templates={templates} onReload={() => loadTemplates(workspace)} showToast={showToast} />}
@@ -2779,52 +2828,6 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                 } catch { showToast('Erro ao agendar reunião'); }
                 setCalSaving(false);
               }}>{calSaving ? 'Agendando...' : '📅 Agendar e enviar invite'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* MODAL SENHA WORKSPACE */}
-      {wsPassModal && (
-        <div className="modal-bg" onClick={() => setWsPassModal(null)}>
-          <div className="modal" style={{ maxWidth: 360 }} onClick={(e: any) => e.stopPropagation()}>
-            <div className="modal-header">
-              <span className="modal-title">🔒 Trocar de Workspace</span>
-              <button className="modal-close" onClick={() => setWsPassModal(null)}>×</button>
-            </div>
-            <div className="modal-body">
-              <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 14 }}>Digite a senha para acessar outro workspace.</p>
-              <div className="field">
-                <label className="field-label">Senha</label>
-                <input
-                  className="field-input"
-                  type="password"
-                  placeholder="••••••••"
-                  value={wsPassInput}
-                  onChange={(e: any) => setWsPassInput(e.target.value)}
-                  onKeyDown={(e: any) => {
-                    if (e.key === 'Enter') {
-                      if (wsPassInput === WS_PASSWORD) {
-                        const targetId = wsPassModal!;
-                        setWorkspace(targetId); localStorage.setItem('active_workspace', targetId); loadTemplates(targetId);
-                        setSidebarOpen(false); setWsListOpen(false);
-                        setWsPassModal(null); setWsPassInput('');
-                      } else { alert('Senha incorreta!'); setWsPassInput(''); }
-                    }
-                  }}
-                  autoFocus
-                />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn" onClick={() => setWsPassModal(null)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={() => {
-                if (wsPassInput === WS_PASSWORD) {
-                  const targetId = wsPassModal!;
-                  setWorkspace(targetId); localStorage.setItem('active_workspace', targetId); loadTemplates(targetId);
-                  setSidebarOpen(false); setWsListOpen(false);
-                  setWsPassModal(null); setWsPassInput('');
-                } else { alert('Senha incorreta!'); setWsPassInput(''); }
-              }}>Entrar</button>
             </div>
           </div>
         </div>

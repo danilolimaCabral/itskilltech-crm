@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getLeads, upsertLead, deleteLead, hasDatabase } from '@/lib/db';
 import { sql } from '@vercel/postgres';
+import { resolveWorkspace } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,7 +10,9 @@ export async function GET(req: Request) {
   if (!hasDatabase) return NextResponse.json({ hasDatabase: false, leads: [] });
   try {
     const { searchParams } = new URL(req.url);
-    const workspace = searchParams.get('workspace') || 'lottus';
+    const access = await resolveWorkspace(req, searchParams.get('workspace'));
+    if (!access.workspace) return NextResponse.json({ error: access.error }, { status: access.session ? 403 : 401 });
+    const workspace = access.workspace;
     const leads = await getLeads(workspace);
     return NextResponse.json({ hasDatabase: true, leads });
   } catch (e: any) {
@@ -22,14 +25,23 @@ export async function POST(req: Request) {
   if (!hasDatabase) return NextResponse.json({ hasDatabase: false, ok: false });
   try {
     const lead = await req.json();
+    const access = await resolveWorkspace(req, lead.workspace);
+    if (!access.workspace) return NextResponse.json({ ok: false, error: access.error }, { status: access.session ? 403 : 401 });
+    lead.workspace = access.workspace;
     
     if (!lead.id) {
       return NextResponse.json({ ok: false, error: 'ID do lead é obrigatório' }, { status: 400 });
     }
 
+    // IDs legados da Lottus são preservados. Nos novos clientes, o workspace
+    // é prefixado para evitar colisões de slugs entre empresas diferentes.
+    if (lead.workspace !== 'lottus' && !lead.id.startsWith(`${lead.workspace}--`)) {
+      lead.id = `${lead.workspace}--${lead.id}`;
+    }
+
     // ─── PROTEÇÃO E MESCLAGEM INTELIGENTE DE TIMELINE ───
     // Buscar o lead existente no banco de dados para garantir que não vamos perder histórico
-    const { rows } = await sql`SELECT notes FROM leads WHERE id = ${lead.id};`;
+    const { rows } = await sql`SELECT notes FROM leads WHERE id = ${lead.id} AND workspace = ${lead.workspace};`;
     
     if (rows.length > 0) {
       const existingNotes = rows[0].notes || '';
@@ -108,8 +120,10 @@ export async function DELETE(req: Request) {
   if (!hasDatabase) return NextResponse.json({ hasDatabase: false, ok: false });
   try {
     const { searchParams } = new URL(req.url);
+    const access = await resolveWorkspace(req, searchParams.get('workspace'));
+    if (!access.workspace) return NextResponse.json({ ok: false, error: access.error }, { status: access.session ? 403 : 401 });
     const id = searchParams.get('id');
-    if (id) await deleteLead(id);
+    if (id) await deleteLead(id, access.workspace);
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e.message }, { status: 500 });

@@ -1,27 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const VALID_USER = 'danilo';
-const VALID_PASS = 'getlog2026';
-const SESSION_COOKIE = 'crm_session';
-const SESSION_VALUE = 'danilo_getlog2026_authenticated';
+import { getTenantUserByUsername, initDatabase } from '@/lib/db';
+import { sessionCookie, startSession, verifyPassword } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { username, password } = body;
+    const username = String(body.username || '').trim().toLowerCase();
+    const password = String(body.password || '');
 
-    if (username === VALID_USER && password === VALID_PASS) {
-      const response = NextResponse.json({ success: true });
-      
-      // Setar cookie de sessão (30 dias)
-      response.cookies.set(SESSION_COOKIE, SESSION_VALUE, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30, // 30 dias
-        path: '/',
+    await initDatabase();
+    const user = await getTenantUserByUsername(username);
+
+    if (user && user.active && verifyPassword(password, user.password_hash)) {
+      const { token, session } = await startSession({
+        id: user.id,
+        username: user.username,
+        display_name: user.display_name,
+        role: user.role === 'master' ? 'master' : 'operator',
+        workspace: user.workspace,
       });
-      
+      const response = NextResponse.json({ success: true, session: { username: session.username, display_name: session.display_name, workspace: session.workspace, role: session.role } });
+      const cookie = sessionCookie(token);
+      response.cookies.set(cookie.name, cookie.value, cookie.options);
       return response;
     }
 
