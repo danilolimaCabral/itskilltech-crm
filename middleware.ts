@@ -20,6 +20,15 @@ const PUBLIC_PATHS = [
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Acesso temporário somente para testes em Preview/Development.
+  // Nunca libera a rota em produção e exige uma chave enviada no header.
+  const isNonProduction = process.env.VERCEL_ENV !== 'production';
+  const testKey = process.env.APOLLO_TEST_KEY || '';
+  const hasValidApolloTestKey = isNonProduction && testKey && request.headers.get('x-apollo-test-key') === testKey;
+  if (pathname.startsWith('/api/prospect') && hasValidApolloTestKey) {
+    return NextResponse.next();
+  }
+
   // Liberar rotas públicas
   const isPublic = PUBLIC_PATHS.some(path => pathname.startsWith(path));
   if (isPublic) {
