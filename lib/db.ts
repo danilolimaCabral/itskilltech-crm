@@ -261,6 +261,21 @@ export async function deleteTenantSession(tokenHash: string) {
   return true;
 }
 
+export async function ensurePasswordRecoveryTable() {
+  if (!hasDatabase) return false;
+  await sql`
+    CREATE TABLE IF NOT EXISTS password_recovery_codes (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES tenant_users(id) ON DELETE CASCADE,
+      code_hash TEXT NOT NULL,
+      expires_at BIGINT NOT NULL,
+      used_at BIGINT,
+      created_at BIGINT NOT NULL
+    );
+  `;
+  return true;
+}
+
 export async function createPasswordRecoveryCode(record: { id: string; user_id: string; code_hash: string; expires_at: number; created_at: number }) {
   if (!hasDatabase) return null;
   await sql`INSERT INTO password_recovery_codes (id, user_id, code_hash, expires_at, created_at) VALUES (${record.id}, ${record.user_id}, ${record.code_hash}, ${record.expires_at}, ${record.created_at});`;

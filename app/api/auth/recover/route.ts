@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import {
   createPasswordRecoveryCode,
+  ensurePasswordRecoveryTable,
   getPasswordRecoveryCode,
   getTenantUserByUsername,
   updateTenantUserPassword,
@@ -17,6 +18,7 @@ function sha256(value: string) {
 
 export async function POST(request: NextRequest) {
   try {
+    await ensurePasswordRecoveryTable();
     const body = await request.json();
     const action = String(body.action || 'verify');
     const configuredCode = process.env.CRM_RECOVERY_CODE || '';
