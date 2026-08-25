@@ -4401,6 +4401,7 @@ function SearchView({ workspace, leads = [], onImport, showToast }: any) {
   const [selectedSegments, setSelectedSegments] = useState<string[]>(['alimentacao']);
   const [customSegment, setCustomSegment] = useState('');
   const [filters, setFilters] = useState({ country: 'Brasil', department: 'comercial', level: 'decisores', industry: '', qty: '25', requireEmail: true, requirePhone: true, autoImport: true });
+  const [companyList, setCompanyList] = useState('');
 
   const AVAILABLE_SEGMENTS = [
     { id: 'alimentacao', label: '🍎 Atacado Alimentício' },
@@ -4513,55 +4514,38 @@ function SearchView({ workspace, leads = [], onImport, showToast }: any) {
   const realSearch = async () => {
     setSearching(true);
     try {
-      // Combinar os segmentos pré-definidos selecionados com o segmento customizado digitado
+      const companies = companyList.split(/[,\n;]+/).map(c => c.trim()).filter(Boolean);
       const segmentsToSearch = [...selectedSegments];
-      if (customSegment.trim()) {
-        segmentsToSearch.push(customSegment.trim());
+      if (customSegment.trim()) segmentsToSearch.push(customSegment.trim());
+      const basePayload = { ...filters, industry: segmentsToSearch.join(','), qty: companies.length ? '1' : filters.qty };
+      const payloads = companies.length ? companies.map(company => ({ ...basePayload, company })) : [basePayload];
+      const allLeads: any[] = [];
+      let totalCredits = 0;
+      for (const payload of payloads) {
+        const r = await fetch('/api/prospect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const j = await r.json();
+        if (!r.ok || !j.ok) throw new Error(j.error || 'Falha na busca');
+        allLeads.push(...(j.leads || []));
+        totalCredits += j.creditsUsed || 0;
       }
-      
-      const payload = {
-        ...filters,
-        industry: segmentsToSearch.join(',')
-      };
-
-      const r = await fetch('/api/prospect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      const j = await r.json();
-      if (j.ok) { 
-        const newLeads = j.leads || [];
-        
-        // Mesclar novos leads com o histórico existente de forma a não duplicar (por email ou id)
-        setApolloResults((prev: any[]) => {
-          const merged = [...newLeads];
-          prev.forEach((oldLead) => {
-            const exists = merged.some(
-              (newLead) => newLead.id === oldLead.id || (newLead.email && newLead.email === oldLead.email)
-            );
-            if (!exists) {
-              merged.push(oldLead);
-            }
-          });
-          return merged;
+      const newLeads = allLeads.filter((lead, index, list) => list.findIndex(other => (lead.email && other.email === lead.email) || lead.id === other.id) === index);
+      setApolloResults(prev => {
+        const merged = [...newLeads];
+        prev.forEach(oldLead => {
+          if (!merged.some(newLead => newLead.id === oldLead.id || (newLead.email && newLead.email === oldLead.email))) merged.push(oldLead);
         });
-
-        setApolloMeta((prev: any) => {
-          const updated = {
-            creditsUsed: j.creditsUsed || 0,
-            totalSessionCredits: (prev?.totalSessionCredits || 0) + (j.creditsUsed || 0)
-          };
-          localStorage.setItem('apollo_meta_cache', JSON.stringify(updated));
-          return updated;
-        });
-
-        // Importação automática imediata para o Kanban se a opção estiver ativa!
-        if (filters.autoImport && newLeads.length > 0) {
-          await onImport(newLeads);
-          showToast(`⚡ ${newLeads.length} leads importados automaticamente para o Kanban!`);
-        } else {
-          showToast(`${j.count} leads adicionados ao histórico de busca!`);
-        }
-      }
-      else showToast('Busca: ' + (j.error || 'falhou'));
-    } catch { showToast('Erro na busca'); }
+        return merged;
+      });
+      setApolloMeta(prev => {
+        const updated = { creditsUsed: totalCredits, totalSessionCredits: (prev?.totalSessionCredits || 0) + totalCredits };
+        localStorage.setItem('apollo_meta_cache', JSON.stringify(updated));
+        return updated;
+      });
+      if (filters.autoImport && newLeads.length > 0) {
+        await onImport(newLeads);
+        showToast(`⚡ ${newLeads.length} leads importados automaticamente para o Kanban!`);
+      } else showToast(`${newLeads.length} leads adicionados ao histórico de busca!`);
+    } catch (error: any) { showToast('Busca: ' + (error.message || 'falhou')); }
     setSearching(false);
   };
 
@@ -4777,6 +4761,11 @@ function SearchView({ workspace, leads = [], onImport, showToast }: any) {
       {tab === 'apollo' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="table-wrap" style={{ padding: 16 }}>
+            <div className="field" style={{ marginBottom: 12 }}>
+              <label className="field-label">Lista de empresas (opcional)</label>
+              <textarea className="field-textarea" value={companyList} onChange={e => setCompanyList(e.target.value)} placeholder="Cole uma empresa por linha ou separe por vírgulas. Ex.: PMG Atacadista\nMasterboi\nUnidasul Distribuidora" style={{ minHeight: 110 }} />
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>Quando preenchida, o CRM pesquisa cada empresa e prioriza os cargos definidos abaixo.</div>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div className="field"><label className="field-label">País</label><select className="field-select" value={filters.country} onChange={e => setFilters({ ...filters, country: e.target.value })}><option>Brasil</option><option>Estados Unidos</option><option>Portugal</option></select></div>
               <div className="field"><label className="field-label">Setor</label><select className="field-select" value={filters.department} onChange={e => setFilters({ ...filters, department: e.target.value })}><option value="ti">TI / Tecnologia</option><option value="operacoes">Operações</option><option value="logistica">Logística</option><option value="comercial">Comercial</option></select></div>

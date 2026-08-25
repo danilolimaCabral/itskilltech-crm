@@ -13,6 +13,10 @@ function LoginForm() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState('');
+  const [recoveryToken, setRecoveryToken] = useState('');
+  const [newPassword, setNewPassword] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +43,26 @@ function LoginForm() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true); setError('');
+    try {
+      const body = recoveryToken
+        ? { action: 'reset', recoveryToken, password: newPassword }
+        : { action: 'verify', username, code: recoveryCode };
+      const res = await fetch('/api/auth/recover', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Não foi possível recuperar o acesso.');
+      if (recoveryToken) {
+        setRecoveryMode(false); setRecoveryToken(''); setRecoveryCode(''); setNewPassword('');
+        setError('Senha redefinida. Faça login com a nova senha.');
+      } else {
+        setRecoveryToken(data.recoveryToken);
+      }
+    } catch (err: any) { setError(err.message || 'Erro de conexão.'); }
+    finally { setLoading(false); }
   };
 
   return (
@@ -221,6 +245,23 @@ function LoginForm() {
               {loading ? 'Entrando...' : 'Acessar CRM'}
             </button>
           </form>
+
+          <button type="button" onClick={() => { setRecoveryMode(!recoveryMode); setError(''); }} style={{ width: '100%', marginTop: '1rem', background: 'transparent', border: 'none', color: '#8fa3b8', cursor: 'pointer', fontSize: '0.85rem' }}>
+            {recoveryMode ? 'Voltar ao login' : 'Esqueci minha senha'}
+          </button>
+
+          {recoveryMode && (
+            <form onSubmit={handleRecovery} style={{ marginTop: '1rem', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1rem' }}>
+              <p style={{ color: '#8fa3b8', fontSize: '0.8rem', margin: '0 0 1rem' }}>
+                {recoveryToken ? 'Digite uma nova senha com pelo menos 10 caracteres.' : 'Informe seu usuário e o código temporário fornecido pelo administrador.'}
+              </p>
+              {!recoveryToken && <input type="text" value={recoveryCode} onChange={e => setRecoveryCode(e.target.value)} placeholder="Código temporário" required style={{ width: '100%', boxSizing: 'border-box', marginBottom: '0.75rem', background: '#0f1923', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.75rem', padding: '0.75rem 1rem', color: 'white' }} />}
+              {recoveryToken && <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Nova senha" minLength={10} required style={{ width: '100%', boxSizing: 'border-box', marginBottom: '0.75rem', background: '#0f1923', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '0.75rem', padding: '0.75rem 1rem', color: 'white' }} />}
+              <button type="submit" disabled={loading} style={{ width: '100%', background: '#34495e', color: 'white', fontWeight: 600, padding: '0.75rem', borderRadius: '0.75rem', border: 'none', cursor: loading ? 'not-allowed' : 'pointer' }}>
+                {loading ? 'Validando...' : recoveryToken ? 'Definir nova senha' : 'Validar código'}
+              </button>
+            </form>
+          )}
         </div>
 
         <p style={{ textAlign: 'center', color: '#3d4f63', fontSize: '0.75rem', marginTop: '1.5rem' }}>

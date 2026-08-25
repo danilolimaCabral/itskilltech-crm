@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
     const level = body.level || 'decisores'; // decisores, donos, gerencia, todos
     const numResults = Math.min(parseInt(body.qty || '10'), 30); // Limitar a busca em lote a no máximo 30 para economizar taxa de requisição paralela e créditos
     const workspaceSlug = body.workspaceSlug || 'lottus';
+    const targetCompany = typeof body.company === 'string' ? body.company.trim() : '';
     
     // Filtros de qualidade exigidos pelo usuário
     const requireEmail = body.requireEmail !== false; // padrão true
@@ -215,7 +216,9 @@ export async function POST(request: NextRequest) {
       searchPayload.contact_phone_book_statuses = ["verified", "unverified"];
     }
 
-    if (keywords.length > 0) {
+    if (targetCompany) {
+      searchPayload.q_keywords = targetCompany;
+    } else if (keywords.length > 0) {
       searchPayload.q_organization_keyword_tags = keywords;
     }
 
@@ -385,6 +388,11 @@ export async function POST(request: NextRequest) {
       })
       // Filtrar conforme exigência do usuário E evitar duplicidade por e-mail caso o e-mail revelado já exista no CRM
       .filter((lead: any) => {
+        if (targetCompany) {
+          const requested = normalizeCompanyName(targetCompany);
+          const returned = normalizeCompanyName(lead.company);
+          if (!returned || (!returned.includes(requested) && !requested.includes(returned))) return false;
+        }
         if (requireEmail && !lead.email) return false;
         
         // Se exigir telefone, agora exigimos RIGIDAMENTE celular móvel de fato para WhatsApp!

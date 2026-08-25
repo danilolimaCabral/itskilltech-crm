@@ -151,6 +151,18 @@ export async function initDatabase() {
       created_at BIGINT NOT NULL
     );
   `;
+  // Códigos temporários de recuperação de acesso
+  await sql`
+    CREATE TABLE IF NOT EXISTS password_recovery_codes (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES tenant_users(id) ON DELETE CASCADE,
+      code_hash TEXT NOT NULL,
+      expires_at BIGINT NOT NULL,
+      used_at BIGINT,
+      created_at BIGINT NOT NULL
+    );
+  `;
+
   // Conta administrativa legada migrada para hash não reversível. A senha original não permanece no código.
   await sql`
     INSERT INTO tenant_users (id, username, password_hash, display_name, workspace, role, active, created_at, updated_at)
@@ -246,6 +258,30 @@ export async function getTenantSessionByTokenHash(tokenHash: string) {
 export async function deleteTenantSession(tokenHash: string) {
   if (!hasDatabase) return null;
   await sql`DELETE FROM crm_sessions WHERE token_hash = ${tokenHash};`;
+  return true;
+}
+
+export async function createPasswordRecoveryCode(record: { id: string; user_id: string; code_hash: string; expires_at: number; created_at: number }) {
+  if (!hasDatabase) return null;
+  await sql`INSERT INTO password_recovery_codes (id, user_id, code_hash, expires_at, created_at) VALUES (${record.id}, ${record.user_id}, ${record.code_hash}, ${record.expires_at}, ${record.created_at});`;
+  return record;
+}
+
+export async function getPasswordRecoveryCode(id: string) {
+  if (!hasDatabase) return null;
+  const { rows } = await sql`SELECT * FROM password_recovery_codes WHERE id = ${id} LIMIT 1;`;
+  return rows[0] || null;
+}
+
+export async function usePasswordRecoveryCode(id: string) {
+  if (!hasDatabase) return null;
+  await sql`UPDATE password_recovery_codes SET used_at = ${Date.now()} WHERE id = ${id} AND used_at IS NULL;`;
+  return true;
+}
+
+export async function updateTenantUserPassword(userId: string, passwordHash: string) {
+  if (!hasDatabase) return null;
+  await sql`UPDATE tenant_users SET password_hash = ${passwordHash}, updated_at = ${Date.now()} WHERE id = ${userId};`;
   return true;
 }
 
