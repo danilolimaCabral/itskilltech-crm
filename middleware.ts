@@ -8,6 +8,7 @@ const SESSION_COOKIE = 'crm_session';
 const PUBLIC_PATHS = [
   '/login',
   '/api/auth/login',
+  '/api/auth/recover',
   '/api/auth/google',
   '/api/auth/google/callback',
   '/api/cron',
