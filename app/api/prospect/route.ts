@@ -3,7 +3,7 @@ import { getLeads, upsertLead } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
-const APOLLO_API_KEY = process.env.APOLLO_API_KEY || 'SlEHY1vVqch_obbLuR1T_A';
+const APOLLO_API_KEY = process.env.APOLLO_API_KEY || '';
 const APOLLO_BASE_URL = 'https://api.apollo.io/api/v1';
 
 // Mapeamento de segmentos amigáveis em português para palavras-chave em inglês do Apollo
