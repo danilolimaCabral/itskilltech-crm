@@ -1015,7 +1015,7 @@ export default function CRM() {
               <div className="page-header">
                 <div><div className="page-title">Leads</div><div className="page-description">{ws?.name} · {leads.length} contato(s)</div></div>
                 <div className="page-actions mobile-actions desktop-only-flex">
-                  <button className="btn" hidden={true} style={{background:'#f59e0b',color:'#fff',border:'none',marginRight:8,fontSize:12,padding:'6px 12px',borderRadius:6,cursor:'pointer',opacity:enrichingAll?0.6:1}} disabled={enrichingAll} onClick={async () => {
+                  {false && <button className="btn" style={{background:'#f59e0b',color:'#fff',border:'none',marginRight:8,fontSize:12,padding:'6px 12px',borderRadius:6,cursor:'pointer',opacity:enrichingAll?0.6:1}} disabled={enrichingAll} onClick={async () => {
                     const toEnrich = leads.filter(l => !l.phone && l.company);
                     if (!toEnrich.length) { showToast('Todos os leads já têm telefone!'); return; }
                     setEnrichingAll(true);
@@ -1053,8 +1053,8 @@ export default function CRM() {
                     showToast(`✓ Enriquecimento concluído: ${enriched}/${toEnrich.length} leads atualizados`);
                   }}>
                     {enrichingAll ? `⚙ Enriquecendo... ${enrichProgress.done}/${enrichProgress.total}` : '⚙ Enriquecer todos'}
-                  </button>
-                  <button className="btn" hidden={isPublic} style={{background:'#ef4444',color:'#fff',border:'none',marginRight:8,fontSize:12,padding:'6px 12px',borderRadius:6,cursor:'pointer'}} onClick={async () => {
+                  </button>}
+                  {isMaster && <button className="btn" style={{background:'#ef4444',color:'#fff',border:'none',marginRight:8,fontSize:12,padding:'6px 12px',borderRadius:6,cursor:'pointer'}} onClick={async () => {
                     const seen = new Map<string, string>();
                     const toDelete: string[] = [];
                     for (const l of [...leads].sort((a,b) => (a.updated_at||0)-(b.updated_at||0))) {
@@ -1066,8 +1066,8 @@ export default function CRM() {
                     if (!confirm(`Encontrados ${toDelete.length} lead(s) duplicado(s). Excluir os mais antigos?`)) return;
                     for (const id of toDelete) await removeLead(id, true);
                     showToast(`✓ ${toDelete.length} duplicado(s) removido(s)`);
-                  }}>🗑 Deduplicar</button>
-                  <button className="btn" hidden={isPublic} style={{background:'#0066ff',color:'#fff',border:'none',marginRight:8,fontSize:12,padding:'6px 12px',borderRadius:6,cursor:'pointer',fontWeight:600}} onClick={() => { setCnpjInput(''); setCnpjResult(null); setCnpjModalOpen(true); }}>🔢 Prospectar CNPJ</button>
+                  }}>🗑 Deduplicar</button>}
+                  {isMaster && <button className="btn" style={{background:'#0066ff',color:'#fff',border:'none',marginRight:8,fontSize:12,padding:'6px 12px',borderRadius:6,cursor:'pointer',fontWeight:600}} onClick={() => { setCnpjInput(''); setCnpjResult(null); setCnpjModalOpen(true); }}>🔢 Prospectar CNPJ</button>}
                   <button className="btn btn-primary" onClick={() => { setEditing(null); setModalOpen(true); }}><Icon d={ICONS.plus} />Novo lead</button>
                 </div>
               </div>
@@ -1088,7 +1088,7 @@ export default function CRM() {
                   </div>
 
                   {/* Card de Reuniões */}
-                  <div className="stat-funnel" hidden={isPublic}
+                  {!isPublic && <div className="stat-funnel"
                     style={{ '--stat-accent': '#0066ff' } as any} 
                     onClick={() => setView('calendar_view')}>
                     <div className="stat-funnel-label">
@@ -1098,7 +1098,7 @@ export default function CRM() {
                     <div className="stat-funnel-value" style={{ color: '#0066ff' }}>
                       {stats.reunioes}
                     </div>
-                  </div>
+                  </div>}
 
                   {/* Cards de Etapas do Funil */}
                   {FUNNEL.map(f => (
@@ -1118,7 +1118,7 @@ export default function CRM() {
                 </div>
               </div>
               {/* Prospecção de hoje com metas (Oculto no mobile na aba de leads para focar na lista de leads) */}
-              <div className="desktop-only-block" hidden={isPublic} style={{ margin: '8px 0', padding: '16px 18px', background: 'var(--surface)', borderRadius: 14, border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
+              {!isPublic && <div className="desktop-only-block" style={{ margin: '8px 0', padding: '16px 18px', background: 'var(--surface)', borderRadius: 14, border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>📊 Prospecção de Hoje</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1156,7 +1156,7 @@ export default function CRM() {
                     );
                   })}
                 </div>
-              </div>
+              </div>}
               {/* Painel de alertas de retorno (Oculto no mobile na aba de leads para focar na lista de leads) */}
               {pendingAlerts.length > 0 && !isPublic && (
                 <div className="desktop-only-block" style={{ margin: '8px 0', padding: '12px 14px', background: overdueAlerts.length > 0 ? '#fff7ed' : '#fffbeb', borderRadius: 10, border: `1px solid ${overdueAlerts.length > 0 ? '#f97316' : '#f59e0b'}55` }}>
@@ -1436,12 +1436,12 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                 <div className="empty-state"><div className="empty-title">Nenhum lead</div><div className="empty-text">Adicione seu primeiro contato</div><button className="btn btn-primary" onClick={() => { setEditing(null); setModalOpen(true); }}><Icon d={ICONS.plus} />Adicionar lead</button></div>
               ) : (
                 <>
-                <div className="table-wrap table-wrap-leads"><table className="data"><thead><tr><th hidden={isPublic} style={{width:32, paddingRight:4}}></th><th>Lead</th><th>Contato</th><th>Status</th><th style={{ textAlign: 'right' }}>Ações</th></tr></thead><tbody>
+                <div className="table-wrap table-wrap-leads"><table className="data"><thead><tr>{!isPublic && <th style={{width:32, paddingRight:4}}></th>}<th>Lead</th><th>Contato</th><th>Status</th>{!isPublic && <th style={{ textAlign: 'right' }}>Ações</th>}</tr></thead><tbody>
                   {filtered.map(lead => (
                     <tr key={lead.id} onClick={() => { setLeadPanel(lead); setPanelAnalysis(null); setPanelTab('info'); }}>
-                      <td hidden={isPublic} onClick={e => e.stopPropagation()} style={{paddingRight:4, width:32}}>
+                      {!isPublic && <td onClick={e => e.stopPropagation()} style={{paddingRight:4, width:32}}>
                         <input type="checkbox" checked={selectedIds.has(lead.id)} onChange={e => { e.stopPropagation(); setSelectedIds(prev => { const n = new Set(prev); if (e.target.checked) n.add(lead.id); else n.delete(lead.id); return n; }); }} style={{width:15,height:15,cursor:'pointer',accentColor:'#0066ff'}} />
-                      </td>
+                      </td>}
 	                      <td>
 	                        <div className="cell-primary" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
 	                          <span>{lead.name}</span>
@@ -1551,11 +1551,11 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                       <td>{
                         (() => { const f = FUNNEL_MAP[normalizeStatus(lead.status)]; return f ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: f.bg, color: f.color, border: `1px solid ${f.color}33`, whiteSpace: 'nowrap' }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: f.color, flexShrink: 0 }} />{f.short}</span> : <span className={`badge badge-${lead.status}`}>{statusLabel(lead.status)}</span>; })()
                       }</td>
-                      <td onClick={e => e.stopPropagation()}><div className="channel-icons" hidden={isPublic}>
+                      {!isPublic && <td onClick={e => e.stopPropagation()}><div className="channel-icons">
                         {/* Enriquecer com Apollo */}
-                        <button className="ch-icon" hidden={true} title="Enrichment legado indisponível; use Buscar Leads > Apollo com teto de créditos" style={{color: enriching === lead.id ? '#f59e0b' : undefined, opacity: enriching === lead.id ? 0.6 : 1}} disabled={!!enriching} onClick={() => enrichLead(lead)}>
+                        {false && <button className="ch-icon" title="Enrichment legado indisponível; use Buscar Leads > Apollo com teto de créditos" style={{color: enriching === lead.id ? '#f59e0b' : undefined, opacity: enriching === lead.id ? 0.6 : 1}} disabled={!!enriching} onClick={() => enrichLead(lead)}>
                           <Icon d={ICONS.enrich} />
-                        </button>
+                        </button>}
                         {/* Agendar reunião */}
                         <button className="ch-icon" title="Agendar reunião no Google Calendar" style={{color:'#0066ff'}} onClick={() => { setCalModal(lead); setCalGuestEmail(lead.email || ''); setCalTitle(`Reunião com ${lead.name} — ${lead.company || ''}`); setCalDescription(''); setCalDate(new Date().toISOString().slice(0,10)); setCalSlots([]); setCalSelectedSlot(''); }}>
                           <Icon d={ICONS.calendar} />
@@ -1602,7 +1602,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                         <button className="ch-icon trash-btn" title="Excluir Lead" style={{ color: '#ef4444' }} onClick={() => removeLead(lead.id)}>
                           <Icon d={ICONS.trash} />
                         </button>
-                      </div></td>
+                      </div></td>}
                     </tr>
                   ))}
                 </tbody></table></div>
@@ -1614,9 +1614,9 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                   return (
                     <div key={lead.id} className={`lead-card lead-card-${statusNormalized}`} onClick={() => { setLeadPanel(lead); setPanelAnalysis(null); setPanelTab('timeline'); }}>
                       <div className="lead-card-header">
-                        <div className="lead-card-check" hidden={isPublic} onClick={e => e.stopPropagation()}>
+                        {!isPublic && <div className="lead-card-check" onClick={e => e.stopPropagation()}>
                           <input type="checkbox" checked={selectedIds.has(lead.id)} onChange={e => { const s = new Set(selectedIds); e.target.checked ? s.add(lead.id) : s.delete(lead.id); setSelectedIds(s); }} style={{ width: 16, height: 16, cursor: 'pointer' }} />
-                        </div>
+                        </div>}
                         <div className="lead-card-info">
                           <div className="lead-card-name" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                             <span>{lead.name}</span>
@@ -1699,8 +1699,8 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                           </span>
                         )}
                       </div>
-                      <div className="lead-card-actions" hidden={isPublic} onClick={e => e.stopPropagation()}>
-                        <button className="ch-icon enrich-btn" hidden={true} title="Enrichment legado indisponível; use Buscar Leads > Apollo com teto de créditos" disabled={!!enriching} onClick={() => enrichLead(lead)}><Icon d={ICONS.enrich} /></button>
+                      {!isPublic && <div className="lead-card-actions" onClick={e => e.stopPropagation()}>
+                        {false && <button className="ch-icon enrich-btn" title="Enrichment legado indisponível; use Buscar Leads > Apollo com teto de créditos" disabled={!!enriching} onClick={() => enrichLead(lead)}><Icon d={ICONS.enrich} /></button>}
                         <button className="ch-icon" title="Agendar" style={{color:'#0066ff'}} onClick={() => { setCalModal(lead); setCalGuestEmail(lead.email || ''); setCalTitle(`Reunião com ${lead.name}`); setCalDescription(''); setCalDate(new Date().toISOString().slice(0,10)); setCalSlots([]); setCalSelectedSlot(''); }}><Icon d={ICONS.calendar} /></button>
                         <button className="ch-icon phone-btn" title="Ligar" onClick={() => openCallModal(lead)}><Icon d={ICONS.phone} /></button>
                         <button className="ch-icon email-btn" title="E-mail" onClick={() => openEmailModal(lead)}><Icon d={ICONS.email} /></button>
@@ -1715,7 +1715,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
                           </button>
                         )}
-                      </div>
+                      </div>}
                     </div>
                   );
                 })}
@@ -1967,13 +1967,13 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                     );
                   })()}
                   {/* Ações rápidas */}
-                  <div hidden={isPublic} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                  {!isPublic && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
                     {(leadPanel.phone || leadPanel.whatsapp) && <button className="btn btn-sm" onClick={() => { const num = cleanPhone(leadPanel.phone || leadPanel.whatsapp || ''); const name = encodeURIComponent(leadPanel.name || ''); const lid = encodeURIComponent(leadPanel.id || ''); window.open(`/phone/index.html?call=${num}&lead=${lid}&name=${name}`, 'softphone', 'width=480,height=700,resizable=yes'); }}><Icon d={ICONS.phone} />Ligar</button>}
                     {(leadPanel.whatsapp || leadPanel.phone) && <button className="btn btn-sm" style={{ background: '#25d366', color: '#fff', border: 'none' }} onClick={() => { const num = cleanPhone(leadPanel.whatsapp || leadPanel.phone || ''); if (num) window.open(`https://wa.me/${num}`, '_blank'); }}><Icon d={ICONS.whatsapp} />WhatsApp</button>}
                     {leadPanel.email && <button className="btn btn-sm" onClick={() => openEmailModal(leadPanel)}><Icon d={ICONS.email} />E-mail</button>}
                     <button className="btn btn-sm" onClick={() => openCallModal(leadPanel)}><Icon d={ICONS.phone} />Registrar ligação</button>
                     <button className="btn btn-sm btn-primary" style={{ background: '#ec4899', color: '#fff', border: 'none' }} onClick={() => { setQuoteModal(leadPanel); setQuoteAttachmentUrl(''); setQuoteValue(''); setQuoteNotes(''); setQuoteItems([]); setQuoteItemDesc(''); setQuoteItemQty('1'); setQuoteItemPrice(''); }}><Icon d={ICONS.template} />Anexar Proposta</button>
-                  </div>
+                  </div>}
                 </div>
               )}
               {panelTab === 'timeline' && (() => {
