@@ -3,6 +3,7 @@ import {
   createTenantSession,
   deleteTenantSession,
   getTenantSessionByTokenHash,
+  getWorkspace,
 } from '@/lib/db';
 
 export const SESSION_COOKIE = 'crm_session';
@@ -91,6 +92,19 @@ export async function resolveWorkspace(request: Request, requestedWorkspace?: st
     return { session, workspace: null, error: 'Acesso negado a este workspace.' };
   }
   return { session, workspace: requested || session.workspace, error: null };
+}
+
+export async function resolvePublicWorkspace(request: Request, requestedWorkspace?: string | null) {
+  const session = await getSession(request);
+  if (session) return resolveWorkspace(request, requestedWorkspace);
+
+  const requested = requestedWorkspace?.trim();
+  if (requested && requested !== 'lottus') {
+    return { session: null, workspace: null, error: 'Somente o workspace público Lottus está disponível sem login.' };
+  }
+  const workspace = await getWorkspace('lottus');
+  if (!workspace) return { session: null, workspace: null, error: 'Workspace público não encontrado.' };
+  return { session: null, workspace: 'lottus', error: null };
 }
 
 export function sessionCookie(token: string) {

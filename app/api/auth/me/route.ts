@@ -1,13 +1,21 @@
 import { NextResponse } from 'next/server';
 import { getSession } from '@/lib/auth';
-import { getWorkspaces } from '@/lib/db';
+import { getWorkspaces, hasDatabase } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const session = await getSession(request);
-  if (!session) return NextResponse.json({ error: 'Sessão inválida ou expirada.' }, { status: 401 });
   const allWorkspaces = await getWorkspaces();
+  if (!session) {
+    const publicWorkspace = allWorkspaces.find((workspace: any) => workspace.id === 'lottus');
+    return NextResponse.json({
+      session: { username: 'public', display_name: 'Acesso público', role: 'public', workspace: 'lottus' },
+      workspaces: publicWorkspace ? [{ id: publicWorkspace.id, name: publicWorkspace.name, color: publicWorkspace.color || '#0066ff' }] : [],
+      hasDatabase,
+      publicAccess: true,
+    });
+  }
   const workspaces = session.role === 'master'
     ? allWorkspaces
     : allWorkspaces.filter((workspace: any) => workspace.id === session.workspace);
@@ -19,5 +27,6 @@ export async function GET(request: Request) {
       workspace: session.workspace,
     },
     workspaces,
+    hasDatabase,
   });
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { getLeads, upsertLead } from '@/lib/db'
+import { resolveWorkspace } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +47,9 @@ function getAttachmentName(url: string): string {
 export async function POST(req: NextRequest) {
   try {
     const { to, subject, body, workspaceSlug, leadId, attachment_url } = await req.json()
+    const access = await resolveWorkspace(req, workspaceSlug)
+    if (!access.workspace) return NextResponse.json({ error: access.error }, { status: access.session ? 403 : 401 })
+    const authorizedWorkspace = access.workspace
 
     if (!to || !subject || !body) {
       return NextResponse.json({ error: 'Campos obrigatórios: to, subject, body' }, { status: 400 })
@@ -58,7 +62,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const sender = workspaceSlug ? (WORKSPACE_SENDERS[workspaceSlug] || DEFAULT_SENDER) : DEFAULT_SENDER
+    const sender = WORKSPACE_SENDERS[authorizedWorkspace] || DEFAULT_SENDER
     
     // O remetente do e-mail (From) agora usa crm@itskilltech.com.br
     const fromEmail = `${sender.displayName} | ${sender.name} <${sender.email}>`
@@ -111,7 +115,7 @@ export async function POST(req: NextRequest) {
     Website: <a href="https://www.gettms.com.br" target="_blank" style="color: #2563eb; text-decoration: none;">www.gettms.com.br</a> &nbsp;|&nbsp; <a href="https://www.lottustech.com.br" target="_blank" style="color: #2563eb; text-decoration: none;">www.lottustech.com.br</a>
   </div>
 
-  ${leadId && workspaceSlug ? `<img src="https://itskilltech-crm.vercel.app/api/track-email?lid=${leadId}&ws=${workspaceSlug}" width="1" height="1" style="display:none;width:1px;height:1px;" />` : ''}
+  ${leadId ? `<img src="https://itskilltech-crm.vercel.app/api/track-email?lid=${leadId}&ws=${authorizedWorkspace}" width="1" height="1" style="display:none;width:1px;height:1px;" />` : ''}
 </body>
 </html>`
     const resend = new Resend(process.env.RESEND_API_KEY)
@@ -135,9 +139,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Registrar o envio do e-mail na timeline do lead se leadId estiver presente
-    if (leadId && workspaceSlug) {
+    if (leadId) {
       try {
-        const leads = await getLeads(workspaceSlug)
+        const leads = await getLeads(authorizedWorkspace)
         const lead = leads.find((l: any) => l.id === leadId)
         if (lead) {
           const timeline = JSON.parse(lead.notes?.match(/\[TIMELINE\](.*?)\[\/TIMELINE\]/)?.[1] || '[]')

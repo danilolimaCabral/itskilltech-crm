@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLeads } from '@/lib/db';
+import { getSession, resolveWorkspace } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -147,6 +148,19 @@ export async function GET(request: NextRequest) {
       }, { status: 200, headers: { 'Cache-Control': 'no-store' } });
     }
 
+    const healthSession = await getSession(request);
+    if (!healthSession || healthSession.role !== 'master') {
+      return NextResponse.json({
+        ok: true,
+        configured: true,
+        authentication: { healthy: true, isLoggedIn: true },
+        peopleSearch: { available: false, tested: false },
+        message: healthSession
+          ? 'Chave Apollo autenticada. O teste de busca de pessoas exige sessão master.'
+          : 'Chave Apollo autenticada. O teste de busca de pessoas exige login.',
+      }, { status: 200, headers: { 'Cache-Control': 'no-store' } });
+    }
+
     // Probe somente de People API Search: não revela emails/telefones e custa 0 créditos.
     const probeParams = new URLSearchParams();
     probeParams.set('page', '1');
@@ -188,17 +202,30 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const searchOnly = request.nextUrl.searchParams.get('mode') === 'search_only';
+  const session = await getSession(request);
+  if (!session) {
+    return NextResponse.json({ ok: false, error: 'Login necessário para buscar ou enriquecer contatos Apollo.' }, { status: 401 });
+  }
+  if (session.role !== 'master') {
+    return NextResponse.json({ ok: false, error: 'Apenas master pode pesquisar ou enriquecer contatos Apollo.' }, { status: 403 });
+  }
+
   try {
     const body = await request.json();
     const country = normalizeCountry(body.country);
     const department = String(body.department || 'logistica').toLowerCase();
     const level = String(body.level || 'todos').toLowerCase();
     const parsedQty = Number.parseInt(String(body.qty || '10'), 10);
-    const numResults = Math.min(Math.max(Number.isFinite(parsedQty) ? parsedQty : 10, 1), 30);
-    const workspaceSlug = String(body.workspaceSlug || 'lottus');
+    const numResults = Math.min(Math.max(Number.isFinite(parsedQty) ? parsedQty : 10, 1), searchOnly ? 10 : 30);
+    const workspaceAccess = await resolveWorkspace(request, body.workspaceSlug);
+    if (!workspaceAccess.workspace) {
+      return NextResponse.json({ ok: false, error: workspaceAccess.error }, { status: workspaceAccess.session ? 403 : 404 });
+    }
+    const workspaceSlug = workspaceAccess.workspace;
     const targetCompany = typeof body.company === 'string' ? body.company.trim() : '';
     const targetDomain = isDomain(targetCompany) ? normalizeDomain(targetCompany) : '';
-    const requireEmail = body.requireEmail !== false;
+    const requireEmail = searchOnly || body.requireEmail !== false;
     const parsedCreditCap = Number(body.maxCredits);
     const maxCredits = Number.isInteger(parsedCreditCap)
       ? Math.min(Math.max(parsedCreditCap, 0), numResults, 30)
@@ -233,7 +260,7 @@ export async function POST(request: NextRequest) {
     }
 
     // O enrichment pode consumir créditos. O cliente precisa enviar um teto explícito após confirmação.
-    if (maxCredits < 1) {
+    if (maxCredits < 1 && !searchOnly) {
       return NextResponse.json({
         ok: false,
         code: 'APOLLO_CREDIT_LIMIT_REQUIRED',
@@ -327,6 +354,46 @@ export async function POST(request: NextRequest) {
       if (requireEmail && status && status !== 'verified') return false;
       return true;
     });
+
+    if (searchOnly) {
+      const leads = candidates.slice(0, numResults).map((person: any) => {
+        const organization = person.organization || {};
+        const name = String(person.name || `${person.first_name || ''} ${person.last_name || ''}`).trim();
+        const company = String(organization.name || '').trim();
+        const city = String(person.city || organization.city || '');
+        const state = String(person.state || organization.state || '');
+        let website = String(organization.primary_domain || organization.website_url || '');
+        if (website && !website.startsWith('http')) website = `https://${website}`;
+        return {
+          id: String(person.id),
+          name,
+          company,
+          role: String(person.title || 'Decisor'),
+          email: '',
+          email_status: String(person.email_status || person.contact_email_status || 'unknown').toLowerCase(),
+          phone: '',
+          whatsapp: '',
+          website,
+          location: [city, state].filter(Boolean).join(' - ') || 'Brasil',
+          city,
+          state,
+          industry: String(organization.industry || industryRaw || 'Outros'),
+          linkedin: String(person.linkedin_url || ''),
+          source: 'Apollo.io',
+          isNewReveal: false,
+          hasRealMobile: false,
+        };
+      });
+      return NextResponse.json({
+        ok: true,
+        count: leads.length,
+        total: leads.length,
+        provider: 'apollo',
+        searchOnly: true,
+        creditsUsed: 0,
+        leads,
+      }, { headers: { 'Cache-Control': 'no-store' } });
+    }
 
     if (candidates.length === 0) {
       return NextResponse.json({ ok: true, count: 0, total: 0, provider: 'apollo', leads: [], creditsUsed: 0 });

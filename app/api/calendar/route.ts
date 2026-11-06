@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAccount } from '@/lib/accounts';
 import { calendarClient } from '@/lib/google';
+import { resolveWorkspace } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +9,9 @@ export const dynamic = 'force-dynamic';
 // Retorna os slots livres do dia para o usuário autenticado
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const workspace = searchParams.get('workspace') || 'lottus';
+  const access = await resolveWorkspace(req, searchParams.get('workspace'));
+  if (!access.workspace) return NextResponse.json({ error: access.error }, { status: access.session ? 403 : 401 });
+  const workspace = access.workspace;
   const dateStr = searchParams.get('date'); // YYYY-MM-DD
 
   const account = getAccount(workspace);
@@ -75,8 +78,9 @@ export async function GET(req: Request) {
 // Cria evento no Google Calendar e envia invite para o convidado
 export async function POST(req: Request) {
   const body = await req.json();
+  const access = await resolveWorkspace(req, body.workspace);
+  if (!access.workspace) return NextResponse.json({ error: access.error }, { status: access.session ? 403 : 401 });
   const {
-    workspace = 'lottus',
     guestEmail,           // e-mail do lead/convidado
     guestName,            // nome do lead
     startTime,            // ISO string
@@ -85,6 +89,7 @@ export async function POST(req: Request) {
     description,          // pauta / notas
     meetLink = true,      // criar Google Meet automaticamente
   } = body;
+  const workspace = access.workspace;
 
   if (!guestEmail || !startTime) {
     return NextResponse.json({ error: 'guestEmail e startTime são obrigatórios' }, { status: 400 });

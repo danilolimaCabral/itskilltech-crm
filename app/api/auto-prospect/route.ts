@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import {
-  hasDatabase, initAgentTables, getAgentConfig, upsertAgentConfig,
+  hasDatabase, initAgentTables, getWorkspaces, getAgentConfig, upsertAgentConfig,
   insertAgentRun, updateAgentRun, getAgentRuns, getLeadEmails, upsertLead,
 } from '@/lib/db';
+import { resolveWorkspace } from '@/lib/auth';
 import { LINKEDIN_KNOWLEDGE } from '@/lib/linkedin-knowledge';
 
 export const dynamic = 'force-dynamic';
@@ -290,7 +291,11 @@ async function sendEmail(to: string, toName: string, subject: string, body: stri
 // ── GET: status do agente ─────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  const workspace = searchParams.get('workspace') || 'lottus';
+  const access = await resolveWorkspace(req, searchParams.get('workspace'));
+  if (!access.workspace) return NextResponse.json({ error: access.error }, { status: access.session ? 403 : 401 });
+  const workspace = access.workspace;
+  const workspaces = await getWorkspaces();
+  if (!workspaces.some((item: any) => item.id === workspace)) return NextResponse.json({ error: 'Workspace não encontrado.' }, { status: 404 });
   await initAgentTables();
   const config = await getAgentConfig(workspace);
   const runs = await getAgentRuns(workspace, 10);
@@ -309,26 +314,45 @@ export async function GET(req: NextRequest) {
 // ── PUT: salvar configuração ──────────────────────────────────────────────────
 export async function PUT(req: NextRequest) {
   const body = await req.json();
+  const access = await resolveWorkspace(req, body.workspace);
+  if (!access.workspace) return NextResponse.json({ error: access.error }, { status: access.session ? 403 : 401 });
+  if (access.session?.role !== 'master') return NextResponse.json({ error: 'Apenas master pode alterar a configuração do agente.' }, { status: 403 });
+  const workspaces = await getWorkspaces();
+  if (!workspaces.some((item: any) => item.id === access.workspace)) return NextResponse.json({ error: 'Workspace não encontrado.' }, { status: 404 });
   await initAgentTables();
-  await upsertAgentConfig(body);
+  await upsertAgentConfig({ ...body, workspace: access.workspace });
   return NextResponse.json({ ok: true });
 }
 
 // ── POST: executar prospecção ─────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const workspace = body.workspace || 'lottus';
-  const wsName = body.wsName || 'getLOG/Lottustech';
+  const cronSecret = process.env.CRON_SECRET || '';
+  const isCron = Boolean(cronSecret && req.headers.get('authorization') === `Bearer ${cronSecret}`);
+  const workspaces = await getWorkspaces();
+  let workspace = String(body.workspace || 'lottus');
+  if (!isCron) {
+    const access = await resolveWorkspace(req, body.workspace);
+    if (!access.workspace) return NextResponse.json({ ok: false, error: access.error }, { status: access.session ? 403 : 401 });
+    if (access.session?.role !== 'master') return NextResponse.json({ ok: false, error: 'Apenas master pode executar o agente.' }, { status: 403 });
+    workspace = access.workspace;
+  }
+  const workspaceRecord = workspaces.find((item: any) => item.id === workspace);
+  if (!workspaceRecord) return NextResponse.json({ ok: false, error: 'Workspace não encontrado.' }, { status: 404 });
+  const wsName = String(workspaceRecord.name || (isCron ? body.wsName : '') || 'getLOG/Lottustech');
 
   await initAgentTables();
   const config = await getAgentConfig(workspace);
-  if (!config && !body.force) {
+  if (!config && !(isCron && body.force === true)) {
     return NextResponse.json({ ok: false, error: 'Agente não configurado para este workspace' }, { status: 400 });
   }
 
   const industry = body.industry || config?.industry || 'logistica';
-  const limit = body.limit || config?.daily_limit || 10;
-  const doSendEmail = body.send_email ?? config?.send_email ?? true;
+  const requestedLimit = Number(body.limit ?? config?.daily_limit ?? 10);
+  const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 10, 1), 30);
+  const doSendEmail = isCron
+    ? (body.send_email ?? config?.send_email ?? true)
+    : (body.send_email ?? config?.send_email ?? false);
   const sources = (body.source || config?.source || 'cnpja,apollo').split(',').map((s: string) => s.trim());
   const customTemplate = config?.email_template || '';
   const customSubject = config?.email_subject || '';

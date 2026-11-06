@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@vercel/postgres';
 import { hasDatabase } from '@/lib/db';
+import { resolvePublicWorkspace } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
-  const workspace = req.nextUrl.searchParams.get('workspace') || 'lottus';
-
-  if (!hasDatabase) {
-    return NextResponse.json({ error: 'no-database' }, { status: 400 });
-  }
+  if (!hasDatabase) return NextResponse.json({ error: 'no-database' }, { status: 400 });
+  const access = await resolvePublicWorkspace(req, req.nextUrl.searchParams.get('workspace'));
+  if (!access.workspace) return NextResponse.json({ error: access.error }, { status: access.session ? 403 : 404 });
+  const workspace = access.workspace;
 
   try {
     // Totais de leads por status

@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'ITskillTech CRM',
   description: 'CRM multicanal com Gmail integrado',
+  robots: { index: false, follow: false, noarchive: true },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

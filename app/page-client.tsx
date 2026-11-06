@@ -13,7 +13,7 @@ interface Lead {
 }
 
 interface Workspace { id: string; name: string; color: string; company_name?: string; company_cnpj?: string; status?: string; plan?: string; }
-interface SessionInfo { username: string; display_name: string; role: 'master' | 'operator'; workspace: string; }
+interface SessionInfo { username: string; display_name: string; role: 'master' | 'operator' | 'public'; workspace: string; }
 
 const DEFAULT_WORKSPACES: Workspace[] = [
   { id: 'lottus', name: 'Lottus Tech', color: '#0066ff' },
@@ -206,6 +206,7 @@ export default function CRM() {
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(''), 2800); };
   const isMaster = sessionInfo?.role === 'master';
+  const isPublic = sessionInfo?.role === 'public';
 
   // O tenant é definido no servidor pela sessão, nunca pelo armazenamento local do navegador.
   useEffect(() => {
@@ -219,7 +220,8 @@ export default function CRM() {
         const data = await response.json();
         setSessionInfo(data.session);
         if (data.workspaces?.length) setWorkspaces(data.workspaces);
-        setWorkspace(data.session.workspace);
+        if (typeof data.hasDatabase === 'boolean') setHasDb(data.hasDatabase);
+        setWorkspace(data.session?.workspace || 'lottus');
         setAuthReady(true);
       } catch {
         window.location.assign(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
@@ -280,6 +282,7 @@ export default function CRM() {
 
   // Envio em massa para leads selecionados
   const sendBulkEmails = async (leadsToSend: Lead[]) => {
+    if (isPublic) { showToast('Envio de email exige login. Use “Entrar” no menu.'); return; }
     const withEmail = leadsToSend.filter(l => l.email);
     if (!withEmail.length) { showToast('Nenhum lead selecionado tem e-mail'); return; }
     if (!confirm(`Enviar e-mail para ${withEmail.length} lead(s) selecionado(s)?`)) return;
@@ -324,53 +327,74 @@ export default function CRM() {
   // init
   useEffect(() => {
     if (!authReady) return;
+    const publicGuest = sessionInfo?.role === 'public';
     (async () => {
-      try {
-        const r = await fetch('/api/init');
-        const j = await r.json();
-        setHasDb(!!j.hasDatabase);
-      } catch { setHasDb(false); }
+      if (!publicGuest) {
+        try {
+          const r = await fetch('/api/init');
+          const j = await r.json();
+          setHasDb(!!j.hasDatabase);
+        } catch { setHasDb(false); }
+      }
       // check gmail smtp
-      try {
-        const r = await fetch('/api/email-status');
-        const j = await r.json();
-        setGmailConfigured(!!j.configured);
-      } catch { setGmailConfigured(false); }
+      if (!publicGuest) {
+        try {
+          const r = await fetch('/api/email-status');
+          const j = await r.json();
+          setGmailConfigured(!!j.configured);
+        } catch { setGmailConfigured(false); }
+      } else {
+        setGmailConfigured(false);
+      }
       // load workspaces from DB if available
-      try {
-        const r = await fetch('/api/workspaces');
-        const j = await r.json();
-        if (j.workspaces?.length) setWorkspaces(j.workspaces);
-      } catch {}
+      if (!publicGuest) {
+        try {
+          const r = await fetch('/api/workspaces');
+          const j = await r.json();
+          if (j.workspaces?.length) setWorkspaces(j.workspaces);
+        } catch {}
+      }
       // load templates
-      try {
-        const r = await fetch(`/api/templates?workspace=${workspace}`);
-        const j = await r.json();
-        if (Array.isArray(j)) setTemplates(j);
-        else setTemplates([]);
-      } catch { setTemplates([]); }
+      if (!publicGuest) {
+        try {
+          const r = await fetch(`/api/templates?workspace=${workspace}`);
+          const j = await r.json();
+          if (Array.isArray(j)) setTemplates(j);
+          else setTemplates([]);
+        } catch { setTemplates([]); }
+      } else {
+        setTemplates([]);
+      }
       // check z-api
-      try {
-        const r = await fetch('/api/whatsapp?action=status');
-        const j = await r.json();
-        setZapiConfigured(false); // Z-API desativada temporariamente
-      } catch { setZapiConfigured(false); }
+      if (!publicGuest) {
+        try {
+          const r = await fetch('/api/whatsapp?action=status');
+          const j = await r.json();
+          setZapiConfigured(false); // Z-API desativada temporariamente
+        } catch { setZapiConfigured(false); }
+      } else {
+        setZapiConfigured(false);
+      }
       // carregar metas do gestor
-      try {
-        const r = await fetch(`/api/gestor-goals?workspace=${workspace}`);
-        const j = await r.json();
-        if (j.whatsapp_goal !== undefined) setDailyGoals(j);
-      } catch {}
+      if (!publicGuest) {
+        try {
+          const r = await fetch(`/api/gestor-goals?workspace=${workspace}`);
+          const j = await r.json();
+          if (j.whatsapp_goal !== undefined) setDailyGoals(j);
+        } catch {}
+      }
       // carregar sugestões não lidas do gestor
-      try {
-        const r = await fetch(`/api/gestor-suggestions?workspace=${workspace}`);
-        const j = await r.json();
-        if (Array.isArray(j)) setUnreadSuggestions(j.filter((s: any) => !s.read_at));
-      } catch {}
+      if (!publicGuest) {
+        try {
+          const r = await fetch(`/api/gestor-suggestions?workspace=${workspace}`);
+          const j = await r.json();
+          if (Array.isArray(j)) setUnreadSuggestions(j.filter((s: any) => !s.read_at));
+        } catch {}
+      }
     })();
     const params = new URLSearchParams(window.location.search);
     if (params.get('auth') === 'ok') { showToast('Conta conectada'); window.history.replaceState({}, '', '/'); }
-  }, [authReady, workspace]);
+  }, [authReady, workspace, sessionInfo]);
 
   const loadLeads = useCallback(async () => {
     if (hasDb) {
@@ -403,7 +427,8 @@ export default function CRM() {
   };
 
   const switchWorkspace = async (targetWorkspace: string) => {
-    if (!isMaster || targetWorkspace === workspace || switchingWorkspace) return;
+    if (targetWorkspace === workspace || switchingWorkspace || (!isMaster && !isPublic)) return;
+    if (isPublic) { setWorkspace(targetWorkspace); return; }
     setSwitchingWorkspace(true);
     try {
       const response = await fetch('/api/auth/switch-workspace', {
@@ -422,12 +447,13 @@ export default function CRM() {
 
   const removeLead = async (id: string, skipConfirm?: boolean) => {
     if (!skipConfirm && !confirm('Excluir este lead?')) return;
-    if (hasDb) { await fetch(`/api/leads?id=${id}`, { method: 'DELETE' }); await loadLeads(); }
+    if (hasDb) { await fetch(`/api/leads?id=${encodeURIComponent(id)}&workspace=${encodeURIComponent(workspace)}`, { method: 'DELETE' }); await loadLeads(); }
     else { const next = leads.filter(l => l.id !== id); setLeads(next); persistLocal(next); }
     showToast('Lead excluído');
   };
 
   const enrichLead = async (lead: Lead) => {
+    if (isPublic) { showToast('Enrichment exige login e autorização de créditos.'); return; }
     if (!lead.company) { showToast('Lead sem empresa — não é possível enriquecer'); return; }
     setEnriching(lead.id);
     try {
@@ -462,8 +488,18 @@ export default function CRM() {
     setEnriching(null);
   };
 
+  const openCallModal = (lead: Lead) => {
+    if (isPublic) { showToast('Registro de ligações exige login.'); return; }
+    setCallModal(lead);
+    setCallResult('');
+    setCallNotes(`${getSaudacao()}, ${lead.name.split(' ')[0]}! `);
+    setCallMoveToProspeccao(false);
+    setCallSetAlert(true);
+  };
+
   // Registrar ligação e mover lead de status
   const saveCall = async () => {
+    if (isPublic) { showToast('Registro de ligações exige login.'); return; }
     if (!callResult || !callModal) return;
     setSavingCall(true);
     const STATUS_MAP: any = {
@@ -516,6 +552,7 @@ export default function CRM() {
 
   // Enviar e-mail via SMTP
   const sendEmail = async () => {
+    if (isPublic) { showToast('Envio de email exige login.'); return; }
     if (!emailModal?.email) return;
     // Verificar se já foi enviado e-mail hoje para este lead
     const todayCheck = new Date().toISOString().slice(0, 10);
@@ -554,6 +591,7 @@ export default function CRM() {
   };
 
   const openEmailModal = (lead: Lead) => {
+    if (isPublic) { showToast('Envio de email exige login.'); return; }
     setEmailModal(lead);
     // Usar primeiro template de email do workspace, se existir
     const emailTpl = templates.find(t => t.type === 'email');
@@ -573,6 +611,7 @@ export default function CRM() {
   const [loadingWhatsTemplates, setLoadingWhatsTemplates] = useState(false);
 
   const openWhatsModal = async (lead: Lead) => {
+    if (isPublic) { showToast('WhatsApp exige login.'); return; }
     setWhatsModal(lead);
     setShowWhatsTemplates(false);
     
@@ -899,6 +938,13 @@ export default function CRM() {
             <span>by Lottustech</span>
           </div>
         </div>
+        {isPublic && (
+          <div style={{ margin: '10px 14px', padding: '10px 12px', borderRadius: 8, background: '#fffbeb', border: '1px solid #fde68a', color: '#78350f', fontSize: 11, lineHeight: 1.45 }}>
+            <strong>Acesso público</strong>
+            <div>Somente leads e propostas do workspace Lottus ficam visíveis e editáveis. Envio de email, integrações, busca de pessoas e enrichment exigem login.</div>
+            <a href="/login?redirect=/" style={{ display: 'inline-block', marginTop: 6, color: '#1d4ed8', fontWeight: 700 }}>Entrar</a>
+          </div>
+        )}
         <div className="sidebar-section">
           {/* Empresa ativa — a troca é permitida apenas a sessões de administrador mestre. */}
           {workspaces.filter(w => w.id === workspace).map(w => (
@@ -908,7 +954,7 @@ export default function CRM() {
               <span style={{ flex: 1, textAlign: 'left' }}>{w.name}</span>
             </div>
           ))}
-          {isMaster && workspaces.length > 1 && (
+          {(isMaster || isPublic) && workspaces.length > 1 && (
             <select aria-label="Trocar empresa" value={workspace} disabled={switchingWorkspace} onChange={e => switchWorkspace(e.target.value)} style={{ width: '100%', marginTop: 8, border: '1px solid var(--border)', borderRadius: 8, padding: '7px 8px', background: 'var(--surface)', color: 'var(--text)', fontSize: 12 }}>
               {workspaces.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
@@ -929,7 +975,7 @@ export default function CRM() {
             ['inbox', 'Caixa de Entrada', ICONS.inbox, '📥', '#4f46e5'],
             ['sent', 'E-mails Enviados', ICONS.inbox, '📤', '#4f46e5'],
             ['settings', 'Configurações', ICONS.settings, '⚙️', '#6b7280'],
-          ].map(([v, label, ic, emoji, color]) => (
+          ].filter(([v]) => !isPublic || ['dashboard', 'leads', 'search'].includes(v as string)).map(([v, label, ic, emoji, color]) => (
             <button key={v} className={`nav-item${view === v ? ' active' : ''}`} onClick={() => { setView(v as string); setSidebarOpen(false); }}>
               <div className="nav-icon" style={{ background: view === v ? `${color}18` : undefined }}>
                 <span style={{ fontSize: 13 }}>{emoji}</span>
@@ -943,14 +989,14 @@ export default function CRM() {
               <span>Clientes & Acessos</span>
             </a>
           )}
-          <a href="/social" target="_blank" className="nav-item" style={{ textDecoration: 'none' }}>
+          {!isPublic && <a href="/social" target="_blank" className="nav-item" style={{ textDecoration: 'none' }}>
             <div className="nav-icon"><span style={{ fontSize: 13 }}>📣</span></div>
             <span>Social Media</span>
-          </a>
-          <a href="/phone" target="_blank" className="nav-item" style={{ textDecoration: 'none' }}>
+          </a>}
+          {!isPublic && <a href="/phone" target="_blank" className="nav-item" style={{ textDecoration: 'none' }}>
             <div className="nav-icon"><span style={{ fontSize: 13 }}>📞</span></div>
             <span>Softphone</span>
-          </a>
+          </a>}
         </div>
       </aside>
       {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
@@ -1129,7 +1175,7 @@ export default function CRM() {
                         <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{l.name}</span>
                         <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l.company}</span>
                         <button className="btn btn-sm" style={{ fontSize: 11, padding: '3px 8px', background: '#25d366', color: '#fff', border: 'none', flexShrink: 0 }}
-                          onClick={e => { e.stopPropagation(); setCallModal(l); setCallResult(''); setCallNotes(`${getSaudacao()}, ${l.name.split(' ')[0]}! `); setCallMoveToProspeccao(false); setCallSetAlert(true); }}>
+                          onClick={e => { e.stopPropagation(); openCallModal(l); }}>
                           📞 Ligar
                         </button>
                         <button className="btn btn-sm" style={{ fontSize: 11, padding: '3px 8px', flexShrink: 0 }}
@@ -1518,7 +1564,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                           <Icon d={ICONS.sparkles} />
                         </button>
                         {/* Ligar */}
-                        <button className="ch-icon phone-btn" title={lead.phone || lead.whatsapp ? `Ligar: ${lead.phone || lead.whatsapp}` : 'Registrar ligação'} onClick={() => { setCallModal(lead); setCallResult(''); setCallNotes(`${getSaudacao()}, ${lead.name.split(' ')[0]}! `); }}>
+                        <button className="ch-icon phone-btn" title={lead.phone || lead.whatsapp ? `Ligar: ${lead.phone || lead.whatsapp}` : 'Registrar ligação'} onClick={() => openCallModal(lead)}>
                           <Icon d={ICONS.phone} />
                         </button>
                         {/* E-mail */}
@@ -1655,7 +1701,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                       <div className="lead-card-actions" onClick={e => e.stopPropagation()}>
                         <button className="ch-icon enrich-btn" title="Enriquecer" disabled={!!enriching} onClick={() => enrichLead(lead)}><Icon d={ICONS.enrich} /></button>
                         <button className="ch-icon" title="Agendar" style={{color:'#0066ff'}} onClick={() => { setCalModal(lead); setCalGuestEmail(lead.email || ''); setCalTitle(`Reunião com ${lead.name}`); setCalDescription(''); setCalDate(new Date().toISOString().slice(0,10)); setCalSlots([]); setCalSelectedSlot(''); }}><Icon d={ICONS.calendar} /></button>
-                        <button className="ch-icon phone-btn" title="Ligar" onClick={() => { setCallModal(lead); setCallResult(''); setCallNotes(`${getSaudacao()}, ${lead.name.split(' ')[0]}! `); }}><Icon d={ICONS.phone} /></button>
+                        <button className="ch-icon phone-btn" title="Ligar" onClick={() => openCallModal(lead)}><Icon d={ICONS.phone} /></button>
                         <button className="ch-icon email-btn" title="E-mail" onClick={() => openEmailModal(lead)}><Icon d={ICONS.email} /></button>
                         <button className="ch-icon" title="Observações" style={{ color: (lead.notes||'').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g,'').trim() ? '#f59e0b' : 'var(--text-muted)' }} onClick={() => { const cleanNotes = (lead.notes||'').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g,'').trim(); setNoteModal(lead); setNoteText(cleanNotes); }}><Icon d={ICONS.note} /></button>
                         <button className="ch-icon whatsapp-btn" title="WhatsApp" onClick={() => openWhatsModal(lead)}><Icon d={ICONS.whatsapp} /></button>
@@ -1694,10 +1740,10 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
               setCallNotes={setCallNotes}
             />
           )}
-          {view === 'search' && <SearchView workspace={workspace} leads={leads} onImport={async (newLeads: any[]) => {
+          {view === 'search' && <SearchView workspace={workspace} leads={leads} publicMode={isPublic} onImport={async (newLeads: any[]) => {
             const now = Date.now();
             for (const nl of newLeads) {
-              await saveLead({ id: uid(), workspace, name: nl.name, company: nl.company || '', role: nl.role || '', email: nl.email || '', whatsapp: cleanPhone(nl.whatsapp || nl.phone || ''), linkedin: nl.linkedin || '', phone: nl.phone || '', source: nl.source || 'Prospecção', notes: '', status: 'novo', created_at: now, updated_at: now } as Lead);
+              await saveLead({ id: nl.id || uid(), workspace, name: nl.name, company: nl.company || '', role: nl.role || '', email: nl.email || '', whatsapp: cleanPhone(nl.whatsapp || nl.phone || ''), linkedin: nl.linkedin || '', phone: nl.phone || '', source: nl.source || 'Prospecção', notes: '', status: 'novo', created_at: now, updated_at: now } as Lead);
             }
             showToast(newLeads.length + ' lead(s) importado(s)');
           }} showToast={showToast} />}
@@ -1924,7 +1970,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                     {(leadPanel.phone || leadPanel.whatsapp) && <button className="btn btn-sm" onClick={() => { const num = cleanPhone(leadPanel.phone || leadPanel.whatsapp || ''); const name = encodeURIComponent(leadPanel.name || ''); const lid = encodeURIComponent(leadPanel.id || ''); window.open(`/phone/index.html?call=${num}&lead=${lid}&name=${name}`, 'softphone', 'width=480,height=700,resizable=yes'); }}><Icon d={ICONS.phone} />Ligar</button>}
                     {(leadPanel.whatsapp || leadPanel.phone) && <button className="btn btn-sm" style={{ background: '#25d366', color: '#fff', border: 'none' }} onClick={() => { const num = cleanPhone(leadPanel.whatsapp || leadPanel.phone || ''); if (num) window.open(`https://wa.me/${num}`, '_blank'); }}><Icon d={ICONS.whatsapp} />WhatsApp</button>}
                     {leadPanel.email && <button className="btn btn-sm" onClick={() => openEmailModal(leadPanel)}><Icon d={ICONS.email} />E-mail</button>}
-                    <button className="btn btn-sm" onClick={() => { setCallModal(leadPanel); setCallResult(''); setCallNotes(`${getSaudacao()}, ${leadPanel.name.split(' ')[0]}! `); }}><Icon d={ICONS.phone} />Registrar ligação</button>
+                    <button className="btn btn-sm" onClick={() => openCallModal(leadPanel)}><Icon d={ICONS.phone} />Registrar ligação</button>
                     <button className="btn btn-sm btn-primary" style={{ background: '#ec4899', color: '#fff', border: 'none' }} onClick={() => { setQuoteModal(leadPanel); setQuoteAttachmentUrl(''); setQuoteValue(''); setQuoteNotes(''); setQuoteItems([]); setQuoteItemDesc(''); setQuoteItemQty('1'); setQuoteItemPrice(''); }}><Icon d={ICONS.template} />Anexar Proposta</button>
                   </div>
                 </div>
@@ -2042,7 +2088,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                                   {q.total ? Number(q.total).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Valor sob consulta'}
                                 </strong>
                               </div>
-                              <button className="btn btn-sm" style={{ color: '#ef4444', borderColor: '#ef4444', padding: '2px 6px', fontSize: 11 }} onClick={async () => { if (confirm('Excluir esta proposta permanente?')) { await fetch(`/api/quotes?id=${q.id}`, { method: 'DELETE' }); loadQuotes(); } }}>Excluir</button>
+                              <button className="btn btn-sm" style={{ color: '#ef4444', borderColor: '#ef4444', padding: '2px 6px', fontSize: 11 }} onClick={async () => { if (confirm('Excluir esta proposta permanente?')) { await fetch(`/api/quotes?id=${encodeURIComponent(q.id)}&workspace=${encodeURIComponent(workspace)}`, { method: 'DELETE' }); loadQuotes(); } }}>Excluir</button>
                             </div>
                             {/* Itens internos da proposta */}
                             {q.items && q.items.length > 0 && (
@@ -2086,7 +2132,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
       {modalOpen && <LeadModal lead={editing} workspace={workspace} onClose={() => setModalOpen(false)} onSave={async (l: Lead) => { await saveLead(l); setModalOpen(false); if (leadPanel && editing?.id === leadPanel.id) setLeadPanel(l); showToast(editing ? 'Lead atualizado' : 'Lead criado'); }} onDelete={editing ? async () => { await removeLead(editing.id); setModalOpen(false); setLeadPanel(null); } : undefined} />}
 
       {/* Modal de Ligação */}
-      {callModal && (
+      {callModal && !isPublic && (
         <div className="modal-bg" onClick={e => { if (e.target === e.currentTarget) setCallModal(null); }}>
           <div className="modal" style={{ maxWidth: 460 }}>
             <div className="modal-header">
@@ -3002,14 +3048,14 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
           <span>👥</span>
           <span>Leads</span>
         </button>
-        <button className={`bottom-nav-item${view === 'followup' ? ' active' : ''}`} onClick={() => setView('followup')}>
+        {!isPublic && <button className={`bottom-nav-item${view === 'followup' ? ' active' : ''}`} onClick={() => setView('followup')}>
           <span>🔄</span>
           <span>Follow-up</span>
-        </button>
-        <button className={`bottom-nav-item${view === 'calendar_view' ? ' active' : ''}`} onClick={() => setView('calendar_view')}>
+        </button>}
+        {!isPublic && <button className={`bottom-nav-item${view === 'calendar_view' ? ' active' : ''}`} onClick={() => setView('calendar_view')}>
           <span>📅</span>
           <span>Agenda</span>
-        </button>
+        </button>}
       </nav>
 
       {/* MODAL DE PROPOSTA COMERCIAL (ANEXAR PROPOSTA) */}
@@ -3944,7 +3990,7 @@ function FollowupView({ workspace, leads, showToast, onOpenLead, openEmailModal,
               <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 10, letterSpacing: '0.5px' }}>📝 Registrar Contato Rápido</div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <button className="btn btn-sm" onClick={() => registerActivity(selectedLead, 'linkedin')}>✅ Conectou no LinkedIn</button>
-                <button className="btn btn-sm" onClick={() => { setCallModal(selectedLead); setCallResult(''); setCallNotes(`${getSaudacao()}, ${selectedLead.name.split(' ')[0]}! `); }}>📞 Registrar Ligação</button>
+                    <button className="btn btn-sm" onClick={() => { setCallModal(selectedLead); setCallResult(''); setCallNotes(`${getSaudacao()}, ${selectedLead.name.split(' ')[0]}! `); }}>📞 Registrar Ligação</button>
               </div>
             </div>
 
@@ -4383,7 +4429,7 @@ function SettingsView({ gmailConfigured, hasDb, showToast }: any) {
 }
 
 // ---------- Buscar Leads ----------
-function SearchView({ workspace, leads = [], onImport, showToast }: any) {
+function SearchView({ workspace, leads = [], onImport, showToast, publicMode = false }: any) {
   const [tab, setTab] = useState('empresa');
   // Busca unificada por empresa
   const [query, setQuery] = useState('');
@@ -4522,16 +4568,17 @@ function SearchView({ workspace, leads = [], onImport, showToast }: any) {
       } else if (data.authentication?.healthy && data.peopleSearch?.tested) {
         showToast(`A chave autenticou, mas o People API Search foi recusado (HTTP ${data.peopleSearch.httpStatus}).`);
       } else {
-        showToast(data.message || 'Não foi possível validar a conexão Apollo. Confira se você está logado no CRM.');
+        showToast(data.message || 'Não foi possível validar a conexão Apollo. Tente novamente.');
       }
     } catch {
-      showToast('Falha ao testar Apollo. Confira sua sessão do CRM e tente novamente.');
+      showToast('Falha ao testar Apollo. Confira a conexão e tente novamente.');
     } finally {
       setTestingApollo(false);
     }
   };
 
   const realSearch = async () => {
+    if (publicMode) { showToast('Entre no CRM para pesquisar contatos Apollo.'); return; }
     const companies = companyList.split(/[,\n;]+/).map(c => c.trim()).filter(Boolean);
     const requestedQty = Number.parseInt(filters.qty, 10);
     const searchLimit = Math.min(Math.max(Number.isFinite(requestedQty) ? requestedQty : 10, 1), 30);
@@ -4646,6 +4693,28 @@ function SearchView({ workspace, leads = [], onImport, showToast }: any) {
     name: 'Ex: TOTVS, Grupo Alltech, Localfrio...',
     segment: 'Ex: transporte, logística, atacado, TMS, 4930...'
   };
+
+  if (publicMode) {
+    return (
+      <div>
+        <div className="page-header">
+          <div>
+            <div className="page-title">Conexão Apollo</div>
+            <div className="page-description">Verifique a autenticação da integração sem buscar ou exibir contatos.</div>
+          </div>
+        </div>
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 18, maxWidth: 680 }}>
+          <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, marginTop: 0 }}>
+            O teste consulta apenas o health check do Apollo. Para buscar perfis de pessoas é necessário entrar no CRM; revelar emails profissionais requer autorização separada de créditos.
+          </p>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button className="btn btn-primary" onClick={testApolloConnection} disabled={testingApollo}>{testingApollo ? 'Testando...' : 'Testar conexão Apollo'}</button>
+            <a href="/login?redirect=/" className="btn" style={{ textDecoration: 'none' }}>Entrar para buscar contatos</a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>

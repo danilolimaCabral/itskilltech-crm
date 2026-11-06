@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getLeads, upsertLead, deleteLead, hasDatabase } from '@/lib/db';
 import { sql } from '@vercel/postgres';
-import { resolveWorkspace } from '@/lib/auth';
+import { resolvePublicWorkspace } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +10,7 @@ export async function GET(req: Request) {
   if (!hasDatabase) return NextResponse.json({ hasDatabase: false, leads: [] });
   try {
     const { searchParams } = new URL(req.url);
-    const access = await resolveWorkspace(req, searchParams.get('workspace'));
+    const access = await resolvePublicWorkspace(req, searchParams.get('workspace'));
     if (!access.workspace) return NextResponse.json({ error: access.error }, { status: access.session ? 403 : 401 });
     const workspace = access.workspace;
     const leads = await getLeads(workspace);
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
   if (!hasDatabase) return NextResponse.json({ hasDatabase: false, ok: false });
   try {
     const lead = await req.json();
-    const access = await resolveWorkspace(req, lead.workspace);
+    const access = await resolvePublicWorkspace(req, lead.workspace);
     if (!access.workspace) return NextResponse.json({ ok: false, error: access.error }, { status: access.session ? 403 : 401 });
     lead.workspace = access.workspace;
     
@@ -37,6 +37,11 @@ export async function POST(req: Request) {
     // é prefixado para evitar colisões de slugs entre empresas diferentes.
     if (lead.workspace !== 'lottus' && !lead.id.startsWith(`${lead.workspace}--`)) {
       lead.id = `${lead.workspace}--${lead.id}`;
+    }
+
+    const { rows: idOwners } = await sql`SELECT workspace FROM leads WHERE id = ${lead.id} LIMIT 1;`;
+    if (idOwners.length > 0 && idOwners[0].workspace !== lead.workspace) {
+      return NextResponse.json({ ok: false, error: 'ID já pertence a outro workspace.' }, { status: 409 });
     }
 
     // ─── PROTEÇÃO E MESCLAGEM INTELIGENTE DE TIMELINE ───
@@ -120,7 +125,7 @@ export async function DELETE(req: Request) {
   if (!hasDatabase) return NextResponse.json({ hasDatabase: false, ok: false });
   try {
     const { searchParams } = new URL(req.url);
-    const access = await resolveWorkspace(req, searchParams.get('workspace'));
+    const access = await resolvePublicWorkspace(req, searchParams.get('workspace'));
     if (!access.workspace) return NextResponse.json({ ok: false, error: access.error }, { status: access.session ? 403 : 401 });
     const id = searchParams.get('id');
     if (id) await deleteLead(id, access.workspace);

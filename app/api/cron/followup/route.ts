@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getWorkspaces, getLeads } from '@/lib/db';
+import { getWorkspaces, getLeads, upsertLead } from '@/lib/db';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
@@ -11,11 +11,10 @@ export const maxDuration = 120;
 export async function GET(req: NextRequest) {
   const authHeader = req.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_URL || 'https://itskilltech-crm.vercel.app';
   const ZAPI_ID = process.env.ZAPI_INSTANCE_ID;
   const ZAPI_TOKEN = process.env.ZAPI_TOKEN;
   const zapiConfigured = !!(ZAPI_ID && ZAPI_TOKEN);
@@ -88,12 +87,8 @@ export async function GET(req: NextRequest) {
             const notesClean = (lead.notes || '').replace(/\[TIMELINE\][\s\S]*?\[\/TIMELINE\]/g, '').trim();
             const updatedNotes = notesClean + `\n[TIMELINE]${JSON.stringify(timeline)}[/TIMELINE]`;
 
-            // Atualizar lead via API
-            await fetch(`${baseUrl}/api/leads`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: lead.id, notes: updatedNotes, updated_at: Date.now() }),
-            });
+            // Atualizar o registro completo no banco após o follow-up autenticado.
+            await upsertLead({ ...lead, workspace: ws.id, notes: updatedNotes, updated_at: Date.now() });
 
             results.push({
               workspace: ws.id,

@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@vercel/postgres';
+import { hasDatabase } from '@/lib/db';
+import { resolvePublicWorkspace } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
+  if (!hasDatabase) return NextResponse.json({ success: false, error: 'no-database' }, { status: 400 });
+  const access = await resolvePublicWorkspace(req, req.nextUrl.searchParams.get('workspace'));
+  if (!access.workspace) return NextResponse.json({ success: false, error: access.error }, { status: access.session ? 403 : 404 });
+  const workspace = access.workspace;
   try {
     const { rows: leads } = await sql`
       SELECT id, name, company, email, notes, updated_at 
       FROM leads 
-      WHERE workspace = 'lottus'
+      WHERE workspace = ${workspace}
     `;
 
     const allEvents: any[] = [];

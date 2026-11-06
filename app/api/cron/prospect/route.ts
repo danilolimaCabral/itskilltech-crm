@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   // Verificar autenticação (Vercel envia CRON_SECRET automaticamente)
   const authHeader = req.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
       try {
         const res = await fetch(`${baseUrl}/api/auto-prospect`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cronSecret}` },
           body: JSON.stringify({
             workspace: ws.id,
             wsName: ws.name,
