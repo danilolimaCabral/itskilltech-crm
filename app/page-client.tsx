@@ -4400,7 +4400,7 @@ function SearchView({ workspace, leads = [], onImport, showToast }: any) {
   // Apollo
   const [selectedSegments, setSelectedSegments] = useState<string[]>(['alimentacao']);
   const [customSegment, setCustomSegment] = useState('');
-  const [filters, setFilters] = useState({ country: 'Brazil', department: 'logistica', level: 'todos', industry: '', qty: '25', requireEmail: true, autoImport: false });
+  const [filters, setFilters] = useState({ country: 'Brazil', department: 'logistica', level: 'todos', industry: '', qty: '10', requireEmail: true, autoImport: false });
   const [companyList, setCompanyList] = useState('');
 
   const AVAILABLE_SEGMENTS = [
@@ -4533,18 +4533,18 @@ function SearchView({ workspace, leads = [], onImport, showToast }: any) {
 
   const realSearch = async () => {
     const companies = companyList.split(/[,\n;]+/).map(c => c.trim()).filter(Boolean);
-    if (companies.length > 30) {
-      showToast('O limite é 30 empresas por busca. Separe a lista em lotes menores.');
-      return;
-    }
-
     const requestedQty = Number.parseInt(filters.qty, 10);
-    const creditCap = companies.length ? companies.length : Math.min(Number.isFinite(requestedQty) ? requestedQty : 10, 30);
+    const searchLimit = Math.min(Math.max(Number.isFinite(requestedQty) ? requestedQty : 10, 1), 30);
+    const companiesToSearch = companies.slice(0, searchLimit);
+    const creditCap = companies.length ? companiesToSearch.length : searchLimit;
+    const scopeNotice = companies.length > companiesToSearch.length
+      ? `Serão pesquisadas as primeiras ${companiesToSearch.length} de ${companies.length} empresas. `
+      : '';
     const importNotice = filters.autoImport
       ? 'Os resultados serão importados automaticamente no Kanban.'
       : 'Os resultados ficarão para revisão e não serão cadastrados automaticamente.';
     const approved = window.confirm(
-      `A busca de perfis do Apollo custa 0 créditos. Revelar emails profissionais pode consumir até ${creditCap} crédito(s), no máximo 1 por perfil, sem email pessoal, telefone ou waterfall. ${importNotice} Nenhum email será enviado. Continuar?`
+      `${scopeNotice}A busca de perfis do Apollo custa 0 créditos. Revelar emails profissionais pode consumir até ${creditCap} crédito(s), no máximo 1 por perfil, sem email pessoal, telefone ou waterfall. ${importNotice} Nenhum email será enviado. Continuar?`
     );
     if (!approved) return;
 
@@ -4552,9 +4552,9 @@ function SearchView({ workspace, leads = [], onImport, showToast }: any) {
     try {
       const segmentsToSearch = [...selectedSegments];
       if (customSegment.trim()) segmentsToSearch.push(customSegment.trim());
-      const basePayload = { ...filters, industry: segmentsToSearch.join(','), qty: companies.length ? '1' : filters.qty };
-      const payloads = companies.length
-        ? companies.map(company => ({ ...basePayload, company, maxCredits: 1 }))
+      const basePayload = { ...filters, industry: segmentsToSearch.join(','), qty: companiesToSearch.length ? '1' : filters.qty };
+      const payloads = companiesToSearch.length
+        ? companiesToSearch.map(company => ({ ...basePayload, company, maxCredits: 1 }))
         : [{ ...basePayload, maxCredits: creditCap }];
       const allLeads: any[] = [];
       const failures: string[] = [];
@@ -4836,7 +4836,7 @@ function SearchView({ workspace, leads = [], onImport, showToast }: any) {
               <div className="field"><label className="field-label">País</label><select className="field-select" value={filters.country} onChange={e => setFilters({ ...filters, country: e.target.value })}><option value="Brazil">Brasil</option><option value="United States">Estados Unidos</option><option value="Portugal">Portugal</option></select></div>
               <div className="field"><label className="field-label">Setor</label><select className="field-select" value={filters.department} onChange={e => setFilters({ ...filters, department: e.target.value })}><option value="ti">TI / Tecnologia</option><option value="operacoes">Operações</option><option value="logistica">Logística</option><option value="comercial">Comercial</option></select></div>
               <div className="field"><label className="field-label">Nível</label><select className="field-select" value={filters.level} onChange={e => setFilters({ ...filters, level: e.target.value })}><option value="todos">Todos os cargos</option><option value="decisores">C-level / Diretor</option><option value="donos">Donos / Fundadores</option><option value="gerencia">Gerência</option></select></div>
-              <div className="field"><label className="field-label">Qtd</label><select className="field-select" value={filters.qty} onChange={e => setFilters({ ...filters, qty: e.target.value })}><option>25</option><option>50</option><option>100</option></select></div>
+              <div className="field"><label className="field-label">Qtd</label><select className="field-select" value={filters.qty} onChange={e => setFilters({ ...filters, qty: e.target.value })}><option>10</option><option>20</option><option>30</option></select></div>
             </div>
             <div className="field" style={{ marginTop: 10 }}>
               <label className="field-label" style={{ marginBottom: 6 }}>Segmentos Alvo (Escolha um ou mais)</label>
