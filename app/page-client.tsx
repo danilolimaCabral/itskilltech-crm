@@ -4400,7 +4400,7 @@ function SearchView({ workspace, leads = [], onImport, showToast }: any) {
   // Apollo
   const [selectedSegments, setSelectedSegments] = useState<string[]>(['alimentacao']);
   const [customSegment, setCustomSegment] = useState('');
-  const [filters, setFilters] = useState({ country: 'Brasil', department: 'comercial', level: 'decisores', industry: '', qty: '25', requireEmail: true, requirePhone: true, autoImport: true });
+  const [filters, setFilters] = useState({ country: 'Brazil', department: 'logistica', level: 'todos', industry: '', qty: '25', requireEmail: true, autoImport: false });
   const [companyList, setCompanyList] = useState('');
 
   const AVAILABLE_SEGMENTS = [
@@ -4420,6 +4420,7 @@ function SearchView({ workspace, leads = [], onImport, showToast }: any) {
     );
   };
   const [searching, setSearching] = useState(false);
+  const [testingApollo, setTestingApollo] = useState(false);
   const [apolloResults, setApolloResults] = useState<any[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('apollo_results_cache');
@@ -4511,24 +4512,79 @@ function SearchView({ workspace, leads = [], onImport, showToast }: any) {
     setLoading(false);
   };
 
+  const testApolloConnection = async () => {
+    setTestingApollo(true);
+    try {
+      const response = await fetch('/api/prospect?health=1', { cache: 'no-store' });
+      const data = await response.json().catch(() => ({}));
+      if (data.authentication?.healthy && data.peopleSearch?.available) {
+        showToast('Apollo conectado: chave e People API Search funcionando. Teste sem créditos.');
+      } else if (data.authentication?.healthy && data.peopleSearch?.tested) {
+        showToast(`A chave autenticou, mas o People API Search foi recusado (HTTP ${data.peopleSearch.httpStatus}).`);
+      } else {
+        showToast(data.message || 'Não foi possível validar a conexão Apollo. Confira se você está logado no CRM.');
+      }
+    } catch {
+      showToast('Falha ao testar Apollo. Confira sua sessão do CRM e tente novamente.');
+    } finally {
+      setTestingApollo(false);
+    }
+  };
+
   const realSearch = async () => {
+    const companies = companyList.split(/[,\n;]+/).map(c => c.trim()).filter(Boolean);
+    if (companies.length > 30) {
+      showToast('O limite é 30 empresas por busca. Separe a lista em lotes menores.');
+      return;
+    }
+
+    const requestedQty = Number.parseInt(filters.qty, 10);
+    const creditCap = companies.length ? companies.length : Math.min(Number.isFinite(requestedQty) ? requestedQty : 10, 30);
+    const importNotice = filters.autoImport
+      ? 'Os resultados serão importados automaticamente no Kanban.'
+      : 'Os resultados ficarão para revisão e não serão cadastrados automaticamente.';
+    const approved = window.confirm(
+      `A busca de perfis do Apollo custa 0 créditos. Revelar emails profissionais pode consumir até ${creditCap} crédito(s), no máximo 1 por perfil, sem email pessoal, telefone ou waterfall. ${importNotice} Nenhum email será enviado. Continuar?`
+    );
+    if (!approved) return;
+
     setSearching(true);
     try {
-      const companies = companyList.split(/[,\n;]+/).map(c => c.trim()).filter(Boolean);
       const segmentsToSearch = [...selectedSegments];
       if (customSegment.trim()) segmentsToSearch.push(customSegment.trim());
       const basePayload = { ...filters, industry: segmentsToSearch.join(','), qty: companies.length ? '1' : filters.qty };
-      const payloads = companies.length ? companies.map(company => ({ ...basePayload, company })) : [basePayload];
+      const payloads = companies.length
+        ? companies.map(company => ({ ...basePayload, company, maxCredits: 1 }))
+        : [{ ...basePayload, maxCredits: creditCap }];
       const allLeads: any[] = [];
+      const failures: string[] = [];
+      const warnings: string[] = [];
       let totalCredits = 0;
+
       for (const payload of payloads) {
-        const r = await fetch('/api/prospect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        const j = await r.json();
-        if (!r.ok || !j.ok) throw new Error(j.error || 'Falha na busca');
-        allLeads.push(...(j.leads || []));
-        totalCredits += j.creditsUsed || 0;
+        try {
+          const response = await fetch('/api/prospect', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            cache: 'no-store',
+            body: JSON.stringify(payload),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.ok) {
+            failures.push(data.error || `Falha na busca (HTTP ${response.status}).`);
+            continue;
+          }
+          allLeads.push(...(data.leads || []));
+          totalCredits += Number(data.creditsUsed || 0);
+          if (data.warning) warnings.push(String(data.warning));
+        } catch {
+          failures.push('Falha de conexão com o CRM durante uma das buscas.');
+        }
       }
-      const newLeads = allLeads.filter((lead, index, list) => list.findIndex(other => (lead.email && other.email === lead.email) || lead.id === other.id) === index);
+
+      const newLeads = allLeads.filter((lead, index, list) =>
+        list.findIndex(other => (lead.email && other.email === lead.email) || lead.id === other.id) === index
+      );
       setApolloResults(prev => {
         const merged = [...newLeads];
         prev.forEach(oldLead => {
@@ -4541,12 +4597,22 @@ function SearchView({ workspace, leads = [], onImport, showToast }: any) {
         localStorage.setItem('apollo_meta_cache', JSON.stringify(updated));
         return updated;
       });
-      if (filters.autoImport && newLeads.length > 0) {
-        await onImport(newLeads);
-        showToast(`⚡ ${newLeads.length} leads importados automaticamente para o Kanban!`);
-      } else showToast(`${newLeads.length} leads adicionados ao histórico de busca!`);
-    } catch (error: any) { showToast('Busca: ' + (error.message || 'falhou')); }
-    setSearching(false);
+
+      if (filters.autoImport && newLeads.length > 0) await onImport(newLeads);
+      if (failures.length > 0 && newLeads.length === 0) {
+        showToast(`Busca Apollo: ${failures[0]}`);
+      } else if (failures.length > 0 || warnings.length > 0) {
+        showToast(`${newLeads.length} contato(s) encontrado(s); ${failures.length + warnings.length} busca(s) precisam de atenção.`);
+      } else if (filters.autoImport && newLeads.length > 0) {
+        showToast(`${newLeads.length} contato(s) importado(s) no Kanban.`);
+      } else {
+        showToast(`${newLeads.length} contato(s) com email profissional adicionado(s) ao histórico.`);
+      }
+    } catch (error: any) {
+      showToast('Busca Apollo: ' + (error.message || 'falhou'));
+    } finally {
+      setSearching(false);
+    }
   };
 
   const clearApolloHistory = () => {
@@ -4767,9 +4833,9 @@ function SearchView({ workspace, leads = [], onImport, showToast }: any) {
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 5 }}>Quando preenchida, o CRM pesquisa cada empresa e prioriza os cargos definidos abaixo.</div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <div className="field"><label className="field-label">País</label><select className="field-select" value={filters.country} onChange={e => setFilters({ ...filters, country: e.target.value })}><option>Brasil</option><option>Estados Unidos</option><option>Portugal</option></select></div>
+              <div className="field"><label className="field-label">País</label><select className="field-select" value={filters.country} onChange={e => setFilters({ ...filters, country: e.target.value })}><option value="Brazil">Brasil</option><option value="United States">Estados Unidos</option><option value="Portugal">Portugal</option></select></div>
               <div className="field"><label className="field-label">Setor</label><select className="field-select" value={filters.department} onChange={e => setFilters({ ...filters, department: e.target.value })}><option value="ti">TI / Tecnologia</option><option value="operacoes">Operações</option><option value="logistica">Logística</option><option value="comercial">Comercial</option></select></div>
-              <div className="field"><label className="field-label">Nível</label><select className="field-select" value={filters.level} onChange={e => setFilters({ ...filters, level: e.target.value })}><option value="decisores">C-level / Diretor</option><option value="donos">Donos / Fundadores</option><option value="gerencia">Gerência</option></select></div>
+              <div className="field"><label className="field-label">Nível</label><select className="field-select" value={filters.level} onChange={e => setFilters({ ...filters, level: e.target.value })}><option value="todos">Todos os cargos</option><option value="decisores">C-level / Diretor</option><option value="donos">Donos / Fundadores</option><option value="gerencia">Gerência</option></select></div>
               <div className="field"><label className="field-label">Qtd</label><select className="field-select" value={filters.qty} onChange={e => setFilters({ ...filters, qty: e.target.value })}><option>25</option><option>50</option><option>100</option></select></div>
             </div>
             <div className="field" style={{ marginTop: 10 }}>
@@ -4802,19 +4868,26 @@ function SearchView({ workspace, leads = [], onImport, showToast }: any) {
                 <input type="checkbox" checked={filters.requireEmail} onChange={e => setFilters({ ...filters, requireEmail: e.target.checked })} style={{ width: 16, height: 16 }} />
                 ✉️ Exigir e-mail verificado
               </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                <input type="checkbox" checked={filters.requirePhone} onChange={e => setFilters({ ...filters, requirePhone: e.target.checked })} style={{ width: 16, height: 16 }} />
-                📱 Exigir celular / telefone
-              </label>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>
+                Email profissional apenas; telefone desativado
+              </span>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', color: 'var(--primary)' }}>
                 <input type="checkbox" checked={filters.autoImport} onChange={e => setFilters({ ...filters, autoImport: e.target.checked })} style={{ width: 16, height: 16 }} />
                 ⚡ Jogar automático no Kanban (Leads Novos)
               </label>
             </div>
 
-            <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 14 }} onClick={realSearch} disabled={searching}>
-              <Icon d={ICONS.search2} />{searching ? 'Buscando...' : 'Buscar via Apollo.io'}
-            </button>
+            <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+              <button className="btn" style={{ flex: 1, justifyContent: 'center' }} onClick={testApolloConnection} disabled={testingApollo || searching}>
+                {testingApollo ? 'Testando...' : 'Testar conexão'}
+              </button>
+              <button className="btn btn-primary" style={{ flex: 2, justifyContent: 'center' }} onClick={realSearch} disabled={searching || testingApollo}>
+                <Icon d={ICONS.search2} />{searching ? 'Buscando...' : 'Buscar via Apollo.io'}
+              </button>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, textAlign: 'center' }}>
+              Testar conexão e People Search não consome créditos nem revela contatos.
+            </div>
           </div>
           {/* Contador de Créditos do Apollo */}
           <div style={{ display: 'flex', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
