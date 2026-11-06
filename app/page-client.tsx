@@ -446,6 +446,7 @@ export default function CRM() {
   };
 
   const removeLead = async (id: string, skipConfirm?: boolean) => {
+    if (isPublic) { showToast('Exclusão de leads exige login master.'); return; }
     if (!skipConfirm && !confirm('Excluir este lead?')) return;
     if (hasDb) { await fetch(`/api/leads?id=${encodeURIComponent(id)}&workspace=${encodeURIComponent(workspace)}`, { method: 'DELETE' }); await loadLeads(); }
     else { const next = leads.filter(l => l.id !== id); setLeads(next); persistLocal(next); }
@@ -941,7 +942,7 @@ export default function CRM() {
         {isPublic && (
           <div style={{ margin: '10px 14px', padding: '10px 12px', borderRadius: 8, background: '#fffbeb', border: '1px solid #fde68a', color: '#78350f', fontSize: 11, lineHeight: 1.45 }}>
             <strong>Acesso público</strong>
-            <div>Somente leads e propostas do workspace Lottus ficam visíveis e editáveis. Envio de email, integrações, busca de pessoas e enrichment exigem login.</div>
+            <div>Somente leads e propostas de Lottus são públicos. Criação/edição é permitida; exclusão, envios, integrações, busca de pessoas e administração exigem login master.</div>
             <a href="/login?redirect=/" style={{ display: 'inline-block', marginTop: 6, color: '#1d4ed8', fontWeight: 700 }}>Entrar</a>
           </div>
         )}
@@ -1014,7 +1015,7 @@ export default function CRM() {
               <div className="page-header">
                 <div><div className="page-title">Leads</div><div className="page-description">{ws?.name} · {leads.length} contato(s)</div></div>
                 <div className="page-actions mobile-actions desktop-only-flex">
-                  <button className="btn" style={{background:'#f59e0b',color:'#fff',border:'none',marginRight:8,fontSize:12,padding:'6px 12px',borderRadius:6,cursor:'pointer',opacity:enrichingAll?0.6:1}} disabled={enrichingAll} onClick={async () => {
+                  <button className="btn" hidden={true} style={{background:'#f59e0b',color:'#fff',border:'none',marginRight:8,fontSize:12,padding:'6px 12px',borderRadius:6,cursor:'pointer',opacity:enrichingAll?0.6:1}} disabled={enrichingAll} onClick={async () => {
                     const toEnrich = leads.filter(l => !l.phone && l.company);
                     if (!toEnrich.length) { showToast('Todos os leads já têm telefone!'); return; }
                     setEnrichingAll(true);
@@ -1053,7 +1054,7 @@ export default function CRM() {
                   }}>
                     {enrichingAll ? `⚙ Enriquecendo... ${enrichProgress.done}/${enrichProgress.total}` : '⚙ Enriquecer todos'}
                   </button>
-                  <button className="btn" style={{background:'#ef4444',color:'#fff',border:'none',marginRight:8,fontSize:12,padding:'6px 12px',borderRadius:6,cursor:'pointer'}} onClick={async () => {
+                  <button className="btn" hidden={isPublic} style={{background:'#ef4444',color:'#fff',border:'none',marginRight:8,fontSize:12,padding:'6px 12px',borderRadius:6,cursor:'pointer'}} onClick={async () => {
                     const seen = new Map<string, string>();
                     const toDelete: string[] = [];
                     for (const l of [...leads].sort((a,b) => (a.updated_at||0)-(b.updated_at||0))) {
@@ -1066,7 +1067,7 @@ export default function CRM() {
                     for (const id of toDelete) await removeLead(id, true);
                     showToast(`✓ ${toDelete.length} duplicado(s) removido(s)`);
                   }}>🗑 Deduplicar</button>
-                  <button className="btn" style={{background:'#0066ff',color:'#fff',border:'none',marginRight:8,fontSize:12,padding:'6px 12px',borderRadius:6,cursor:'pointer',fontWeight:600}} onClick={() => { setCnpjInput(''); setCnpjResult(null); setCnpjModalOpen(true); }}>🔢 Prospectar CNPJ</button>
+                  <button className="btn" hidden={isPublic} style={{background:'#0066ff',color:'#fff',border:'none',marginRight:8,fontSize:12,padding:'6px 12px',borderRadius:6,cursor:'pointer',fontWeight:600}} onClick={() => { setCnpjInput(''); setCnpjResult(null); setCnpjModalOpen(true); }}>🔢 Prospectar CNPJ</button>
                   <button className="btn btn-primary" onClick={() => { setEditing(null); setModalOpen(true); }}><Icon d={ICONS.plus} />Novo lead</button>
                 </div>
               </div>
@@ -1087,7 +1088,7 @@ export default function CRM() {
                   </div>
 
                   {/* Card de Reuniões */}
-                  <div className="stat-funnel" 
+                  <div className="stat-funnel" hidden={isPublic}
                     style={{ '--stat-accent': '#0066ff' } as any} 
                     onClick={() => setView('calendar_view')}>
                     <div className="stat-funnel-label">
@@ -1117,7 +1118,7 @@ export default function CRM() {
                 </div>
               </div>
               {/* Prospecção de hoje com metas (Oculto no mobile na aba de leads para focar na lista de leads) */}
-              <div className="desktop-only-block" style={{ margin: '8px 0', padding: '16px 18px', background: 'var(--surface)', borderRadius: 14, border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
+              <div className="desktop-only-block" hidden={isPublic} style={{ margin: '8px 0', padding: '16px 18px', background: 'var(--surface)', borderRadius: 14, border: '1px solid var(--border)', boxShadow: 'var(--shadow-card)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)' }}>📊 Prospecção de Hoje</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1157,7 +1158,7 @@ export default function CRM() {
                 </div>
               </div>
               {/* Painel de alertas de retorno (Oculto no mobile na aba de leads para focar na lista de leads) */}
-              {pendingAlerts.length > 0 && (
+              {pendingAlerts.length > 0 && !isPublic && (
                 <div className="desktop-only-block" style={{ margin: '8px 0', padding: '12px 14px', background: overdueAlerts.length > 0 ? '#fff7ed' : '#fffbeb', borderRadius: 10, border: `1px solid ${overdueAlerts.length > 0 ? '#f97316' : '#f59e0b'}55` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <span style={{ fontSize: 14 }}>🔔</span>
@@ -1371,7 +1372,7 @@ export default function CRM() {
                 </div>
 
                 {/* Botões de seleção em massa */}
-                {filtered.length > 0 && (
+                {filtered.length > 0 && !isPublic && (
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
                     <button className="btn btn-sm" style={{ fontSize: 11, padding: '5px 10px' }}
                       onClick={() => {
@@ -1435,10 +1436,10 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                 <div className="empty-state"><div className="empty-title">Nenhum lead</div><div className="empty-text">Adicione seu primeiro contato</div><button className="btn btn-primary" onClick={() => { setEditing(null); setModalOpen(true); }}><Icon d={ICONS.plus} />Adicionar lead</button></div>
               ) : (
                 <>
-                <div className="table-wrap table-wrap-leads"><table className="data"><thead><tr><th style={{width:32, paddingRight:4}}></th><th>Lead</th><th>Contato</th><th>Status</th><th style={{ textAlign: 'right' }}>Ações</th></tr></thead><tbody>
+                <div className="table-wrap table-wrap-leads"><table className="data"><thead><tr><th hidden={isPublic} style={{width:32, paddingRight:4}}></th><th>Lead</th><th>Contato</th><th>Status</th><th style={{ textAlign: 'right' }}>Ações</th></tr></thead><tbody>
                   {filtered.map(lead => (
                     <tr key={lead.id} onClick={() => { setLeadPanel(lead); setPanelAnalysis(null); setPanelTab('info'); }}>
-                      <td onClick={e => e.stopPropagation()} style={{paddingRight:4, width:32}}>
+                      <td hidden={isPublic} onClick={e => e.stopPropagation()} style={{paddingRight:4, width:32}}>
                         <input type="checkbox" checked={selectedIds.has(lead.id)} onChange={e => { e.stopPropagation(); setSelectedIds(prev => { const n = new Set(prev); if (e.target.checked) n.add(lead.id); else n.delete(lead.id); return n; }); }} style={{width:15,height:15,cursor:'pointer',accentColor:'#0066ff'}} />
                       </td>
 	                      <td>
@@ -1550,9 +1551,9 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                       <td>{
                         (() => { const f = FUNNEL_MAP[normalizeStatus(lead.status)]; return f ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: f.bg, color: f.color, border: `1px solid ${f.color}33`, whiteSpace: 'nowrap' }}><span style={{ width: 6, height: 6, borderRadius: '50%', background: f.color, flexShrink: 0 }} />{f.short}</span> : <span className={`badge badge-${lead.status}`}>{statusLabel(lead.status)}</span>; })()
                       }</td>
-                      <td onClick={e => e.stopPropagation()}><div className="channel-icons">
+                      <td onClick={e => e.stopPropagation()}><div className="channel-icons" hidden={isPublic}>
                         {/* Enriquecer com Apollo */}
-                        <button className="ch-icon" title="Enriquecer com Apollo.io (telefone, e-mail, decisor)" style={{color: enriching === lead.id ? '#f59e0b' : undefined, opacity: enriching === lead.id ? 0.6 : 1}} disabled={!!enriching} onClick={() => enrichLead(lead)}>
+                        <button className="ch-icon" hidden={true} title="Enrichment legado indisponível; use Buscar Leads > Apollo com teto de créditos" style={{color: enriching === lead.id ? '#f59e0b' : undefined, opacity: enriching === lead.id ? 0.6 : 1}} disabled={!!enriching} onClick={() => enrichLead(lead)}>
                           <Icon d={ICONS.enrich} />
                         </button>
                         {/* Agendar reunião */}
@@ -1613,7 +1614,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                   return (
                     <div key={lead.id} className={`lead-card lead-card-${statusNormalized}`} onClick={() => { setLeadPanel(lead); setPanelAnalysis(null); setPanelTab('timeline'); }}>
                       <div className="lead-card-header">
-                        <div className="lead-card-check" onClick={e => e.stopPropagation()}>
+                        <div className="lead-card-check" hidden={isPublic} onClick={e => e.stopPropagation()}>
                           <input type="checkbox" checked={selectedIds.has(lead.id)} onChange={e => { const s = new Set(selectedIds); e.target.checked ? s.add(lead.id) : s.delete(lead.id); setSelectedIds(s); }} style={{ width: 16, height: 16, cursor: 'pointer' }} />
                         </div>
                         <div className="lead-card-info">
@@ -1698,8 +1699,8 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                           </span>
                         )}
                       </div>
-                      <div className="lead-card-actions" onClick={e => e.stopPropagation()}>
-                        <button className="ch-icon enrich-btn" title="Enriquecer" disabled={!!enriching} onClick={() => enrichLead(lead)}><Icon d={ICONS.enrich} /></button>
+                      <div className="lead-card-actions" hidden={isPublic} onClick={e => e.stopPropagation()}>
+                        <button className="ch-icon enrich-btn" hidden={true} title="Enrichment legado indisponível; use Buscar Leads > Apollo com teto de créditos" disabled={!!enriching} onClick={() => enrichLead(lead)}><Icon d={ICONS.enrich} /></button>
                         <button className="ch-icon" title="Agendar" style={{color:'#0066ff'}} onClick={() => { setCalModal(lead); setCalGuestEmail(lead.email || ''); setCalTitle(`Reunião com ${lead.name}`); setCalDescription(''); setCalDate(new Date().toISOString().slice(0,10)); setCalSlots([]); setCalSelectedSlot(''); }}><Icon d={ICONS.calendar} /></button>
                         <button className="ch-icon phone-btn" title="Ligar" onClick={() => openCallModal(lead)}><Icon d={ICONS.phone} /></button>
                         <button className="ch-icon email-btn" title="E-mail" onClick={() => openEmailModal(lead)}><Icon d={ICONS.email} /></button>
@@ -1740,7 +1741,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
               setCallNotes={setCallNotes}
             />
           )}
-          {view === 'search' && <SearchView workspace={workspace} leads={leads} publicMode={isPublic} onImport={async (newLeads: any[]) => {
+          {view === 'search' && <SearchView workspace={workspace} leads={leads} publicMode={isPublic} canUseApollo={isMaster} onImport={async (newLeads: any[]) => {
             const now = Date.now();
             for (const nl of newLeads) {
               await saveLead({ id: nl.id || uid(), workspace, name: nl.name, company: nl.company || '', role: nl.role || '', email: nl.email || '', whatsapp: cleanPhone(nl.whatsapp || nl.phone || ''), linkedin: nl.linkedin || '', phone: nl.phone || '', source: nl.source || 'Prospecção', notes: '', status: 'novo', created_at: now, updated_at: now } as Lead);
@@ -1755,7 +1756,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
           {view === 'bi' && <BIView workspace={workspace} leads={leads} />}
           {view === 'sheets' && <SheetsView workspace={workspace} workspaceName={ws?.name} onImport={(newLeads: any[]) => { setLeads(prev => { const ids = new Set(prev.map((l:any)=>l.id)); const fresh = newLeads.filter((l:any)=>!ids.has(l.id)); return [...fresh,...prev]; }); showToast(newLeads.length + ' lead(s) importado(s) do Sheets'); }} showToast={showToast} />}
           {view === 'settings' && <SettingsView gmailConfigured={gmailConfigured} hasDb={hasDb} showToast={showToast} />}
-          {view === 'calendar_view' && <CalendarView meetings={allMeetings} leads={leads} onOpenLead={(lead: any) => { setLeadPanel(lead); setPanelTab('timeline'); }} onSchedule={(dateStr?: string) => { const firstLead = leads[0]; if (firstLead) { setCalModal(firstLead); setCalGuestEmail(firstLead.email || ''); setCalTitle(`Reunião com ${firstLead.name} — ${firstLead.company || ''}`); setCalDescription(''); setCalDate(dateStr || new Date().toISOString().slice(0,10)); setCalSlots([]); setCalSelectedSlot(''); } else { showToast('Adicione um lead primeiro para agendar uma reunião.'); } }} />}
+          {view === 'calendar_view' && !isPublic && <CalendarView meetings={allMeetings} leads={leads} onOpenLead={(lead: any) => { setLeadPanel(lead); setPanelTab('timeline'); }} onSchedule={(dateStr?: string) => { const firstLead = leads[0]; if (firstLead) { setCalModal(firstLead); setCalGuestEmail(firstLead.email || ''); setCalTitle(`Reunião com ${firstLead.name} — ${firstLead.company || ''}`); setCalDescription(''); setCalDate(dateStr || new Date().toISOString().slice(0,10)); setCalSlots([]); setCalSelectedSlot(''); } else { showToast('Adicione um lead primeiro para agendar uma reunião.'); } }} />}
         </div></div>
       </div>
 
@@ -1910,7 +1911,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0, marginLeft: 10 }}>
                   <button className="btn btn-sm" title="Editar lead" onClick={() => { setEditing(leadPanel); setModalOpen(true); }}><Icon d={ICONS.edit} /></button>
-                  <button className="btn btn-sm" title="Excluir lead" style={{ color: '#ef4444', borderColor: '#ef4444' }} onClick={async () => { if (confirm(`Excluir "${leadPanel.name}"? Esta ação não pode ser desfeita.`)) { await removeLead(leadPanel.id, true); setLeadPanel(null); } }}><Icon d={ICONS.trash} /></button>
+                  {!isPublic && <button className="btn btn-sm" title="Excluir lead" style={{ color: '#ef4444', borderColor: '#ef4444' }} onClick={async () => { if (confirm(`Excluir "${leadPanel.name}"? Esta ação não pode ser desfeita.`)) { await removeLead(leadPanel.id, true); setLeadPanel(null); } }}><Icon d={ICONS.trash} /></button>}
                   <button className="modal-close" onClick={() => setLeadPanel(null)} style={{ position: 'static', fontSize: 20, width: 32, height: 32 }}>×</button>
                 </div>
               </div>
@@ -1930,7 +1931,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
             </div>
             {/* Abas do painel */}
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
-              {([['info','Dados'],['timeline','Histórico'],['analysis','Análise IA'],['proposta','Proposta']] as const).map(([t, lbl]) => (
+              {([['info','Dados'],['timeline','Histórico'],['analysis','Análise IA'],['proposta','Proposta']] as const).filter(([t]) => !isPublic || t !== 'analysis').map(([t, lbl]) => (
                 <button key={t} onClick={() => { setPanelTab(t); if (t === 'analysis' && !panelAnalysis && !analyzingLead) analyzeCompany(leadPanel); }}
                   style={{ flex: 1, padding: '10px 4px', fontSize: 12, fontWeight: panelTab === t ? 700 : 400, borderBottom: panelTab === t ? '2px solid var(--primary)' : '2px solid transparent', background: 'none', cursor: 'pointer', color: panelTab === t ? 'var(--primary)' : 'var(--text-muted)', transition: 'all .15s' }}>
                   {lbl}
@@ -1966,7 +1967,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                     );
                   })()}
                   {/* Ações rápidas */}
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                  <div hidden={isPublic} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
                     {(leadPanel.phone || leadPanel.whatsapp) && <button className="btn btn-sm" onClick={() => { const num = cleanPhone(leadPanel.phone || leadPanel.whatsapp || ''); const name = encodeURIComponent(leadPanel.name || ''); const lid = encodeURIComponent(leadPanel.id || ''); window.open(`/phone/index.html?call=${num}&lead=${lid}&name=${name}`, 'softphone', 'width=480,height=700,resizable=yes'); }}><Icon d={ICONS.phone} />Ligar</button>}
                     {(leadPanel.whatsapp || leadPanel.phone) && <button className="btn btn-sm" style={{ background: '#25d366', color: '#fff', border: 'none' }} onClick={() => { const num = cleanPhone(leadPanel.whatsapp || leadPanel.phone || ''); if (num) window.open(`https://wa.me/${num}`, '_blank'); }}><Icon d={ICONS.whatsapp} />WhatsApp</button>}
                     {leadPanel.email && <button className="btn btn-sm" onClick={() => openEmailModal(leadPanel)}><Icon d={ICONS.email} />E-mail</button>}
@@ -2003,7 +2004,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                   </div>
                 );
               })()}
-              {panelTab === 'analysis' && (
+              {panelTab === 'analysis' && !isPublic && (
                 analyzingLead ? (
                   <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
                     <div style={{ width: 36, height: 36, border: '3px solid var(--border)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
@@ -2088,7 +2089,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
                                   {q.total ? Number(q.total).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Valor sob consulta'}
                                 </strong>
                               </div>
-                              <button className="btn btn-sm" style={{ color: '#ef4444', borderColor: '#ef4444', padding: '2px 6px', fontSize: 11 }} onClick={async () => { if (confirm('Excluir esta proposta permanente?')) { await fetch(`/api/quotes?id=${encodeURIComponent(q.id)}&workspace=${encodeURIComponent(workspace)}`, { method: 'DELETE' }); loadQuotes(); } }}>Excluir</button>
+                              {!isPublic && <button className="btn btn-sm" style={{ color: '#ef4444', borderColor: '#ef4444', padding: '2px 6px', fontSize: 11 }} onClick={async () => { if (confirm('Excluir esta proposta permanente?')) { await fetch(`/api/quotes?id=${encodeURIComponent(q.id)}&workspace=${encodeURIComponent(workspace)}`, { method: 'DELETE' }); loadQuotes(); } }}>Excluir</button>}
                             </div>
                             {/* Itens internos da proposta */}
                             {q.items && q.items.length > 0 && (
@@ -2129,7 +2130,7 @@ Qualquer dúvida, pode me chamar aqui ou pelo (41) 99949-9815.`);
       )}
 
       {/* Modal de Lead */}
-      {modalOpen && <LeadModal lead={editing} workspace={workspace} onClose={() => setModalOpen(false)} onSave={async (l: Lead) => { await saveLead(l); setModalOpen(false); if (leadPanel && editing?.id === leadPanel.id) setLeadPanel(l); showToast(editing ? 'Lead atualizado' : 'Lead criado'); }} onDelete={editing ? async () => { await removeLead(editing.id); setModalOpen(false); setLeadPanel(null); } : undefined} />}
+      {modalOpen && <LeadModal lead={editing} workspace={workspace} onClose={() => setModalOpen(false)} onSave={async (l: Lead) => { await saveLead(l); setModalOpen(false); if (leadPanel && editing?.id === leadPanel.id) setLeadPanel(l); showToast(editing ? 'Lead atualizado' : 'Lead criado'); }} onDelete={editing && !isPublic ? async () => { await removeLead(editing.id); setModalOpen(false); setLeadPanel(null); } : undefined} />}
 
       {/* Modal de Ligação */}
       {callModal && !isPublic && (
@@ -4429,7 +4430,7 @@ function SettingsView({ gmailConfigured, hasDb, showToast }: any) {
 }
 
 // ---------- Buscar Leads ----------
-function SearchView({ workspace, leads = [], onImport, showToast, publicMode = false }: any) {
+function SearchView({ workspace, leads = [], onImport, showToast, publicMode = false, canUseApollo = true }: any) {
   const [tab, setTab] = useState('empresa');
   // Busca unificada por empresa
   const [query, setQuery] = useState('');
@@ -4578,7 +4579,7 @@ function SearchView({ workspace, leads = [], onImport, showToast, publicMode = f
   };
 
   const realSearch = async () => {
-    if (publicMode) { showToast('Entre no CRM para pesquisar contatos Apollo.'); return; }
+    if (publicMode || !canUseApollo) { showToast('Busca e enrichment Apollo exigem perfil master.'); return; }
     const companies = companyList.split(/[,\n;]+/).map(c => c.trim()).filter(Boolean);
     const requestedQty = Number.parseInt(filters.qty, 10);
     const searchLimit = Math.min(Math.max(Number.isFinite(requestedQty) ? requestedQty : 10, 1), 30);
@@ -4728,7 +4729,7 @@ function SearchView({ workspace, leads = [], onImport, showToast, publicMode = f
       {/* Abas */}
       <div className="filter-group" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
         <button className={`filter-tab${tab === 'empresa' ? ' active' : ''}`} onClick={() => setTab('empresa')} style={{ fontWeight: 700 }}>🔍 Buscar empresa</button>
-        <button className={`filter-tab${tab === 'apollo' ? ' active' : ''}`} onClick={() => setTab('apollo')}>Apollo.io</button>
+        <button className={`filter-tab${tab === 'apollo' ? ' active' : ''}`} disabled={!canUseApollo} title={!canUseApollo ? 'Apenas perfil master pode pesquisar no Apollo' : undefined} onClick={() => setTab('apollo')}>Apollo.io</button>
         <button className={`filter-tab${tab === 'importar' ? ' active' : ''}`} onClick={() => setTab('importar')}>Importar planilha</button>
       </div>
 
@@ -4893,7 +4894,7 @@ function SearchView({ workspace, leads = [], onImport, showToast, publicMode = f
       )}
 
       {/* ── Aba Apollo.io ── */}
-      {tab === 'apollo' && (
+      {tab === 'apollo' && canUseApollo && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div className="table-wrap" style={{ padding: 16 }}>
             <div className="field" style={{ marginBottom: 12 }}>

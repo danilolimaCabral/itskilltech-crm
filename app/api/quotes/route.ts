@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@vercel/postgres';
 import { getQuotes, upsertQuote, deleteQuote } from '@/lib/db';
-import { resolvePublicWorkspace } from '@/lib/auth';
+import { resolvePublicWorkspace, resolveWorkspace } from '@/lib/auth';
 export const dynamic = 'force-dynamic';
 
 const uid = () => 'qt_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
@@ -59,8 +59,9 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const access = await resolvePublicWorkspace(req, searchParams.get('workspace'));
+    const access = await resolveWorkspace(req, searchParams.get('workspace'));
     if (!access.workspace) return NextResponse.json({ error: access.error }, { status: access.session ? 403 : 401 });
+    if (access.session?.role !== 'master') return NextResponse.json({ error: 'Exclusão exige perfil master.' }, { status: 403 });
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'id obrigatório' }, { status: 400 });
     await deleteQuote(id, access.workspace);

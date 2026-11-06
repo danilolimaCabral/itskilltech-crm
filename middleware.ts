@@ -19,8 +19,8 @@ const PUBLIC_PATHS = [
 
 // Acesso anônimo limitado a dados de CRM; integrações, envios e custos ficam privados.
 const PUBLIC_DATA_METHODS: Record<string, readonly string[]> = {
-  '/api/leads': ['GET', 'POST', 'DELETE'],
-  '/api/quotes': ['GET', 'POST', 'DELETE'],
+  '/api/leads': ['GET', 'POST'],
+  '/api/quotes': ['GET', 'POST'],
   '/api/get-real-activities': ['GET'],
   '/api/stats': ['GET'],
 };

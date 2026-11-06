@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getLeads, upsertLead, deleteLead, hasDatabase } from '@/lib/db';
 import { sql } from '@vercel/postgres';
-import { resolvePublicWorkspace } from '@/lib/auth';
+import { resolvePublicWorkspace, resolveWorkspace } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -125,8 +125,9 @@ export async function DELETE(req: Request) {
   if (!hasDatabase) return NextResponse.json({ hasDatabase: false, ok: false });
   try {
     const { searchParams } = new URL(req.url);
-    const access = await resolvePublicWorkspace(req, searchParams.get('workspace'));
+    const access = await resolveWorkspace(req, searchParams.get('workspace'));
     if (!access.workspace) return NextResponse.json({ ok: false, error: access.error }, { status: access.session ? 403 : 401 });
+    if (access.session?.role !== 'master') return NextResponse.json({ ok: false, error: 'Exclusão exige perfil master.' }, { status: 403 });
     const id = searchParams.get('id');
     if (id) await deleteLead(id, access.workspace);
     return NextResponse.json({ ok: true });
